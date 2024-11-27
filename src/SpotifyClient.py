@@ -1,6 +1,7 @@
 import spotipy
+from spotify.Track import Track
 from spotipy.oauth2 import SpotifyOAuth
-from typing import Optional
+from typing import List, Optional
 
 CLIENT_ID = "e1ee69e65fb241a29c6a46e856a5e64e"
 CLIENT_SECRET = "affb3816f14346ae8298f9284e772b02"
@@ -21,15 +22,14 @@ class SpotifyClient:
             )
         )
 
-    def gen_upsert_most_recent_tracks(self, after: Optional[int] = None):
+    def gen_most_recent_tracks(self, after: Optional[int] = None) -> List[Track]:
         res = self.client.current_user_recently_played(limit=MAXIMUM_RECENT_TRACKS, after=after)
         if not res:
             raise Exception("No recents found")
 
-        recents = res["items"]
-        if len(recents) >= MAXIMUM_RECENT_TRACKS:
+        recent_tracks = res["items"]
+        if len(recent_tracks) >= MAXIMUM_RECENT_TRACKS:
             ## TODO: handle likely missing data
             pass
 
-        for recent in recents:
-            print(recent["track"]["name"])
+        return [Track.from_dict(track["track"]) for track in recent_tracks]

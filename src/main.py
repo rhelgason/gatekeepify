@@ -6,7 +6,8 @@ db = Database()
 
 # get most recent tracks from spotify API
 client = SpotifyClient()
-client.gen_upsert_most_recent_tracks()
+recent_tracks = client.gen_most_recent_tracks()
+print(f"Got {len(recent_tracks)} recent tracks from Spotify API.")
 
 db.close()
 print("Done.")
