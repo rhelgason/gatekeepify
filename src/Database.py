@@ -1,8 +1,8 @@
 import os
 import sqlite3
 from datetime import datetime
-from spotify.types import Track
-from typing import Dict
+from spotify.types import Track, User
+from typing import Dict, List
 
 DB_DIRECTORY = "db"
 DB_NAME = "database.db"
@@ -21,23 +21,38 @@ class Database:
         path = os.path.join(DB_DIRECTORY, db_name)
         self.conn = sqlite3.connect(path)
         self.cursor = self.conn.cursor()
-        self.__create_tables()
+        self.__create_all_tables()
 
-    def __create_tables(self):
+    """
+    METHODS FOR CREATING ALL TABLES
+    """
+    def __create_all_tables(self):
+        self.__create_dim_all_albums()
         self.__create_dim_all_tracks()
         self.__create_dim_all_artists()
-        self.__create_dim_all_albums()
         self.__create_track_to_artist()
         self.__create_dim_all_users()
         self.__create_dim_all_listens()
+
+    # table for storing information about every album
+    def __create_dim_all_albums(self):
+        query = """
+        CREATE TABLE IF NOT EXISTS dim_all_albums (
+            album_id VARCHAR(255) PRIMARY KEY,
+            album_name VARCHAR(255)
+        )
+        """
+        self.cursor.execute(query)
+        self.conn.commit()
 
     # table for storing information about every track
     def __create_dim_all_tracks(self):
         query = """
         CREATE TABLE IF NOT EXISTS dim_all_tracks (
-            track_id VARCHAR(255),
+            track_id VARCHAR(255) PRIMARY KEY,
             track_name VARCHAR(255),
-            album_id VARCHAR(255)
+            album_id VARCHAR(255),
+            FOREIGN KEY(album_id) REFERENCES dim_all_albums(album_id)
         )
         """
         self.cursor.execute(query)
@@ -47,19 +62,8 @@ class Database:
     def __create_dim_all_artists(self):
         query = """
         CREATE TABLE IF NOT EXISTS dim_all_artists (
-            artist_id VARCHAR(255),
+            artist_id VARCHAR(255) PRIMARY KEY,
             artist_name VARCHAR(255)
-        )
-        """
-        self.cursor.execute(query)
-        self.conn.commit()
-
-    # table for storing information about every album
-    def __create_dim_all_albums(self):
-        query = """
-        CREATE TABLE IF NOT EXISTS dim_all_albums (
-            album_id VARCHAR(255),
-            album_name VARCHAR(255)
         )
         """
         self.cursor.execute(query)
@@ -70,7 +74,9 @@ class Database:
         query = """
         CREATE TABLE IF NOT EXISTS track_to_artist (
             track_id VARCHAR(255),
-            artist_id VARCHAR(255)
+            artist_id VARCHAR(255),
+            FOREIGN KEY(track_id) REFERENCES dim_all_tracks(track_id),
+            FOREIGN KEY(artist_id) REFERENCES dim_all_artists(artist_id)
         )
         """
         self.cursor.execute(query)
@@ -80,7 +86,7 @@ class Database:
     def __create_dim_all_users(self):
         query = """
         CREATE TABLE IF NOT EXISTS dim_all_users (
-            user_id VARCHAR(255),
+            user_id VARCHAR(255) PRIMARY KEY,
             user_name VARCHAR(255)
         )
         """
@@ -93,14 +99,34 @@ class Database:
         CREATE TABLE IF NOT EXISTS dim_all_listens (
             user_id VARCHAR(255),
             track_id VARCHAR(255),
-            ts DATETIME
+            ts DATETIME,
+            FOREIGN KEY(user_id) REFERENCES dim_all_users(user_id),
+            FOREIGN KEY(track_id) REFERENCES dim_all_tracks(track_id)
         )
         """
         self.cursor.execute(query)
         self.conn.commit()
 
-    def update_listened_tracks(self, tracks: Dict[datetime, Track]):
-        pass
+    """
+    METHODS FOR UPSERTING DATA INTO ALL TABLES
+    """
+    def upsert_all_tables(self, user: User, tracks: Dict[datetime, Track]):
+        # self.__upsert_dim_all_tracks(list(tracks.values()))
+        # self.__upsert_dim_all_artists(tracks)
+        # self.__upsert_dim_all_albums(tracks)
+        # self.__upsert_track_to_artist(tracks)
+        self.__upsert_dim_all_users(user)
+        # self.__upsert_dim_all_listens(user, tracks)
+    
+    # upserts users into dim_all_users
+    def __upsert_dim_all_users(self, user: User):
+        query = """
+        INSERT INTO dim_all_users (user_id, user_name)
+        VALUES (?, ?)
+        ON CONFLICT (user_id) DO UPDATE SET user_name=excluded.user_name
+        """
+        self.cursor.execute(query, (user.id, user.name))
+        self.conn.commit()
 
     def close(self):
         self.conn.close()
