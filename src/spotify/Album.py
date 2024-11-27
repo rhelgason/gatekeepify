@@ -1,4 +1,4 @@
-class Artist:
+class Album:
     id: str
     name: str
 

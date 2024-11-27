@@ -1,9 +1,10 @@
+from Album import Album
 from Artist import Artist
 
 class Track:
     id: str
     name: str
-    album_name: str
+    albums: list[Album]
     artists: list[Artist]
 
     def __init__(self, id, name, album_name, artists) -> None:

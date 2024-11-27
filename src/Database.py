@@ -14,7 +14,9 @@ class Database:
     def __create_tables(self):
         self.__create_dim_all_tracks()
         self.__create_dim_all_artists()
-        self.__create_dim_track_to_artist()
+        self.__create_dim_all_albums()
+        self.__create_track_to_artist()
+        self.__create_track_to_album()
         self.__create_dim_all_users()
         self.__create_dim_all_listens()
 
@@ -41,12 +43,34 @@ class Database:
         self.cursor.execute(query)
         self.conn.commit()
 
-    # mapping table between tracks and artists
-    def __create_dim_track_to_artist(self):
+    # table for storing information about every album
+    def __create_dim_all_albums(self):
         query = """
-        CREATE TABLE IF NOT EXISTS dim_track_to_artist (
+        CREATE TABLE IF NOT EXISTS dim_all_albums (
+            album_id VARCHAR(255),
+            album_name VARCHAR(255)
+        )
+        """
+        self.cursor.execute(query)
+        self.conn.commit()
+
+    # mapping table between tracks and artists
+    def __create_track_to_artist(self):
+        query = """
+        CREATE TABLE IF NOT EXISTS track_to_artist (
             track_id VARCHAR(255),
             artist_id VARCHAR(255)
+        )
+        """
+        self.cursor.execute(query)
+        self.conn.commit()
+
+    # mapping table between tracks and albums
+    def __create_track_to_album(self):
+        query = """
+        CREATE TABLE IF NOT EXISTS track_to_album (
+            track_id VARCHAR(255),
+            album_id VARCHAR(255)
         )
         """
         self.cursor.execute(query)
