@@ -1,7 +1,8 @@
 import spotipy
+from datetime import datetime
 from spotify.Track import Track
 from spotipy.oauth2 import SpotifyOAuth
-from typing import List, Optional
+from typing import Dict, Optional
 
 CLIENT_ID = "e1ee69e65fb241a29c6a46e856a5e64e"
 CLIENT_SECRET = "affb3816f14346ae8298f9284e772b02"
@@ -22,7 +23,7 @@ class SpotifyClient:
             )
         )
 
-    def gen_most_recent_tracks(self, after: Optional[int] = None) -> List[Track]:
+    def gen_most_recent_tracks(self, after: Optional[int] = None) -> Dict[datetime, Track]:
         res = self.client.current_user_recently_played(limit=MAXIMUM_RECENT_TRACKS, after=after)
         if not res:
             raise Exception("No recents found")
@@ -32,4 +33,4 @@ class SpotifyClient:
             ## TODO: handle likely missing data
             pass
 
-        return [Track.from_dict(track["track"]) for track in recent_tracks]
+        return {datetime.strptime(track["played_at"], "%Y-%m-%dT%H:%M:%S.%fZ"): Track.from_dict(track["track"]) for track in recent_tracks}
