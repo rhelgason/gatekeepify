@@ -69,7 +69,7 @@ class Database:
         CREATE TABLE IF NOT EXISTS dim_all_listens (
             user_id VARCHAR(255),
             track_id VARCHAR(255),
-            ds DATETIME
+            ts DATETIME
         )
         """
         self.cursor.execute(query)
