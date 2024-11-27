@@ -1,15 +1,27 @@
 import os
 import sqlite3
+from datetime import datetime
+from spotify.types import Track
+from typing import Dict
 
 DB_DIRECTORY = "db"
 DB_NAME = "database.db"
 
-
+"""
+Database setup for Gatekeepify. Currently includes the following tables:
+- dim_all_tracks: stores information about every track
+- dim_all_artists: stores information about every artist
+- dim_all_albums: stores information about every album
+- track_to_artist: mapping table between tracks and artists
+- dim_all_users: stores information about every user
+- dim_all_listens: stores every track listened to by every user
+"""
 class Database:
     def __init__(self, db_name=DB_NAME):
         path = os.path.join(DB_DIRECTORY, db_name)
         self.conn = sqlite3.connect(path)
         self.cursor = self.conn.cursor()
+        self.__create_tables()
 
     def __create_tables(self):
         self.__create_dim_all_tracks()
@@ -86,6 +98,9 @@ class Database:
         """
         self.cursor.execute(query)
         self.conn.commit()
+
+    def update_listened_tracks(self, tracks: Dict[datetime, Track]):
+        pass
 
     def close(self):
         self.conn.close()
