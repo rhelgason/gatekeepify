@@ -1,7 +1,7 @@
 import os
 import sqlite3
 from datetime import datetime
-from spotify.types import Track, User
+from spotify.types import Album, Artist, Track, User
 from typing import Dict, List
 
 DB_DIRECTORY = "db"
@@ -111,12 +111,30 @@ class Database:
     METHODS FOR UPSERTING DATA INTO ALL TABLES
     """
     def upsert_all_tables(self, user: User, tracks: Dict[datetime, Track]):
-        # self.__upsert_dim_all_tracks(list(tracks.values()))
-        # self.__upsert_dim_all_artists(tracks)
-        # self.__upsert_dim_all_albums(tracks)
-        # self.__upsert_track_to_artist(tracks)
+        # all_tracks = list(tracks.values())
+
+        # self.__upsert_dim_all_albums()
+        # self.__upsert_dim_all_tracks()
+        # self.__upsert_dim_all_artists()
+        # self.__upsert_track_to_artist()
         self.__upsert_dim_all_users(user)
-        # self.__upsert_dim_all_listens(user, tracks)
+        # self.__upsert_dim_all_listens()
+    
+    # upserts albums into dim_all_albums
+    def __upsert_dim_all_albums(self, albums: List[Album]):
+        pass
+
+    # upserts tracks into dim_all_tracks
+    def __upsert_dim_all_tracks(self, tracks: List[Track]):
+        pass
+
+    # upserts artists into dim_all_artists
+    def __upsert_dim_all_artists(self, artists: List[Artist]):
+        pass
+
+    # upserts tracks to artists into track_to_artist
+    def __upsert_track_to_artist(self, tracks: List[Track]):
+        pass
     
     # upserts users into dim_all_users
     def __upsert_dim_all_users(self, user: User):
@@ -127,6 +145,10 @@ class Database:
         """
         self.cursor.execute(query, (user.id, user.name))
         self.conn.commit()
+    
+    # upserts listens into dim_all_listens
+    def __upsert_dim_all_listens(self, user: User, tracks: List[Track]):
+        pass
 
     def close(self):
         self.conn.close()
