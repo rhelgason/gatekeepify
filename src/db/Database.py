@@ -1,11 +1,9 @@
 import os
 import sqlite3
 from datetime import datetime
+from db.constants import DB_DIRECTORY, DB_NAME
 from spotify.types import Album, Artist, Track, User
 from typing import Dict, List, Set
-
-DB_DIRECTORY = "db"
-DB_NAME = "database.db"
 
 """
 Database setup for Gatekeepify. Currently includes the following tables:
@@ -33,6 +31,7 @@ class Database:
         self.__create_track_to_artist()
         self.__create_dim_all_users()
         self.__create_dim_all_listens()
+        self.__create_dim_all_logs()
 
     # table for storing information about every album
     def __create_dim_all_albums(self):
@@ -104,6 +103,19 @@ class Database:
             PRIMARY KEY(user_id, track_id, ts),
             FOREIGN KEY(user_id) REFERENCES dim_all_users(user_id),
             FOREIGN KEY(track_id) REFERENCES dim_all_tracks(track_id)
+        )
+        """
+        self.cursor.execute(query)
+        self.conn.commit()
+
+    # logging table for storing every program action
+    def __create_dim_all_logs(self):
+        query = """
+        CREATE TABLE IF NOT EXISTS dim_all_logs (
+            ts DATETIME,
+            action VARCHAR(255),
+            metadata TEXT,
+            PRIMARY KEY(ts, action)
         )
         """
         self.cursor.execute(query)
@@ -182,6 +194,15 @@ class Database:
         ON CONFLICT (user_id, track_id, ts) DO NOTHING
         """
         self.cursor.executemany(query, [(user.id, track.id, ts) for ts, track in listens.items()])
+        self.conn.commit()
+
+    # upserts logs into dim_all_logs
+    def __upsert_dim_all_logs(self, action: str, metadata: str):
+        query = """
+        INSERT INTO dim_all_logs (ts, action, metadata)
+        VALUES (?, ?, ?)
+        """
+        self.cursor.execute(query, (datetime.now(), action, metadata))
         self.conn.commit()
 
     """
