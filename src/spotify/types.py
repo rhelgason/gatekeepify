@@ -1,3 +1,5 @@
+from typing import List
+
 class Artifact:
     id: str
     name: str
@@ -19,6 +21,12 @@ class Artifact:
     def __eq__(self, other) -> bool:
         return self.id == other.id and self.name == other.name
 
+class Album(Artifact):
+    pass
+
+class Artist(Artifact):
+    pass
+
 class User(Artifact):
     @classmethod
     def from_dict(cls, data):
@@ -27,20 +35,14 @@ class User(Artifact):
             data['display_name'],
         )
 
-class Album(Artifact):
-    pass
-
-class Artist(Artifact):
-    pass
-
 class Track(Artifact):
     album: Album
-    artists: list[Artist]
+    artists: List[Artist]
 
-    def __init__(self, id, name, album_name, artists) -> None:
+    def __init__(self, id, name, album, artists) -> None:
         self.id = id
         self.name = name
-        self.album_name = album_name
+        self.album = album
         self.artists = artists
     
     @classmethod

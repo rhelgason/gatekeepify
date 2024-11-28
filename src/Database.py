@@ -2,7 +2,7 @@ import os
 import sqlite3
 from datetime import datetime
 from spotify.types import Album, Artist, Track, User
-from typing import Dict, List
+from typing import Dict, List, Set
 
 DB_DIRECTORY = "db"
 DB_NAME = "database.db"
@@ -111,9 +111,10 @@ class Database:
     METHODS FOR UPSERTING DATA INTO ALL TABLES
     """
     def upsert_all_tables(self, user: User, tracks: Dict[datetime, Track]):
-        # all_tracks = list(tracks.values())
+        all_tracks = list(tracks.values())
+        all_albums = set([track.album for track in all_tracks])
 
-        # self.__upsert_dim_all_albums()
+        self.__upsert_dim_all_albums(all_albums)
         # self.__upsert_dim_all_tracks()
         # self.__upsert_dim_all_artists()
         # self.__upsert_track_to_artist()
@@ -121,8 +122,14 @@ class Database:
         # self.__upsert_dim_all_listens()
     
     # upserts albums into dim_all_albums
-    def __upsert_dim_all_albums(self, albums: List[Album]):
-        pass
+    def __upsert_dim_all_albums(self, albums: Set[Album]):
+        query = """
+        INSERT INTO dim_all_albums (album_id, album_name)
+        VALUES (?, ?)
+        ON CONFLICT (album_id) DO UPDATE SET album_name=excluded.album_name
+        """
+        self.cursor.executemany(query, [(album.id, album.name) for album in albums])
+        self.conn.commit()
 
     # upserts tracks into dim_all_tracks
     def __upsert_dim_all_tracks(self, tracks: List[Track]):
