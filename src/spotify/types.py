@@ -1,4 +1,5 @@
-from typing import List
+import json
+from typing import Any, Dict, List
 
 class Artifact:
     id: str
@@ -20,6 +21,15 @@ class Artifact:
     
     def __eq__(self, other) -> bool:
         return self.id == other.id and self.name == other.name
+
+    def _to_json(self) -> Dict[str, Any]:
+        return {
+            'id': self.id,
+            'name': self.name,
+        }
+
+    def to_json_str(self) -> str:
+        return json.dumps(self._to_json())
 
 class Album(Artifact):
     pass
@@ -53,3 +63,9 @@ class Track(Artifact):
             Album.from_dict(data['album']),
             [Artist.from_dict(artist) for artist in data['artists']]
         )
+    
+    def _to_json(self) -> Dict[str, Any]:
+        json = super()._to_json()
+        json['album'] = self.album._to_json()
+        json['artists'] = [artist._to_json() for artist in self.artists]
+        return json

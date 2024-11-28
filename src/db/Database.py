@@ -1,7 +1,8 @@
+import json
 import os
 import sqlite3
 from datetime import datetime
-from db.constants import DB_DIRECTORY, DB_NAME
+from db.constants import DB_DIRECTORY, DB_NAME, LoggerAction
 from spotify.types import Album, Artist, Track, User
 from typing import Dict, List, Set
 
@@ -145,6 +146,7 @@ class Database:
         """
         self.cursor.executemany(query, [(album.id, album.name) for album in albums])
         self.conn.commit()
+        self.__upsert_dim_all_logs(LoggerAction.UPSERT_DIM_ALL_ALBUMS, json.dumps([album.to_json_str() for album in albums]))
 
     # upserts tracks into dim_all_tracks
     def __upsert_dim_all_tracks(self, tracks: Set[Track]):
@@ -155,6 +157,7 @@ class Database:
         """
         self.cursor.executemany(query, [(track.id, track.name, track.album.id) for track in tracks])
         self.conn.commit()
+        self.__upsert_dim_all_logs(LoggerAction.UPSERT_DIM_ALL_TRACKS, json.dumps([track.to_json_str() for track in tracks]))
 
     # upserts artists into dim_all_artists
     def __upsert_dim_all_artists(self, artists: Set[Artist]):
@@ -165,6 +168,7 @@ class Database:
         """
         self.cursor.executemany(query, [(artist.id, artist.name) for artist in artists])
         self.conn.commit()
+        self.__upsert_dim_all_logs(LoggerAction.UPSERT_DIM_ALL_ARTISTS, json.dumps([artist.to_json_str() for artist in artists]))
 
     # upserts tracks to artists into track_to_artist
     def __upsert_track_to_artist(self, tracks: Set[Track]):
@@ -175,6 +179,7 @@ class Database:
         """
         self.cursor.executemany(query, [(track.id, artist.id) for track in tracks for artist in track.artists])
         self.conn.commit()
+        self.__upsert_dim_all_logs(LoggerAction.UPSERT_TRACK_TO_ARTIST, json.dumps([track.to_json_str() for track in tracks]))
     
     # upserts users into dim_all_users
     def __upsert_dim_all_users(self, user: User):
@@ -185,6 +190,7 @@ class Database:
         """
         self.cursor.execute(query, (user.id, user.name))
         self.conn.commit()
+        self.__upsert_dim_all_logs(LoggerAction.UPSERT_DIM_ALL_USERS, user.to_json_str())
     
     # upserts listens into dim_all_listens
     def __upsert_dim_all_listens(self, user: User, listens: Dict[datetime, Track]):
@@ -196,13 +202,22 @@ class Database:
         self.cursor.executemany(query, [(user.id, track.id, ts) for ts, track in listens.items()])
         self.conn.commit()
 
+        log_json = {
+            "user": user.to_json_str(),
+            "listens": {
+                ts.strftime("%Y-%m-%d %H:%M:%S.%f"): track.to_json_str() for ts, track in listens.items()
+            }
+        }
+        self.__upsert_dim_all_logs(LoggerAction.UPSERT_DIM_ALL_LISTENS, json.dumps(log_json))
+
+
     # upserts logs into dim_all_logs
-    def __upsert_dim_all_logs(self, action: str, metadata: str):
+    def __upsert_dim_all_logs(self, action: LoggerAction, metadata: str):
         query = """
         INSERT INTO dim_all_logs (ts, action, metadata)
         VALUES (?, ?, ?)
         """
-        self.cursor.execute(query, (datetime.now(), action, metadata))
+        self.cursor.execute(query, (datetime.now(), action.value, metadata))
         self.conn.commit()
 
     """
