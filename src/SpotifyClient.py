@@ -1,4 +1,5 @@
 import spotipy
+from constants import DATETIME_FORMAT
 from datetime import datetime, timezone
 from spotify.types import Track, User
 from spotipy.oauth2 import SpotifyOAuth
@@ -43,6 +44,6 @@ class SpotifyClient:
         return {
             datetime.strptime(
                 track["played_at"],
-                "%Y-%m-%dT%H:%M:%S.%fZ"
+                DATETIME_FORMAT
             ): Track.from_dict(track["track"]) for track in recent_tracks
         }

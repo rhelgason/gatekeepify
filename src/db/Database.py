@@ -1,6 +1,7 @@
 import json
 import os
 import sqlite3
+from constants import DATETIME_FORMAT
 from datetime import datetime
 from db.constants import DB_DIRECTORY, DB_NAME, LoggerAction
 from spotify.types import Album, Artist, Track, User
@@ -142,7 +143,7 @@ class Database:
         log_json = {
             "user": user.to_json_str(),
             "listens": {
-                ts.strftime("%Y-%m-%d %H:%M:%S.%f"): track.to_json_str() for ts, track in listens.items()
+                ts.strftime(DATETIME_FORMAT): track.to_json_str() for ts, track in listens.items()
             }
         }
         self.__upsert_dim_all_logs(LoggerAction.RUN_CRON_BACKFILL, json.dumps(log_json))
@@ -215,7 +216,7 @@ class Database:
         log_json = {
             "user": user.to_json_str(),
             "listens": {
-                ts.strftime("%Y-%m-%d %H:%M:%S.%f"): track.to_json_str() for ts, track in listens.items()
+                ts.strftime(DATETIME_FORMAT): track.to_json_str() for ts, track in listens.items()
             }
         }
         self.__upsert_dim_all_logs(LoggerAction.UPSERT_DIM_ALL_LISTENS, json.dumps(log_json))
@@ -240,7 +241,7 @@ class Database:
         """
         self.cursor.execute(query, (user.id,))
         result = self.cursor.fetchone()
-        return datetime.strptime(result[0], "%Y-%m-%d %H:%M:%S.%f")
+        return datetime.strptime(result[0], DATETIME_FORMAT)
 
     def close(self):
         self.conn.close()
