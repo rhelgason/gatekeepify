@@ -53,6 +53,3 @@ class Track(Artifact):
             Album.from_dict(data['album']),
             [Artist.from_dict(artist) for artist in data['artists']]
         )
-    
-    def __eq__(self, other) -> bool:
-        return super().__eq__(other) and self.album == other.album and set(self.artists) == set(other.artists)

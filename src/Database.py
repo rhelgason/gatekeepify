@@ -111,11 +111,11 @@ class Database:
     METHODS FOR UPSERTING DATA INTO ALL TABLES
     """
     def upsert_all_tables(self, user: User, tracks: Dict[datetime, Track]):
-        all_tracks = list(tracks.values())
+        all_tracks = set(tracks.values())
         all_albums = set([track.album for track in all_tracks])
 
         self.__upsert_dim_all_albums(all_albums)
-        # self.__upsert_dim_all_tracks()
+        self.__upsert_dim_all_tracks(all_tracks)
         # self.__upsert_dim_all_artists()
         # self.__upsert_track_to_artist()
         self.__upsert_dim_all_users(user)
@@ -132,8 +132,14 @@ class Database:
         self.conn.commit()
 
     # upserts tracks into dim_all_tracks
-    def __upsert_dim_all_tracks(self, tracks: List[Track]):
-        pass
+    def __upsert_dim_all_tracks(self, tracks: Set[Track]):
+        query = """
+        INSERT INTO dim_all_tracks (track_id, track_name, album_id)
+        VALUES (?, ?, ?)
+        ON CONFLICT (track_id) DO UPDATE SET track_name=excluded.track_name, album_id=excluded.album_id
+        """
+        self.cursor.executemany(query, [(track.id, track.name, track.album.id) for track in tracks])
+        self.conn.commit()
 
     # upserts artists into dim_all_artists
     def __upsert_dim_all_artists(self, artists: List[Artist]):
