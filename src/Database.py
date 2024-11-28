@@ -75,6 +75,7 @@ class Database:
         CREATE TABLE IF NOT EXISTS track_to_artist (
             track_id VARCHAR(255),
             artist_id VARCHAR(255),
+            PRIMARY KEY(track_id, artist_id),
             FOREIGN KEY(track_id) REFERENCES dim_all_tracks(track_id),
             FOREIGN KEY(artist_id) REFERENCES dim_all_artists(artist_id)
         )
@@ -118,7 +119,7 @@ class Database:
         self.__upsert_dim_all_albums(all_albums)
         self.__upsert_dim_all_tracks(all_tracks)
         self.__upsert_dim_all_artists(all_artists)
-        # self.__upsert_track_to_artist()
+        self.__upsert_track_to_artist(all_tracks)
         self.__upsert_dim_all_users(user)
         # self.__upsert_dim_all_listens()
     
@@ -153,8 +154,14 @@ class Database:
         self.conn.commit()
 
     # upserts tracks to artists into track_to_artist
-    def __upsert_track_to_artist(self, tracks: List[Track]):
-        pass
+    def __upsert_track_to_artist(self, tracks: Set[Track]):
+        query = """
+        INSERT INTO track_to_artist (track_id, artist_id)
+        VALUES (?, ?)
+        ON CONFLICT (track_id, artist_id) DO NOTHING
+        """
+        self.cursor.executemany(query, [(track.id, artist.id) for track in tracks for artist in track.artists])
+        self.conn.commit()
     
     # upserts users into dim_all_users
     def __upsert_dim_all_users(self, user: User):
