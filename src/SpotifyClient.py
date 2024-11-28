@@ -1,15 +1,9 @@
 import spotipy
-from constants import DATETIME_FORMAT
+from constants import CLIENT_DATETIME_FORMAT, CLIENT_ID, CLIENT_SECRET, DEFAULT_SCOPE, MAXIMUM_RECENT_TRACKS, REDIRECT_URI
 from datetime import datetime, timezone
 from spotify.types import Track, User
 from spotipy.oauth2 import SpotifyOAuth
 from typing import Dict, Optional
-
-CLIENT_ID = "e1ee69e65fb241a29c6a46e856a5e64e"
-CLIENT_SECRET = "affb3816f14346ae8298f9284e772b02"
-REDIRECT_URI = "https://github.com/rhelgason"
-DEFAULT_SCOPE = "user-read-private user-read-email user-read-recently-played"
-MAXIMUM_RECENT_TRACKS = 50
 
 class SpotifyClient:
     client: spotipy.Spotify
@@ -44,6 +38,6 @@ class SpotifyClient:
         return {
             datetime.strptime(
                 track["played_at"],
-                DATETIME_FORMAT
+                CLIENT_DATETIME_FORMAT
             ): Track.from_dict(track["track"]) for track in recent_tracks
         }
