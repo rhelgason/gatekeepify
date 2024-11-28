@@ -136,6 +136,16 @@ class Database:
         self.__upsert_track_to_artist(all_tracks)
         self.__upsert_dim_all_users(user)
         self.__upsert_dim_all_listens(user, listens)
+
+    def upsert_cron_backfill(self, user: User, listens: Dict[datetime, Track]):
+        self.upsert_all_tables(user, listens)
+        log_json = {
+            "user": user.to_json_str(),
+            "listens": {
+                ts.strftime("%Y-%m-%d %H:%M:%S.%f"): track.to_json_str() for ts, track in listens.items()
+            }
+        }
+        self.__upsert_dim_all_logs(LoggerAction.RUN_CRON_BACKFILL, json.dumps(log_json))
     
     # upserts albums into dim_all_albums
     def __upsert_dim_all_albums(self, albums: Set[Album]):
