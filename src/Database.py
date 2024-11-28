@@ -113,10 +113,11 @@ class Database:
     def upsert_all_tables(self, user: User, tracks: Dict[datetime, Track]):
         all_tracks = set(tracks.values())
         all_albums = set([track.album for track in all_tracks])
+        all_artists = set([artist for track in all_tracks for artist in track.artists])
 
         self.__upsert_dim_all_albums(all_albums)
         self.__upsert_dim_all_tracks(all_tracks)
-        # self.__upsert_dim_all_artists()
+        self.__upsert_dim_all_artists(all_artists)
         # self.__upsert_track_to_artist()
         self.__upsert_dim_all_users(user)
         # self.__upsert_dim_all_listens()
@@ -142,8 +143,14 @@ class Database:
         self.conn.commit()
 
     # upserts artists into dim_all_artists
-    def __upsert_dim_all_artists(self, artists: List[Artist]):
-        pass
+    def __upsert_dim_all_artists(self, artists: Set[Artist]):
+        query = """
+        INSERT INTO dim_all_artists (artist_id, artist_name)
+        VALUES (?, ?)
+        ON CONFLICT (artist_id) DO UPDATE SET artist_name=excluded.artist_name
+        """
+        self.cursor.executemany(query, [(artist.id, artist.name) for artist in artists])
+        self.conn.commit()
 
     # upserts tracks to artists into track_to_artist
     def __upsert_track_to_artist(self, tracks: List[Track]):
