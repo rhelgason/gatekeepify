@@ -101,6 +101,7 @@ class Database:
             user_id VARCHAR(255),
             track_id VARCHAR(255),
             ts DATETIME,
+            PRIMARY KEY(user_id, track_id, ts),
             FOREIGN KEY(user_id) REFERENCES dim_all_users(user_id),
             FOREIGN KEY(track_id) REFERENCES dim_all_tracks(track_id)
         )
@@ -111,8 +112,8 @@ class Database:
     """
     METHODS FOR UPSERTING DATA INTO ALL TABLES
     """
-    def upsert_all_tables(self, user: User, tracks: Dict[datetime, Track]):
-        all_tracks = set(tracks.values())
+    def upsert_all_tables(self, user: User, listens: Dict[datetime, Track]):
+        all_tracks = set(listens.values())
         all_albums = set([track.album for track in all_tracks])
         all_artists = set([artist for track in all_tracks for artist in track.artists])
 
@@ -121,7 +122,7 @@ class Database:
         self.__upsert_dim_all_artists(all_artists)
         self.__upsert_track_to_artist(all_tracks)
         self.__upsert_dim_all_users(user)
-        # self.__upsert_dim_all_listens()
+        self.__upsert_dim_all_listens(user, listens)
     
     # upserts albums into dim_all_albums
     def __upsert_dim_all_albums(self, albums: Set[Album]):
@@ -174,8 +175,14 @@ class Database:
         self.conn.commit()
     
     # upserts listens into dim_all_listens
-    def __upsert_dim_all_listens(self, user: User, tracks: List[Track]):
-        pass
+    def __upsert_dim_all_listens(self, user: User, listens: Dict[datetime, Track]):
+        query = """
+        INSERT INTO dim_all_listens (user_id, track_id, ts)
+        VALUES (?, ?, ?)
+        ON CONFLICT (user_id, track_id, ts) DO NOTHING
+        """
+        self.cursor.executemany(query, [(user.id, track.id, ts) for ts, track in listens.items()])
+        self.conn.commit()
 
     def close(self):
         self.conn.close()
