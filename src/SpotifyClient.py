@@ -1,5 +1,5 @@
 import spotipy
-from datetime import datetime
+from datetime import datetime, timezone
 from spotify.types import Track, User
 from spotipy.oauth2 import SpotifyOAuth
 from typing import Dict, Optional
@@ -29,8 +29,9 @@ class SpotifyClient:
             raise Exception("No user found")
         return User.from_dict(res)
 
-    def gen_most_recent_tracks(self, after: Optional[int] = None) -> Dict[datetime, Track]:
-        res = self.client.current_user_recently_played(limit=MAXIMUM_RECENT_TRACKS, after=after)
+    def gen_most_recent_tracks(self, after: Optional[datetime] = None) -> Dict[datetime, Track]:
+        after_ts = int(after.replace(tzinfo=timezone.utc).timestamp() * 1000) if after else None
+        res = self.client.current_user_recently_played(limit=MAXIMUM_RECENT_TRACKS, after=after_ts)
         if not res:
             raise Exception("No recents found")
 

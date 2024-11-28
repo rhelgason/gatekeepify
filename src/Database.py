@@ -188,13 +188,13 @@ class Database:
     METHODS FOR QUERYING ALL TABLES
     """
     # query most recent listen time for a user
-    def query_most_recent_listen_time(self, user: User) -> datetime:
+    def gen_most_recent_listen_time(self, user: User) -> datetime:
         query = """
         SELECT MAX(ts) FROM dim_all_listens WHERE user_id=?
         """
         self.cursor.execute(query, (user.id,))
         result = self.cursor.fetchone()
-        return result[0]
+        return datetime.strptime(result[0], "%Y-%m-%d %H:%M:%S.%f")
 
     def close(self):
         self.conn.close()
