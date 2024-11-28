@@ -184,5 +184,17 @@ class Database:
         self.cursor.executemany(query, [(user.id, track.id, ts) for ts, track in listens.items()])
         self.conn.commit()
 
+    """
+    METHODS FOR QUERYING ALL TABLES
+    """
+    # query most recent listen time for a user
+    def query_most_recent_listen_time(self, user: User) -> datetime:
+        query = """
+        SELECT MAX(ts) FROM dim_all_listens WHERE user_id=?
+        """
+        self.cursor.execute(query, (user.id,))
+        result = self.cursor.fetchone()
+        return result[0]
+
     def close(self):
         self.conn.close()
