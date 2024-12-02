@@ -238,7 +238,23 @@ class Database:
             }
         }
         self.__upsert_dim_all_logs(LoggerAction.UPSERT_DIM_ALL_LISTENS, json.dumps(log_json))
+    
+    # upserts missing data into dim_possible_missing_data
+    def __upsert_dim_possible_missing_data(self, user: User, start_ts: datetime, end_ts: datetime):
+        query = """
+        INSERT INTO dim_possible_missing_data (user_id, start_ts, end_ts)
+        VALUES (?, ?, ?)
+        ON CONFLICT (user_id, start_ts, end_ts) DO NOTHING
+        """
+        self.cursor.execute(query, (user.id, start_ts, end_ts))
+        self.conn.commit()
 
+        log_json = {
+            "user": user.to_json_str(),
+            "start_ts": start_ts.strftime(DB_DATETIME_FORMAT),
+            "end_ts": end_ts.strftime(DB_DATETIME_FORMAT)
+        }
+        self.__upsert_dim_all_logs(LoggerAction.INCLUDE_POSSIBLE_MISSING_DATA, json.dumps(log_json))
 
     # upserts logs into dim_all_logs
     def __upsert_dim_all_logs(self, action: LoggerAction, metadata: str):

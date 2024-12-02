@@ -12,3 +12,5 @@ class LoggerAction(Enum):
     UPSERT_DIM_ALL_USERS = "upsertDimAllUsers"
     UPSERT_DIM_ALL_LISTENS = "upsertDimAllListens"
     RUN_CRON_BACKFILL = "runCronBackfill"
+    INCLUDE_POSSIBLE_MISSING_DATA = "includePossibleMissingData"
+    CLEAR_POSSIBLE_MISSING_DATA = "clearPossibleMissingData"
