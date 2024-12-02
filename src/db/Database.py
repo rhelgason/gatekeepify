@@ -14,6 +14,8 @@ Database setup for Gatekeepify. Currently includes the following tables:
 - track_to_artist: mapping table between tracks and artists
 - dim_all_users: stores information about every user
 - dim_all_listens: stores every track listened to by every user
+- dim_possible_missing_data: stores information for ts that may not be tracked
+- dim_all_logs: stores logging data for every program action
 """
 class Database:
     def __init__(self, db_name=DB_NAME):
@@ -34,6 +36,7 @@ class Database:
         self.__create_track_to_artist()
         self.__create_dim_all_users()
         self.__create_dim_all_listens()
+        self.__create_dim_possible_missing_data()
         self.__create_dim_all_logs()
 
     # table for storing information about every album
@@ -106,6 +109,20 @@ class Database:
             PRIMARY KEY(user_id, track_id, ts),
             FOREIGN KEY(user_id) REFERENCES dim_all_users(user_id),
             FOREIGN KEY(track_id) REFERENCES dim_all_tracks(track_id)
+        )
+        """
+        self.cursor.execute(query)
+        self.conn.commit()
+
+    # table that stores information for ts that may not be tracked
+    def __create_dim_possible_missing_data(self):
+        query = """
+        CREATE TABLE IF NOT EXISTS dim_possible_missing_data (
+            user_id VARCHAR(255),
+            start_ts DATETIME,
+            end_ts DATETIME,
+            PRIMARY KEY(user_id, start_ts, end_ts),
+            FOREIGN KEY(user_id) REFERENCES dim_all_users(user_id)
         )
         """
         self.cursor.execute(query)
