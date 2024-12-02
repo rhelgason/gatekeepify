@@ -1,5 +1,6 @@
 /env/
 /db/
+/src/host_constants.py
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

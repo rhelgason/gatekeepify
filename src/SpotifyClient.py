@@ -1,25 +1,42 @@
 import spotipy
-from constants import CLIENT_DATETIME_FORMAT, CLIENT_ID, CLIENT_SECRET, DEFAULT_SCOPE, MAXIMUM_RECENT_TRACKS, REDIRECT_URI
+from constants import CLIENT_DATETIME_FORMAT, DEFAULT_SCOPE, HOST_CONSTANTS_PATH, MAXIMUM_RECENT_TRACKS, REDIRECT_URI
 from datetime import datetime, timezone
 from db.Database import Database
+from getpass import getpass
 from spotify.types import Track, User
 from spotipy.oauth2 import SpotifyOAuth
-from typing import Dict, Optional
+from typing import Dict, Optional, Tuple
 
 class SpotifyClient:
     client: spotipy.Spotify
     db: Database
 
     def __init__(self) -> None:
+        client_id, client_secret = self.get_host_constants()      
         self.client = spotipy.Spotify(
             auth_manager=SpotifyOAuth(
-                client_id=CLIENT_ID,
-                client_secret=CLIENT_SECRET,
+                client_id=client_id,
+                client_secret=client_secret,
                 redirect_uri=REDIRECT_URI,
                 scope=DEFAULT_SCOPE,
             )
         )
         self.db = Database()
+    
+    # get client id and secret if exists, otherwise get user input
+    def get_host_constants(self) -> Tuple[str, str]:
+        try:
+            host_constants_spec = __import__("/".join(HOST_CONSTANTS_PATH.split("/")[1:]), globals(), locals(), ['CLIENT_ID', 'CLIENT_SECRET'], 0)
+            return (host_constants_spec.CLIENT_ID, host_constants_spec.CLIENT_SECRET)
+        except:
+            # constants file not found, get user input
+            client_id = input('Please input your Spotify API client ID: ')
+            client_secret = getpass('Please input your Spotify API client secret: ')
+            f = open(".".join((HOST_CONSTANTS_PATH, "py")), "w")
+            f.write('CLIENT_ID = "' + client_id + '"\n')
+            f.write('CLIENT_SECRET = "' + client_secret + '"')
+            f.close()
+            return (client_id, client_secret)
 
     def gen_current_user(self) -> User:
         res = self.client.current_user()
