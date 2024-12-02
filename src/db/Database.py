@@ -40,7 +40,6 @@ class Database:
         self.__create_track_to_artist()
         self.__create_dim_all_users()
         self.__create_dim_all_listens()
-        self.__create_dim_possible_missing_data()
         self.__create_dim_all_logs()
 
     # table for storing information about every album
@@ -118,20 +117,6 @@ class Database:
         self.cursor.execute(query)
         self.conn.commit()
 
-    # table that stores information for ts that may not be tracked
-    def __create_dim_possible_missing_data(self):
-        query = """
-        CREATE TABLE IF NOT EXISTS dim_possible_missing_data (
-            user_id VARCHAR(255),
-            start_ts DATETIME,
-            end_ts DATETIME,
-            PRIMARY KEY(user_id, start_ts, end_ts),
-            FOREIGN KEY(user_id) REFERENCES dim_all_users(user_id)
-        )
-        """
-        self.cursor.execute(query)
-        self.conn.commit()
-
     # logging table for storing every program action
     def __create_dim_all_logs(self):
         query = """
@@ -153,13 +138,6 @@ class Database:
         all_tracks = set(listens.values())
         all_albums = set([track.album for track in all_tracks])
         all_artists = set([artist for track in all_tracks for artist in track.artists])
-
-        # if maximum number of listens is provided, we are possibly missing data
-        if (len(listens) >= MAXIMUM_RECENT_TRACKS):
-            end_ts = min(listens.keys())
-            start_ts = self.gen_most_recent_listen_time(user)
-            if (start_ts < end_ts):
-                self.__upsert_dim_possible_missing_data(user, start_ts, end_ts)
 
         self.__upsert_dim_all_albums(all_albums)
         self.__upsert_dim_all_tracks(all_tracks)
@@ -251,23 +229,6 @@ class Database:
             }
         }
         self.__upsert_dim_all_logs(LoggerAction.UPSERT_DIM_ALL_LISTENS, json.dumps(log_json))
-    
-    # upserts missing data into dim_possible_missing_data
-    def __upsert_dim_possible_missing_data(self, user: User, start_ts: datetime, end_ts: datetime):
-        query = """
-        INSERT INTO dim_possible_missing_data (user_id, start_ts, end_ts)
-        VALUES (?, ?, ?)
-        ON CONFLICT (user_id, start_ts, end_ts) DO NOTHING
-        """
-        self.cursor.execute(query, (user.id, start_ts, end_ts))
-        self.conn.commit()
-
-        log_json = {
-            "user": user.to_json_str(),
-            "start_ts": start_ts.strftime(DB_DATETIME_FORMAT),
-            "end_ts": end_ts.strftime(DB_DATETIME_FORMAT)
-        }
-        self.__upsert_dim_all_logs(LoggerAction.INCLUDE_POSSIBLE_MISSING_DATA, json.dumps(log_json))
 
     # upserts logs into dim_all_logs
     def __upsert_dim_all_logs(self, action: LoggerAction, metadata: str):
@@ -282,10 +243,10 @@ class Database:
     METHODS FOR QUERYING ALL TABLES
     """
     # query most recent listen time for a user
-    def gen_most_recent_listen_time(self, user: User) -> datetime:
+    def gen_most_recent_listen_time(self, user: User) -> Optional[datetime]:
         query = """
         SELECT MAX(ts) FROM dim_all_listens WHERE user_id=?
         """
         self.cursor.execute(query, (user.id,))
         result = self.cursor.fetchone()
-        return datetime.strptime(result[0], DB_DATETIME_FORMAT)
+        return datetime.strptime(result[0], DB_DATETIME_FORMAT) if result[0] else None

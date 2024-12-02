@@ -34,10 +34,6 @@ class SpotifyClient:
             raise Exception("No recents found")
 
         recent_tracks = res["items"]
-        if len(recent_tracks) >= MAXIMUM_RECENT_TRACKS:
-            ## TODO: handle likely missing data
-            pass
-
         return {
             datetime.strptime(
                 track["played_at"],

@@ -1,4 +1,3 @@
-from db.Database import Database
 from SpotifyClient import SpotifyClient
 
 """
