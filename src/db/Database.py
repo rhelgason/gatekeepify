@@ -149,13 +149,17 @@ class Database:
     METHODS FOR UPSERTING DATA INTO ALL TABLES
     """
     # top-level upsert method for all tables
-    # assumes the invariant that passed listens should not already be in DB
-    # although this would not affect the DB data, it could falsely create an
-    # entry for possibly missing data.
     def upsert_all_tables(self, user: User, listens: Dict[datetime, Track]):
         all_tracks = set(listens.values())
         all_albums = set([track.album for track in all_tracks])
         all_artists = set([artist for track in all_tracks for artist in track.artists])
+
+        # if maximum number of listens is provided, we are possibly missing data
+        if (len(listens) >= MAXIMUM_RECENT_TRACKS):
+            end_ts = min(listens.keys())
+            start_ts = self.gen_most_recent_listen_time(user)
+            if (start_ts < end_ts):
+                self.__upsert_dim_possible_missing_data(user, start_ts, end_ts)
 
         self.__upsert_dim_all_albums(all_albums)
         self.__upsert_dim_all_tracks(all_tracks)
@@ -163,12 +167,6 @@ class Database:
         self.__upsert_track_to_artist(all_tracks)
         self.__upsert_dim_all_users(user)
         self.__upsert_dim_all_listens(user, listens)
-
-        # if maximum number of listens is provided, we are possibly missing data
-        if (len(listens) >= MAXIMUM_RECENT_TRACKS):
-            end_ts = min(listens.keys())
-            start_ts = self.gen_most_recent_listen_time(user, end_ts)
-            self.__upsert_dim_possible_missing_data(user, start_ts, end_ts)
 
     # upserts all tables with logs for the current cron job
     def upsert_cron_backfill(self, user: User, listens: Dict[datetime, Track]):
@@ -284,18 +282,10 @@ class Database:
     METHODS FOR QUERYING ALL TABLES
     """
     # query most recent listen time for a user
-    # optionally pass a ts to search before
-    def gen_most_recent_listen_time(self, user: User, before: Optional[datetime] = None) -> datetime:
+    def gen_most_recent_listen_time(self, user: User) -> datetime:
         query = """
         SELECT MAX(ts) FROM dim_all_listens WHERE user_id=?
         """
-        params = (user.id,)
-
-        # optionally add before clause
-        if before:
-            query += " AND ts < ?"
-            params += (before,)
-        
-        self.cursor.execute(query, params)
+        self.cursor.execute(query, (user.id,))
         result = self.cursor.fetchone()
         return datetime.strptime(result[0], DB_DATETIME_FORMAT)
