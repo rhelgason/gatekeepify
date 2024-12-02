@@ -1,12 +1,12 @@
 from db.Database import Database
 from SpotifyClient import SpotifyClient
 
-# initialize database and client
-db = Database()
+"""
+Upserts most recent tracks from Spotify API into database.
+Should be associated with a cron job at least every 25 minutes.
+This is because Spotify API returns a maximum of 50 tracks, and
+they only record a listen if the track was played at least 30 seconds.
+"""
 client = SpotifyClient()
-
-# upsert most recent tracks from Spotify API
 user = client.gen_current_user()
-most_recent_ts = db.gen_most_recent_listen_time(user)
-recent_listens = client.gen_most_recent_tracks(most_recent_ts)
-db.upsert_cron_backfill(user, recent_listens)
+client.gen_run_cron_backfill(user)
