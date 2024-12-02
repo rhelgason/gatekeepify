@@ -1,10 +1,11 @@
 import json
 import os
 import sqlite3
+from constants import MAXIMUM_RECENT_TRACKS
 from datetime import datetime
 from db.constants import DB_DATETIME_FORMAT, DB_DIRECTORY, DB_NAME, LoggerAction
 from spotify.types import Album, Artist, Track, User
-from typing import Dict, List, Set
+from typing import Dict, Optional, Set
 
 """
 Database setup for Gatekeepify. Currently includes the following tables:
@@ -25,6 +26,9 @@ class Database:
         self.conn = sqlite3.connect(path)
         self.cursor = self.conn.cursor()
         self.__create_all_tables()
+    
+    def close(self):
+        self.conn.close()
 
     """
     METHODS FOR CREATING ALL TABLES
@@ -144,6 +148,10 @@ class Database:
     """
     METHODS FOR UPSERTING DATA INTO ALL TABLES
     """
+    # top-level upsert method for all tables
+    # assumes the invariant that passed listens should not already be in DB
+    # although this would not affect the DB data, it could falsely create an
+    # entry for possibly missing data.
     def upsert_all_tables(self, user: User, listens: Dict[datetime, Track]):
         all_tracks = set(listens.values())
         all_albums = set([track.album for track in all_tracks])
@@ -156,6 +164,13 @@ class Database:
         self.__upsert_dim_all_users(user)
         self.__upsert_dim_all_listens(user, listens)
 
+        # if maximum number of listens is provided, we are possibly missing data
+        if (len(listens) >= MAXIMUM_RECENT_TRACKS):
+            end_ts = min(listens.keys())
+            start_ts = self.gen_most_recent_listen_time(user, end_ts)
+            self.__upsert_dim_possible_missing_data(user, start_ts, end_ts)
+
+    # upserts all tables with logs for the current cron job
     def upsert_cron_backfill(self, user: User, listens: Dict[datetime, Track]):
         self.upsert_all_tables(user, listens)
         log_json = {
@@ -269,13 +284,18 @@ class Database:
     METHODS FOR QUERYING ALL TABLES
     """
     # query most recent listen time for a user
-    def gen_most_recent_listen_time(self, user: User) -> datetime:
+    # optionally pass a ts to search before
+    def gen_most_recent_listen_time(self, user: User, before: Optional[datetime] = None) -> datetime:
         query = """
         SELECT MAX(ts) FROM dim_all_listens WHERE user_id=?
         """
-        self.cursor.execute(query, (user.id,))
+        params = (user.id,)
+
+        # optionally add before clause
+        if before:
+            query += " AND ts < ?"
+            params += (before,)
+        
+        self.cursor.execute(query, params)
         result = self.cursor.fetchone()
         return datetime.strptime(result[0], DB_DATETIME_FORMAT)
-
-    def close(self):
-        self.conn.close()
