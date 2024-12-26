@@ -4,6 +4,7 @@ DB_DIRECTORY = "db"
 DB_NAME = "database.db"
 DB_DATETIME_FORMAT = "%Y-%m-%d %H:%M:%S.%f"
 
+
 class LoggerAction(Enum):
     UPSERT_DIM_ALL_ALBUMS = "upsertDimAllAlbums"
     UPSERT_DIM_ALL_ARTISTS = "upsertDimAllArtists"
