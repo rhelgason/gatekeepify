@@ -98,5 +98,7 @@ class TestSpotifyTypes(unittest.TestCase):
 
         self.assertEqual(
             track.to_json_str(),
-            '{"id": "123", "name": "test", "album": {"id": "456", "name": "test_album"}, "artists": [{"id": "789", "name": "test_artist"}, {"id": "234", "name": "test_artist_2"}]}',
+            '{"id": "123", "name": "test", "album": {"id": "456", '
+            '"name": "test_album"}, "artists": [{"id": "789", '
+            '"name": "test_artist"}, {"id": "234", "name": "test_artist_2"}]}',
         )
