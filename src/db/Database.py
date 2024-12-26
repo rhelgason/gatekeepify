@@ -168,6 +168,7 @@ class Database:
         query = """
         INSERT INTO dim_all_albums (album_id, album_name)
         VALUES (?, ?)
+        -- update if album has updated its name
         ON CONFLICT (album_id) DO UPDATE SET album_name=excluded.album_name
         """
         self.cursor.executemany(query, [(album.id, album.name) for album in albums])
@@ -182,6 +183,7 @@ class Database:
         query = """
         INSERT INTO dim_all_tracks (track_id, track_name, album_id)
         VALUES (?, ?, ?)
+        -- update if track has updated its name or album
         ON CONFLICT (track_id) DO UPDATE SET track_name=excluded.track_name, album_id=excluded.album_id
         """
         self.cursor.executemany(
@@ -198,6 +200,7 @@ class Database:
         query = """
         INSERT INTO dim_all_artists (artist_id, artist_name)
         VALUES (?, ?)
+        -- update if artist has updated their name
         ON CONFLICT (artist_id) DO UPDATE SET artist_name=excluded.artist_name
         """
         self.cursor.executemany(query, [(artist.id, artist.name) for artist in artists])
@@ -212,8 +215,10 @@ class Database:
         query = """
         INSERT INTO track_to_artist (track_id, artist_id)
         VALUES (?, ?)
+        -- do nothing, as track to artist mapping already exists
         ON CONFLICT (track_id, artist_id) DO NOTHING
         """
+        # TODO: remove preexisting artists that may now be invalid
         self.cursor.executemany(
             query,
             [(track.id, artist.id) for track in tracks for artist in track.artists],
@@ -229,6 +234,7 @@ class Database:
         query = """
         INSERT INTO dim_all_users (user_id, user_name)
         VALUES (?, ?)
+        -- update if user has updated their name
         ON CONFLICT (user_id) DO UPDATE SET user_name=excluded.user_name
         """
         self.cursor.execute(query, (user.id, user.name))
@@ -242,6 +248,7 @@ class Database:
         query = """
         INSERT INTO dim_all_listens (user_id, track_id, ts)
         VALUES (?, ?, ?)
+        -- do nothing, as listen already exists for that user and time
         ON CONFLICT (user_id, track_id, ts) DO NOTHING
         """
         self.cursor.executemany(

@@ -69,6 +69,8 @@ class Track(Artifact):
             [Artist.from_dict(artist) for artist in data["artists"]],
         )
 
+    # TODO: overhaul eq method
+
     def _to_json(self) -> Dict[str, Any]:
         json = super()._to_json()
         json["album"] = self.album._to_json()
