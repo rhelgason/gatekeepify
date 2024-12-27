@@ -212,18 +212,30 @@ class Database:
 
     # upserts tracks to artists into track_to_artist
     def __upsert_track_to_artist(self, tracks: Set[Track]):
+        # remove artists that are no longer associated with track
+        query = """
+        DELETE FROM track_to_artist
+        WHERE track_id=?
+        AND artist_id NOT IN (?)
+        """
+        self.cursor.executemany(
+            query, [(track.id, ", ".join(map(str, track.artists)),) for track in tracks]
+        )
+        self.conn.commit()
+
+        # upsert new tracks to artists
         query = """
         INSERT INTO track_to_artist (track_id, artist_id)
         VALUES (?, ?)
         -- do nothing, as track to artist mapping already exists
         ON CONFLICT (track_id, artist_id) DO NOTHING
         """
-        # TODO: remove preexisting artists that may now be invalid
         self.cursor.executemany(
             query,
             [(track.id, artist.id) for track in tracks for artist in track.artists],
         )
         self.conn.commit()
+
         self.__upsert_dim_all_logs(
             LoggerAction.UPSERT_TRACK_TO_ARTIST,
             json.dumps([track.to_json_str() for track in tracks]),
