@@ -2,9 +2,10 @@ import os
 import pathlib as pl
 import unittest
 
-from constants import HOST_CONSTANTS_TEST_PATH
-from getpass import getpass
+from constants import CLIENT_DATETIME_FORMAT, HOST_CONSTANTS_TEST_PATH
+from datetime import datetime
 from SpotifyClient import SpotifyClient
+from spotify.types import Album, Artist, Track
 from unittest.mock import patch
 
 CLIENT_ID = "test_id"
@@ -15,14 +16,14 @@ class TestSpotifyClient(unittest.TestCase):
     def setUp(self) -> None:
         self.path = ".".join((HOST_CONSTANTS_TEST_PATH, "py"))
 
-    def test_get_host_client(self, mock_input) -> None:
         # delete test constants, if exists
         try:
             os.remove(self.path)
         except OSError:
             pass
         self.assertEqual(pl.Path(self.path).resolve().is_file(), False)
-        
+
+    def test_get_host_client(self, mock_input) -> None:    
         SpotifyClient(is_test=True)
         self.assertEqual(mock_input.call_count, 2)
         self.assertEqual(pl.Path(self.path).resolve().is_file(), True)
@@ -35,6 +36,78 @@ class TestSpotifyClient(unittest.TestCase):
         )
         self.assertEqual(host_constants_spec.CLIENT_ID, CLIENT_ID)
         self.assertEqual(host_constants_spec.CLIENT_SECRET, CLIENT_SECRET)
+    
+    @patch("spotipy.Spotify.current_user_recently_played")
+    def test_gen_most_recent_listens(self, mock_recently_played, mock_input) -> None:
+        played_at_1 = "2024-12-27T22:30:04.214000Z"
+        played_at_2 = "2024-12-26T16:48:12.712392Z"
+        played_at_datetime_1 = datetime.strptime(played_at_1, CLIENT_DATETIME_FORMAT)
+        played_at_datetime_2 = datetime.strptime(played_at_2, CLIENT_DATETIME_FORMAT)
+        mock_recently_played.return_value = {
+            "items": [
+                {
+                    "track": {
+                        "id": "123",
+                        "name": "test track name",
+                        "album": {
+                            "id": "234",
+                            "name": "test album name",
+                        },
+                        "artists": [
+                            {
+                                "id": "345",
+                                "name": "test artist name",
+                            },
+                            {
+                                "id": "678",
+                                "name": "test artist name 2",
+                            }
+                        ],
+                    },
+                    "played_at": played_at_1
+                },
+                {
+                    "track": {
+                        "id": "456",
+                        "name": "test track name 2",
+                        "album": {
+                            "id": "567",
+                            "name": "test album name 2",
+                        },
+                        "artists": [
+                            {
+                                "id": "678",
+                                "name": "test artist name 2",
+                            },
+                            {
+                                "id": "912",
+                                "name": "test artist name 3",
+                            }
+                        ],
+                    },
+                    "played_at": played_at_2
+                },
+            ]
+        }
+
+        client = SpotifyClient(is_test=True)
+        self.assertEqual(mock_input.call_count, 2)
+        recent_listens = client.gen_most_recent_listens()
+
+        self.assertEqual(len(recent_listens), 2)
+        self.assertEqual(sorted(recent_listens.keys()), [played_at_datetime_2, played_at_datetime_1])
+        self.assertEqual(
+            recent_listens[played_at_datetime_1],
+            Track("123", "test track name", Album("234", "test album name"), [
+                Artist("345", "test artist name"), Artist("678", "test artist name 2")
+            ])
+        )
+        self.assertEqual(
+            recent_listens[played_at_datetime_2],
+            Track("456", "test track name 2", Album("567", "test album name 2"), [
+                Artist("678", "test artist name 2"), Artist("912", "test artist name 3")
+            ])
+        )
 
     def tearDown(self) -> None:
         os.remove(self.path)
