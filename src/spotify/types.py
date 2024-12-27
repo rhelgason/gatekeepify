@@ -23,6 +23,9 @@ class Artifact:
     def __eq__(self, other) -> bool:
         return self.id == other.id and self.name == other.name
 
+    def __lt__(self, other):
+        return self.id < other.id
+
     def _to_json(self) -> Dict[str, Any]:
         return {
             "id": self.id,
@@ -68,8 +71,12 @@ class Track(Artifact):
             Album.from_dict(data["album"]),
             [Artist.from_dict(artist) for artist in data["artists"]],
         )
+    
+    def __hash__(self) -> int:
+        return hash(self.id)
 
-    # TODO: overhaul eq method
+    def __eq__(self, other) -> bool:
+        return self.id == other.id and self.name == other.name and self.album == other.album and sorted(self.artists) == sorted(other.artists)
 
     def _to_json(self) -> Dict[str, Any]:
         json = super()._to_json()

@@ -73,19 +73,21 @@ class TestSpotifyTypes(unittest.TestCase):
         self.assertEqual(track.album, test_album)
         self.assertEqual(track.artists, [test_artist_1, test_artist_2])
 
+        ## tracks should be equal despite order of artists
         self.assertEqual(
             track, Track("123", "test", test_album, [test_artist_1, test_artist_2])
         )
+        self.assertEqual(
+            track, Track("123", "test", test_album, [test_artist_2, test_artist_1])
+        )
+
         self.assertNotEqual(
             track, Track("1234", "test", test_album, [test_artist_1, test_artist_2])
         )
         self.assertNotEqual(
             track, Track("123", "test2", test_album, [test_artist_1, test_artist_2])
         )
-
-        # tracks should be equal even if album or artists are different
-        # this is in case the album or artists are updated on the track
-        self.assertEqual(
+        self.assertNotEqual(
             track,
             Track(
                 "123",
@@ -94,7 +96,7 @@ class TestSpotifyTypes(unittest.TestCase):
                 [test_artist_1, test_artist_2],
             ),
         )
-        self.assertEqual(track, Track("123", "test", test_album, [test_artist_1]))
+        self.assertNotEqual(track, Track("123", "test", test_album, [test_artist_1]))
 
         self.assertEqual(
             track.to_json_str(),
