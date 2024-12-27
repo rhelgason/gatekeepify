@@ -7,6 +7,7 @@ from constants import (
     CLIENT_DATETIME_FORMAT,
     DEFAULT_SCOPE,
     HOST_CONSTANTS_PATH,
+    HOST_CONSTANTS_TEST_PATH,
     MAXIMUM_RECENT_TRACKS,
     REDIRECT_URI,
 )
@@ -19,8 +20,8 @@ class SpotifyClient:
     client: spotipy.Spotify
     db: Database
 
-    def __init__(self) -> None:
-        client_id, client_secret = self.get_host_constants()
+    def __init__(self, is_test: bool = False) -> None:
+        client_id, client_secret = self.get_host_constants(is_test)
         self.client = spotipy.Spotify(
             auth_manager=SpotifyOAuth(
                 client_id=client_id,
@@ -32,10 +33,11 @@ class SpotifyClient:
         self.db = Database()
 
     # get client id and secret if exists, otherwise get user input
-    def get_host_constants(self) -> Tuple[str, str]:
+    def get_host_constants(self, is_test: bool = False) -> Tuple[str, str]:
+        host_constants_path = HOST_CONSTANTS_TEST_PATH if is_test else HOST_CONSTANTS_PATH
         try:
             host_constants_spec = __import__(
-                "/".join(HOST_CONSTANTS_PATH.split("/")[1:]),
+                "/".join(host_constants_path.split("/")[1:]),
                 globals(),
                 locals(),
                 ["CLIENT_ID", "CLIENT_SECRET"],
@@ -45,8 +47,8 @@ class SpotifyClient:
         except:
             # constants file not found, get user input
             client_id = input("Please input your Spotify API client ID: ")
-            client_secret = getpass("Please input your Spotify API client secret: ")
-            f = open(".".join((HOST_CONSTANTS_PATH, "py")), "w")
+            client_secret = input("Please input your Spotify API client secret: ")
+            f = open(".".join((host_constants_path, "py")), "w")
             f.write('CLIENT_ID = "' + client_id + '"\n')
             f.write('CLIENT_SECRET = "' + client_secret + '"')
             f.close()
