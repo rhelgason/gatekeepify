@@ -4,7 +4,6 @@ import sqlite3
 from datetime import datetime
 from typing import Dict, Optional, Set
 
-from constants import MAXIMUM_RECENT_TRACKS
 from db.constants import DB_DATETIME_FORMAT, DB_DIRECTORY, DB_NAME, LoggerAction
 from spotify.types import Album, Artist, Track, User
 
