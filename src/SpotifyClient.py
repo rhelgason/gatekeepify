@@ -1,5 +1,4 @@
 from datetime import datetime, timezone
-from getpass import getpass
 from typing import Dict, Optional, Tuple
 
 import spotipy
@@ -47,6 +46,7 @@ class SpotifyClient:
         except:
             # constants file not found, get user input
             client_id = input("Please input your Spotify API client ID: ")
+            # TODO: reenable getpass, was not working with unittest patch
             client_secret = input("Please input your Spotify API client secret: ")
             f = open(".".join((host_constants_path, "py")), "w")
             f.write('CLIENT_ID = "' + client_id + '"\n')
