@@ -64,7 +64,9 @@ class SpotifyClient:
             raise Exception("No user found")
         return User.from_dict(res)
 
-    def gen_most_recent_listens(self, after: Optional[datetime] = None) -> List[Listen]:
+    def gen_most_recent_listens(
+        self, user: User, after: Optional[datetime] = None
+    ) -> List[Listen]:
         after_ts = (
             int(after.replace(tzinfo=timezone.utc).timestamp() * 1000)
             if after
@@ -77,9 +79,9 @@ class SpotifyClient:
             raise Exception("No recents found")
 
         recent_tracks = res["items"]
-        return [Listen.from_dict(track) for track in recent_tracks]
+        return [Listen.from_dict(track, user) for track in recent_tracks]
 
     def gen_run_cron_backfill(self, user: User) -> None:
         after_ts = self.db.get_most_recent_listen_time(user)
-        recent_listens = self.gen_most_recent_listens(after_ts)
-        self.db.upsert_cron_backfill(user, recent_listens)
+        recent_listens = self.gen_most_recent_listens(user, after_ts)
+        self.db.upsert_cron_backfill(recent_listens)

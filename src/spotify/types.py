@@ -97,24 +97,31 @@ class Track(Artifact):
 class Listen:
     track: Track
     ts: datetime
+    user: User
 
-    def __init__(self, track, ts) -> None:
+    def __init__(self, user, track, ts) -> None:
+        self.user = user
         self.track = track
         self.ts = ts
 
     @classmethod
-    def from_dict(cls, data):
+    def from_dict(cls, data, user: User):
         return cls(
+            user,
             Track.from_dict(data["track"]),
             datetime.strptime(data["played_at"], CLIENT_DATETIME_FORMAT),
         )
 
     # TODO: support user field to make hashes unique across users
     def __hash__(self) -> int:
-        return hash(self.track) ^ hash(self.ts)
+        return hash(self.user) ^ hash(self.track) ^ hash(self.ts)
 
     def __eq__(self, other) -> bool:
-        return self.track == other.track and self.ts == other.ts
+        return (
+            self.user == other.user
+            and self.track == other.track
+            and self.ts == other.ts
+        )
 
     def __lt__(self, other):
         return self.ts < other.ts
@@ -123,6 +130,7 @@ class Listen:
         return {
             "track": self.track._to_json(),
             "ts": self.ts.strftime(DB_DATETIME_FORMAT),
+            "user": self.user._to_json(),
         }
 
     def to_json_str(self) -> str:

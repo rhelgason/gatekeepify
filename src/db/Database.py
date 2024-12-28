@@ -138,8 +138,9 @@ class Database:
     """
 
     # top-level upsert method for all tables
-    def upsert_all_tables(self, user: User, listens: List[Listen]):
+    def upsert_all_tables(self, listens: List[Listen]):
         all_tracks = set(listen.track for listen in listens)
+        all_users = set(listen.user for listen in listens)
         all_albums = set([track.album for track in all_tracks])
         all_artists = set([artist for track in all_tracks for artist in track.artists])
 
@@ -147,14 +148,13 @@ class Database:
         self.__upsert_dim_all_tracks(all_tracks)
         self.__upsert_dim_all_artists(all_artists)
         self.__upsert_track_to_artist(all_tracks)
-        self.__upsert_dim_all_users(user)
-        self.__upsert_dim_all_listens(user, listens)
+        self.__upsert_dim_all_users(all_users)
+        self.__upsert_dim_all_listens(listens)
 
     # upserts all tables with logs for the current cron job
-    def upsert_cron_backfill(self, user: User, listens: List[Listen]):
-        self.upsert_all_tables(user, listens)
+    def upsert_cron_backfill(self, listens: List[Listen]):
+        self.upsert_all_tables(listens)
         log_json = {
-            "user": user.to_json_str(),
             "listens": [listen.to_json_str() for listen in listens],
         }
         self.__upsert_dim_all_logs(LoggerAction.RUN_CRON_BACKFILL, json.dumps(log_json))
@@ -245,21 +245,22 @@ class Database:
         )
 
     # upserts users into dim_all_users
-    def __upsert_dim_all_users(self, user: User):
+    def __upsert_dim_all_users(self, users: Set[User]):
         query = """
         INSERT INTO dim_all_users (user_id, user_name)
         VALUES (?, ?)
         -- update if user has updated their name
         ON CONFLICT (user_id) DO UPDATE SET user_name=excluded.user_name
         """
-        self.cursor.execute(query, (user.id, user.name))
+        self.cursor.executemany(query, [(user.id, user.name) for user in users])
         self.conn.commit()
         self.__upsert_dim_all_logs(
-            LoggerAction.UPSERT_DIM_ALL_USERS, user.to_json_str()
+            LoggerAction.UPSERT_DIM_ALL_USERS,
+            json.dumps([user.to_json_str() for user in users]),
         )
 
     # upserts listens into dim_all_listens
-    def __upsert_dim_all_listens(self, user: User, listens: List[Listen]):
+    def __upsert_dim_all_listens(self, listens: List[Listen]):
         query = """
         INSERT INTO dim_all_listens (user_id, track_id, ts)
         VALUES (?, ?, ?)
@@ -267,12 +268,11 @@ class Database:
         ON CONFLICT (user_id, track_id, ts) DO NOTHING
         """
         self.cursor.executemany(
-            query, [(user.id, listen.track.id, listen.ts) for listen in listens]
+            query, [(listen.user.id, listen.track.id, listen.ts) for listen in listens]
         )
         self.conn.commit()
 
         log_json = {
-            "user": user.to_json_str(),
             "listens": [listen.to_json_str() for listen in listens],
         }
         self.__upsert_dim_all_logs(

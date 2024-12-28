@@ -20,6 +20,7 @@ class TestDatabase(unittest.TestCase):
     def setUp(self) -> None:
         self.db = Database(db_name=DB_TEST_NAME)
         self.user_1 = User("12345", "test user")
+        self.user_2 = User("6789", "test user 2")
         self.track_1 = Track(
             "123",
             "test track",
@@ -34,12 +35,14 @@ class TestDatabase(unittest.TestCase):
         )
         self.base_upsert_data = [
             Listen(
+                self.user_1,
                 self.track_1,
                 datetime.strptime(
                     "2024-12-27T22:30:04.214000Z", CLIENT_DATETIME_FORMAT
                 ),
             ),
             Listen(
+                self.user_2,
                 self.track_2,
                 datetime.strptime(
                     "2024-12-26T16:48:12.712392Z", CLIENT_DATETIME_FORMAT
@@ -47,10 +50,7 @@ class TestDatabase(unittest.TestCase):
             ),
         ]
 
-        self.db.upsert_cron_backfill(
-            self.user_1,
-            self.base_upsert_data,
-        )
+        self.db.upsert_cron_backfill(self.base_upsert_data)
 
     def test_upsert_dim_all_albums(self) -> None:
         # base upsert case
@@ -63,7 +63,7 @@ class TestDatabase(unittest.TestCase):
 
         # overwrite existing album with new name
         self.track_1.album = Album("234", "test album new name")
-        self.db.upsert_cron_backfill(self.user_1, self.base_upsert_data)
+        self.db.upsert_cron_backfill(self.base_upsert_data)
         all_albums = self.db.get_all_albums()
         self.assertEqual(len(all_albums), 2)
         self.assertEqual(
@@ -87,7 +87,7 @@ class TestDatabase(unittest.TestCase):
             Artist("6789", "test artist 4"),
         ]
         self.track_2.album = Album("567", "test album 2 new name")
-        self.db.upsert_cron_backfill(self.user_1, self.base_upsert_data)
+        self.db.upsert_cron_backfill(self.base_upsert_data)
         all_tracks = self.db.get_all_tracks()
         self.assertEqual(len(all_tracks), 2)
         self.assertEqual(
@@ -113,7 +113,7 @@ class TestDatabase(unittest.TestCase):
             Artist("345", "test artist new name"),
             Artist("678", "test artist 2"),
         ]
-        self.db.upsert_cron_backfill(self.user_1, self.base_upsert_data)
+        self.db.upsert_cron_backfill(self.base_upsert_data)
         all_artists = self.db.get_all_artists()
         self.assertEqual(len(all_artists), 3)
         self.assertEqual(
@@ -144,7 +144,7 @@ class TestDatabase(unittest.TestCase):
             Artist("678", "test artist 2"),
             Artist("912", "test artist 3"),
         ]
-        self.db.upsert_cron_backfill(self.user_1, self.base_upsert_data)
+        self.db.upsert_cron_backfill(self.base_upsert_data)
         self.db.cursor.execute(query)
         results = self.db.cursor.fetchall()
         self.assertEqual(len(results), 2)
@@ -156,33 +156,20 @@ class TestDatabase(unittest.TestCase):
     def test_upsert_dim_all_users(self) -> None:
         # base upsert case
         all_users = self.db.get_all_users()
-        self.assertEqual(len(all_users), 1)
-        self.assertEqual(
-            sorted(list(all_users)),
-            [self.user_1],
-        )
-
-        # add new user
-        user_2 = User("6789", "test user 2")
-        self.db.upsert_cron_backfill(
-            user_2,
-            self.base_upsert_data,
-        )
-        all_users = self.db.get_all_users()
         self.assertEqual(len(all_users), 2)
         self.assertEqual(
             sorted(list(all_users)),
-            [self.user_1, user_2],
+            [self.user_1, self.user_2],
         )
 
         # overwrite existing user with new name
         self.user_1.name = "test user new name"
-        self.db.upsert_cron_backfill(self.user_1, self.base_upsert_data)
+        self.db.upsert_cron_backfill(self.base_upsert_data)
         all_users = self.db.get_all_users()
         self.assertEqual(len(all_users), 2)
         self.assertEqual(
             sorted(list(all_users)),
-            [self.user_1, user_2],
+            [self.user_1, self.user_2],
         )
 
     def tearDown(self) -> None:

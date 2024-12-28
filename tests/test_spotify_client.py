@@ -5,7 +5,7 @@ from datetime import datetime
 from unittest.mock import patch
 
 from constants import CLIENT_DATETIME_FORMAT, HOST_CONSTANTS_TEST_PATH
-from spotify.types import Album, Artist, Track
+from spotify.types import Album, Artist, Track, User
 from SpotifyClient import SpotifyClient
 
 CLIENT_ID = "test_id"
@@ -50,6 +50,7 @@ class TestSpotifyClient(unittest.TestCase):
         played_at_2 = "2024-12-26T16:48:12.712392Z"
         played_at_datetime_1 = datetime.strptime(played_at_1, CLIENT_DATETIME_FORMAT)
         played_at_datetime_2 = datetime.strptime(played_at_2, CLIENT_DATETIME_FORMAT)
+        user_1 = User("12345", "test user")
         mock_recently_played.return_value = {
             "items": [
                 {
@@ -100,7 +101,7 @@ class TestSpotifyClient(unittest.TestCase):
         client = SpotifyClient(is_test=True)
         mock_input.assert_called_once()
         mock_getpass.assert_called_once()
-        recent_listens = client.gen_most_recent_listens()
+        recent_listens = client.gen_most_recent_listens(user_1)
         sorted_listens = sorted(recent_listens)
 
         self.assertEqual(len(recent_listens), 2)
