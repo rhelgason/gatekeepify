@@ -1,15 +1,16 @@
 import os
 import pathlib as pl
 import unittest
+from datetime import datetime
+from unittest.mock import patch
 
 from constants import CLIENT_DATETIME_FORMAT, HOST_CONSTANTS_TEST_PATH
-from datetime import datetime
-from SpotifyClient import SpotifyClient
 from spotify.types import Album, Artist, Track
-from unittest.mock import patch
+from SpotifyClient import SpotifyClient
 
 CLIENT_ID = "test_id"
 CLIENT_SECRET = "test_secret"
+
 
 @patch("builtins.input", side_effect=[CLIENT_ID])
 @patch("getpass.getpass", return_value="test_secret")
@@ -40,7 +41,9 @@ class TestSpotifyClient(unittest.TestCase):
         self.assertEqual(host_constants_spec.CLIENT_SECRET, CLIENT_SECRET)
 
     @patch("spotipy.Spotify.current_user_recently_played")
-    def test_gen_most_recent_listens(self, mock_recently_played, mock_getpass, mock_input) -> None:
+    def test_gen_most_recent_listens(
+        self, mock_recently_played, mock_getpass, mock_input
+    ) -> None:
         played_at_1 = "2024-12-27T22:30:04.214000Z"
         played_at_2 = "2024-12-26T16:48:12.712392Z"
         played_at_datetime_1 = datetime.strptime(played_at_1, CLIENT_DATETIME_FORMAT)
@@ -63,10 +66,10 @@ class TestSpotifyClient(unittest.TestCase):
                             {
                                 "id": "678",
                                 "name": "test artist name 2",
-                            }
+                            },
                         ],
                     },
-                    "played_at": played_at_1
+                    "played_at": played_at_1,
                 },
                 {
                     "track": {
@@ -84,10 +87,10 @@ class TestSpotifyClient(unittest.TestCase):
                             {
                                 "id": "912",
                                 "name": "test artist name 3",
-                            }
+                            },
                         ],
                     },
-                    "played_at": played_at_2
+                    "played_at": played_at_2,
                 },
             ]
         }
@@ -98,18 +101,32 @@ class TestSpotifyClient(unittest.TestCase):
         recent_listens = client.gen_most_recent_listens()
 
         self.assertEqual(len(recent_listens), 2)
-        self.assertEqual(sorted(recent_listens.keys()), [played_at_datetime_2, played_at_datetime_1])
+        self.assertEqual(
+            sorted(recent_listens.keys()), [played_at_datetime_2, played_at_datetime_1]
+        )
         self.assertEqual(
             recent_listens[played_at_datetime_1],
-            Track("123", "test track name", Album("234", "test album name"), [
-                Artist("345", "test artist name"), Artist("678", "test artist name 2")
-            ])
+            Track(
+                "123",
+                "test track name",
+                Album("234", "test album name"),
+                [
+                    Artist("345", "test artist name"),
+                    Artist("678", "test artist name 2"),
+                ],
+            ),
         )
         self.assertEqual(
             recent_listens[played_at_datetime_2],
-            Track("456", "test track name 2", Album("567", "test album name 2"), [
-                Artist("678", "test artist name 2"), Artist("912", "test artist name 3")
-            ])
+            Track(
+                "456",
+                "test track name 2",
+                Album("567", "test album name 2"),
+                [
+                    Artist("678", "test artist name 2"),
+                    Artist("912", "test artist name 3"),
+                ],
+            ),
         )
 
     def tearDown(self) -> None:

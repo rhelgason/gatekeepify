@@ -218,7 +218,14 @@ class Database:
         AND artist_id NOT IN (?)
         """
         self.cursor.executemany(
-            query, [(track.id, ", ".join(map(str, track.artists)),) for track in tracks]
+            query,
+            [
+                (
+                    track.id,
+                    ", ".join(map(str, track.artists)),
+                )
+                for track in tracks
+            ],
         )
         self.conn.commit()
 
