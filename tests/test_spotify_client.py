@@ -11,7 +11,8 @@ from unittest.mock import patch
 CLIENT_ID = "test_id"
 CLIENT_SECRET = "test_secret"
 
-@patch("builtins.input", side_effect=[CLIENT_ID, CLIENT_SECRET])
+@patch("builtins.input", side_effect=[CLIENT_ID])
+@patch("getpass.getpass", return_value="test_secret")
 class TestSpotifyClient(unittest.TestCase):
     def setUp(self) -> None:
         self.path = ".".join((HOST_CONSTANTS_TEST_PATH, "py"))
@@ -23,9 +24,10 @@ class TestSpotifyClient(unittest.TestCase):
             pass
         self.assertEqual(pl.Path(self.path).resolve().is_file(), False)
 
-    def test_get_host_client(self, mock_input) -> None:    
+    def test_get_host_client(self, mock_getpass, mock_input) -> None:
         SpotifyClient(is_test=True)
-        self.assertEqual(mock_input.call_count, 2)
+        mock_input.assert_called_once()
+        mock_getpass.assert_called_once()
         self.assertEqual(pl.Path(self.path).resolve().is_file(), True)
         host_constants_spec = __import__(
             HOST_CONSTANTS_TEST_PATH.split("/")[-1].removesuffix(".py"),
@@ -36,9 +38,9 @@ class TestSpotifyClient(unittest.TestCase):
         )
         self.assertEqual(host_constants_spec.CLIENT_ID, CLIENT_ID)
         self.assertEqual(host_constants_spec.CLIENT_SECRET, CLIENT_SECRET)
-    
+
     @patch("spotipy.Spotify.current_user_recently_played")
-    def test_gen_most_recent_listens(self, mock_recently_played, mock_input) -> None:
+    def test_gen_most_recent_listens(self, mock_recently_played, mock_getpass, mock_input) -> None:
         played_at_1 = "2024-12-27T22:30:04.214000Z"
         played_at_2 = "2024-12-26T16:48:12.712392Z"
         played_at_datetime_1 = datetime.strptime(played_at_1, CLIENT_DATETIME_FORMAT)
@@ -91,7 +93,8 @@ class TestSpotifyClient(unittest.TestCase):
         }
 
         client = SpotifyClient(is_test=True)
-        self.assertEqual(mock_input.call_count, 2)
+        mock_input.assert_called_once()
+        mock_getpass.assert_called_once()
         recent_listens = client.gen_most_recent_listens()
 
         self.assertEqual(len(recent_listens), 2)
