@@ -65,6 +65,30 @@ class TestDatabase(unittest.TestCase):
             [Album("234", "test album new name"), Album("567", "test album 2")],
         )
 
+    def test_upsert_dim_all_tracks(self) -> None:
+        # base upsert case
+        all_tracks = self.db.get_all_tracks()
+        self.assertEqual(len(all_tracks), 2)
+        self.assertEqual(
+            sorted(list(all_tracks)),
+            [self.track_1, self.track_2],
+        )
+
+        # overwrite existing track with new name and artist
+        self.track_1.name = "test track new name"
+        self.track_1.artists = [
+            Artist("678", "test artist 2"),
+            Artist("6789", "test artist 4"),
+        ]
+        self.track_2.album = Album("567", "test album 2 new name")
+        self.db.upsert_cron_backfill(self.user_1, self.base_upsert_data)
+        all_tracks = self.db.get_all_tracks()
+        self.assertEqual(len(all_tracks), 2)
+        self.assertEqual(
+            sorted(list(all_tracks)),
+            [self.track_1, self.track_2],
+        )
+
     def test_upsert_dim_all_artists(self) -> None:
         # base upsert case
         all_artists = self.db.get_all_artists()

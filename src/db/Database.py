@@ -306,6 +306,26 @@ class Database:
         results = self.cursor.fetchall()
         return {Album(row[0], row[1]) for row in results}
 
+    def get_all_tracks(self) -> Set[Track]:
+        query = """
+        SELECT t.track_id, track_name, t.album_id, album_name, JSON_GROUP_ARRAY(JSON_ARRAY(ar.artist_id, ar.artist_name)) artists FROM dim_all_tracks t
+        LEFT JOIN dim_all_albums al ON t.album_id=al.album_id
+        LEFT JOIN track_to_artist ta ON t.track_id=ta.track_id
+        LEFT JOIN dim_all_artists ar ON ta.artist_id=ar.artist_id
+        GROUP BY t.track_id, track_name, t.album_id, album_name
+        """
+        self.cursor.execute(query)
+        results = self.cursor.fetchall()
+        return {
+            Track(
+                row[0],
+                row[1],
+                Album(row[2], row[3]),
+                [Artist(artist[0], artist[1]) for artist in json.loads(row[4])],
+            )
+            for row in results
+        }
+
     def get_all_artists(self) -> Set[Artist]:
         query = """
         SELECT artist_id, artist_name FROM dim_all_artists
