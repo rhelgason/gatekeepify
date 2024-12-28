@@ -2,10 +2,11 @@ import os
 import unittest
 from copy import deepcopy
 from datetime import datetime
+from logging import Logger
 from typing import List
 
 from constants import CLIENT_DATETIME_FORMAT
-from db.constants import DB_DIRECTORY, DB_TEST_NAME
+from db.constants import DB_DIRECTORY, DB_TEST_NAME, LoggerAction
 
 from db.Database import Database
 from spotify.types import Album, Artist, Listen, Track, User
@@ -43,6 +44,14 @@ class TestDatabase(unittest.TestCase):
 
         self.db.upsert_cron_backfill(self.base_upsert_data)
 
+    def assertLogsWrittenToDb(self, action: LoggerAction, count: int) -> None:
+        query = """
+        SELECT COUNT(*) FROM dim_all_logs WHERE action = ?
+        """
+        self.db.cursor.execute(query, (action.value,))
+        results = self.db.cursor.fetchall()
+        self.assertEqual(results[0][0], count)
+
     def test_upsert_dim_all_albums(self) -> None:
         # base upsert case
         all_albums = self.db.get_all_albums()
@@ -61,6 +70,8 @@ class TestDatabase(unittest.TestCase):
             sorted(list(all_albums)),
             [Album("234", "test album new name"), Album("567", "test album 2")],
         )
+
+        self.assertLogsWrittenToDb(LoggerAction.UPSERT_DIM_ALL_ALBUMS, 2)
 
     def test_upsert_dim_all_tracks(self) -> None:
         # base upsert case
@@ -85,6 +96,8 @@ class TestDatabase(unittest.TestCase):
             sorted(list(all_tracks)),
             [self.listen_1.track, self.listen_2.track],
         )
+
+        self.assertLogsWrittenToDb(LoggerAction.UPSERT_DIM_ALL_TRACKS, 2)
 
     def test_upsert_dim_all_artists(self) -> None:
         # base upsert case
@@ -116,6 +129,8 @@ class TestDatabase(unittest.TestCase):
             ],
         )
 
+        self.assertLogsWrittenToDb(LoggerAction.UPSERT_DIM_ALL_ARTISTS, 2)
+
     def test_upsert_track_to_artist(self) -> None:
         # base upsert case
         query = """
@@ -144,6 +159,8 @@ class TestDatabase(unittest.TestCase):
             [(self.listen_1.track.id, "678"), (self.listen_1.track.id, "912")],
         )
 
+        self.assertLogsWrittenToDb(LoggerAction.UPSERT_TRACK_TO_ARTIST, 2)
+
     def test_upsert_dim_all_users(self) -> None:
         # base upsert case
         all_users = self.db.get_all_users()
@@ -162,6 +179,8 @@ class TestDatabase(unittest.TestCase):
             sorted(list(all_users)),
             [self.listen_1.user, self.listen_2.user],
         )
+
+        self.assertLogsWrittenToDb(LoggerAction.UPSERT_DIM_ALL_USERS, 2)
 
     def test_upsert_dim_all_listens(self) -> None:
         # base upsert case
@@ -183,6 +202,8 @@ class TestDatabase(unittest.TestCase):
             sorted(list(all_listens)),
             [listen_3, self.listen_2, self.listen_1],
         )
+
+        self.assertLogsWrittenToDb(LoggerAction.UPSERT_DIM_ALL_LISTENS, 2)
 
     def tearDown(self) -> None:
         if self.db.conn:
