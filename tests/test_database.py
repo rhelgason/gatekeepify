@@ -12,43 +12,33 @@ from spotify.types import Album, Artist, Listen, Track, User
 
 class TestDatabase(unittest.TestCase):
     db: Database
-    user_1: User
-    track_1: Track
-    track_2: Track
+    listen_1: Listen
+    listen_1: Listen
     base_upsert_data: List[Listen]
 
     def setUp(self) -> None:
         self.db = Database(db_name=DB_TEST_NAME)
-        self.user_1 = User("12345", "test user")
-        self.user_2 = User("6789", "test user 2")
-        self.track_1 = Track(
-            "123",
-            "test track",
-            Album("234", "test album"),
-            [Artist("345", "test artist"), Artist("678", "test artist 2")],
-        )
-        self.track_2 = Track(
-            "456",
-            "test track 2",
-            Album("567", "test album 2"),
-            [Artist("678", "test artist 2"), Artist("912", "test artist 3")],
-        )
-        self.base_upsert_data = [
-            Listen(
-                self.user_1,
-                self.track_1,
-                datetime.strptime(
-                    "2024-12-27T22:30:04.214000Z", CLIENT_DATETIME_FORMAT
-                ),
+        self.listen_1 = Listen(
+            User("12345", "test user"),
+            Track(
+                "123",
+                "test track",
+                Album("234", "test album"),
+                [Artist("345", "test artist"), Artist("678", "test artist 2")],
             ),
-            Listen(
-                self.user_2,
-                self.track_2,
-                datetime.strptime(
-                    "2024-12-26T16:48:12.712392Z", CLIENT_DATETIME_FORMAT
-                ),
+            datetime.strptime("2024-12-27T22:30:04.214000Z", CLIENT_DATETIME_FORMAT),
+        )
+        self.listen_2 = Listen(
+            User("6789", "test user 2"),
+            Track(
+                "456",
+                "test track 2",
+                Album("567", "test album 2"),
+                [Artist("678", "test artist 2"), Artist("912", "test artist 3")],
             ),
-        ]
+            datetime.strptime("2024-12-26T16:48:12.712392Z", CLIENT_DATETIME_FORMAT),
+        )
+        self.base_upsert_data = [self.listen_1, self.listen_2]
 
         self.db.upsert_cron_backfill(self.base_upsert_data)
 
@@ -62,7 +52,7 @@ class TestDatabase(unittest.TestCase):
         )
 
         # overwrite existing album with new name
-        self.track_1.album = Album("234", "test album new name")
+        self.listen_1.track.album = Album("234", "test album new name")
         self.db.upsert_cron_backfill(self.base_upsert_data)
         all_albums = self.db.get_all_albums()
         self.assertEqual(len(all_albums), 2)
@@ -77,22 +67,22 @@ class TestDatabase(unittest.TestCase):
         self.assertEqual(len(all_tracks), 2)
         self.assertEqual(
             sorted(list(all_tracks)),
-            [self.track_1, self.track_2],
+            [self.listen_1.track, self.listen_2.track],
         )
 
         # overwrite existing track with new name and artist
-        self.track_1.name = "test track new name"
-        self.track_1.artists = [
+        self.listen_1.track.name = "test track new name"
+        self.listen_1.track.artists = [
             Artist("678", "test artist 2"),
             Artist("6789", "test artist 4"),
         ]
-        self.track_2.album = Album("567", "test album 2 new name")
+        self.listen_2.track.album = Album("567", "test album 2 new name")
         self.db.upsert_cron_backfill(self.base_upsert_data)
         all_tracks = self.db.get_all_tracks()
         self.assertEqual(len(all_tracks), 2)
         self.assertEqual(
             sorted(list(all_tracks)),
-            [self.track_1, self.track_2],
+            [self.listen_1.track, self.listen_2.track],
         )
 
     def test_upsert_dim_all_artists(self) -> None:
@@ -109,7 +99,7 @@ class TestDatabase(unittest.TestCase):
         )
 
         # overwrite existing artist with new name
-        self.track_1.artists = [
+        self.listen_1.track.artists = [
             Artist("345", "test artist new name"),
             Artist("678", "test artist 2"),
         ]
@@ -136,11 +126,11 @@ class TestDatabase(unittest.TestCase):
         self.assertEqual(len(results), 2)
         self.assertEqual(
             sorted(list(results)),
-            [(self.track_1.id, "345"), (self.track_1.id, "678")],
+            [(self.listen_1.track.id, "345"), (self.listen_1.track.id, "678")],
         )
 
         # overwrite existing track with new artist
-        self.track_1.artists = [
+        self.listen_1.track.artists = [
             Artist("678", "test artist 2"),
             Artist("912", "test artist 3"),
         ]
@@ -150,7 +140,7 @@ class TestDatabase(unittest.TestCase):
         self.assertEqual(len(results), 2)
         self.assertEqual(
             sorted(list(results)),
-            [(self.track_1.id, "678"), (self.track_1.id, "912")],
+            [(self.listen_1.track.id, "678"), (self.listen_1.track.id, "912")],
         )
 
     def test_upsert_dim_all_users(self) -> None:
@@ -159,17 +149,17 @@ class TestDatabase(unittest.TestCase):
         self.assertEqual(len(all_users), 2)
         self.assertEqual(
             sorted(list(all_users)),
-            [self.user_1, self.user_2],
+            [self.listen_1.user, self.listen_2.user],
         )
 
         # overwrite existing user with new name
-        self.user_1.name = "test user new name"
+        self.listen_1.user.name = "test user new name"
         self.db.upsert_cron_backfill(self.base_upsert_data)
         all_users = self.db.get_all_users()
         self.assertEqual(len(all_users), 2)
         self.assertEqual(
             sorted(list(all_users)),
-            [self.user_1, self.user_2],
+            [self.listen_1.user, self.listen_2.user],
         )
 
     def tearDown(self) -> None:
