@@ -298,6 +298,22 @@ class Database:
     METHODS FOR QUERYING ALL TABLES
     """
 
+    def get_all_albums(self) -> Set[Album]:
+        query = """
+        SELECT album_id, album_name FROM dim_all_albums
+        """
+        self.cursor.execute(query)
+        results = self.cursor.fetchall()
+        return {Album(row[0], row[1]) for row in results}
+
+    def get_all_artists(self) -> Set[Artist]:
+        query = """
+        SELECT artist_id, artist_name FROM dim_all_artists
+        """
+        self.cursor.execute(query)
+        results = self.cursor.fetchall()
+        return {Artist(row[0], row[1]) for row in results}
+
     # query most recent listen time for a user
     def gen_most_recent_listen_time(self, user: User) -> Optional[datetime]:
         query = """
