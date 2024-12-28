@@ -119,6 +119,66 @@ class TestDatabase(unittest.TestCase):
             ],
         )
 
+    def test_upsert_track_to_artist(self) -> None:
+        # base upsert case
+        query = """
+        SELECT track_id, artist_id FROM track_to_artist
+        WHERE track_id = '123'
+        """
+        self.db.cursor.execute(query)
+        results = self.db.cursor.fetchall()
+        self.assertEqual(len(results), 2)
+        self.assertEqual(
+            sorted(list(results)),
+            [(self.track_1.id, "345"), (self.track_1.id, "678")],
+        )
+
+        # overwrite existing track with new artist
+        self.track_1.artists = [
+            Artist("678", "test artist 2"),
+            Artist("912", "test artist 3"),
+        ]
+        self.db.upsert_cron_backfill(self.user_1, self.base_upsert_data)
+        self.db.cursor.execute(query)
+        results = self.db.cursor.fetchall()
+        self.assertEqual(len(results), 2)
+        self.assertEqual(
+            sorted(list(results)),
+            [(self.track_1.id, "678"), (self.track_1.id, "912")],
+        )
+
+    def test_upsert_dim_all_users(self) -> None:
+        # base upsert case
+        all_users = self.db.get_all_users()
+        self.assertEqual(len(all_users), 1)
+        self.assertEqual(
+            sorted(list(all_users)),
+            [self.user_1],
+        )
+
+        # add new user
+        user_2 = User("6789", "test user 2")
+        self.db.upsert_cron_backfill(
+            user_2,
+            self.base_upsert_data,
+        )
+        all_users = self.db.get_all_users()
+        self.assertEqual(len(all_users), 2)
+        self.assertEqual(
+            sorted(list(all_users)),
+            [self.user_1, user_2],
+        )
+
+        # overwrite existing user with new name
+        self.user_1.name = "test user new name"
+        self.db.upsert_cron_backfill(self.user_1, self.base_upsert_data)
+        all_users = self.db.get_all_users()
+        self.assertEqual(len(all_users), 2)
+        self.assertEqual(
+            sorted(list(all_users)),
+            [self.user_1, user_2],
+        )
+
     def tearDown(self) -> None:
         if self.db.conn:
             self.db.conn.close()

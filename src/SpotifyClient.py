@@ -87,6 +87,6 @@ class SpotifyClient:
         }
 
     def gen_run_cron_backfill(self, user: User) -> None:
-        after_ts = self.db.gen_most_recent_listen_time(user)
+        after_ts = self.db.get_most_recent_listen_time(user)
         recent_listens = self.gen_most_recent_listens(after_ts)
         self.db.upsert_cron_backfill(user, recent_listens)

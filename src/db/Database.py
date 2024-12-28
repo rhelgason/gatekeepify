@@ -334,8 +334,16 @@ class Database:
         results = self.cursor.fetchall()
         return {Artist(row[0], row[1]) for row in results}
 
+    def get_all_users(self) -> Set[User]:
+        query = """
+        SELECT user_id, user_name FROM dim_all_users
+        """
+        self.cursor.execute(query)
+        results = self.cursor.fetchall()
+        return {User(row[0], row[1]) for row in results}
+
     # query most recent listen time for a user
-    def gen_most_recent_listen_time(self, user: User) -> Optional[datetime]:
+    def get_most_recent_listen_time(self, user: User) -> Optional[datetime]:
         query = """
         SELECT MAX(ts) FROM dim_all_listens WHERE user_id=?
         """
