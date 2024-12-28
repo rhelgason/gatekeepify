@@ -302,7 +302,13 @@ class Database:
 
     def get_all_tracks(self) -> Set[Track]:
         query = """
-        SELECT t.track_id, track_name, t.album_id, album_name, JSON_GROUP_ARRAY(JSON_ARRAY(ar.artist_id, ar.artist_name)) artists FROM dim_all_tracks t
+        SELECT
+            t.track_id,
+            track_name,
+            t.album_id,
+            album_name,
+            JSON_GROUP_ARRAY(JSON_ARRAY(ar.artist_id, ar.artist_name)) artists
+        FROM dim_all_tracks t
         LEFT JOIN dim_all_albums al ON t.album_id=al.album_id
         LEFT JOIN track_to_artist ta ON t.track_id=ta.track_id
         LEFT JOIN dim_all_artists ar ON ta.artist_id=ar.artist_id
@@ -335,6 +341,41 @@ class Database:
         self.cursor.execute(query)
         results = self.cursor.fetchall()
         return {User(row[0], row[1]) for row in results}
+
+    def get_all_listens(self) -> Set[Listen]:
+        query = """
+        SELECT
+            l.user_id,
+            u.user_name,
+            ts,
+            t.track_id,
+            track_name,
+            t.album_id,
+            album_name,
+            JSON_GROUP_ARRAY(JSON_ARRAY(ar.artist_id, ar.artist_name)) artists
+        FROM dim_all_listens l
+        LEFT JOIN dim_all_users u ON l.user_id=u.user_id
+        LEFT JOIN dim_all_tracks t ON l.track_id=t.track_id
+        LEFT JOIN dim_all_albums al ON t.album_id=al.album_id
+        LEFT JOIN track_to_artist ta ON t.track_id=ta.track_id
+        LEFT JOIN dim_all_artists ar ON ta.artist_id=ar.artist_id
+        GROUP BY l.user_id, u.user_name, ts, t.track_id, track_name, t.album_id, album_name
+        """
+        self.cursor.execute(query)
+        results = self.cursor.fetchall()
+        return {
+            Listen(
+                User(row[0], row[1]),
+                Track(
+                    row[3],
+                    row[4],
+                    Album(row[5], row[6]),
+                    [Artist(artist[0], artist[1]) for artist in json.loads(row[7])],
+                ),
+                datetime.strptime(row[2], DB_DATETIME_FORMAT),
+            )
+            for row in results
+        }
 
     # query most recent listen time for a user
     def get_most_recent_listen_time(self, user: User) -> Optional[datetime]:

@@ -124,6 +124,8 @@ class Listen:
         )
 
     def __lt__(self, other):
+        if self.ts == other.ts:
+            return self.user < other.user
         return self.ts < other.ts
 
     def _to_json(self) -> Dict[str, Any]:

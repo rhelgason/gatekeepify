@@ -1,5 +1,6 @@
 import os
 import unittest
+from copy import deepcopy
 from datetime import datetime
 from typing import List
 
@@ -160,6 +161,27 @@ class TestDatabase(unittest.TestCase):
         self.assertEqual(
             sorted(list(all_users)),
             [self.listen_1.user, self.listen_2.user],
+        )
+
+    def test_upsert_dim_all_listens(self) -> None:
+        # base upsert case
+        all_listens = self.db.get_all_listens()
+        self.assertEqual(len(all_listens), 2)
+        self.assertEqual(
+            sorted(list(all_listens)),
+            [self.listen_2, self.listen_1],
+        )
+
+        # add equivalent listen with different user
+        listen_3 = deepcopy(self.listen_2)
+        listen_3.user = User("12345", "test user")
+        self.base_upsert_data.append(listen_3)
+        self.db.upsert_cron_backfill(self.base_upsert_data)
+        all_listens = self.db.get_all_listens()
+        self.assertEqual(len(all_listens), 3)
+        self.assertEqual(
+            sorted(list(all_listens)),
+            [listen_3, self.listen_2, self.listen_1],
         )
 
     def tearDown(self) -> None:
