@@ -1,13 +1,13 @@
 import os
 import unittest
 from datetime import datetime
-from typing import Dict
+from typing import List
 
 from constants import CLIENT_DATETIME_FORMAT
 from db.constants import DB_DIRECTORY, DB_TEST_NAME
 
 from db.Database import Database
-from spotify.types import Album, Artist, Track, User
+from spotify.types import Album, Artist, Listen, Track, User
 
 
 class TestDatabase(unittest.TestCase):
@@ -15,7 +15,7 @@ class TestDatabase(unittest.TestCase):
     user_1: User
     track_1: Track
     track_2: Track
-    base_upsert_data: Dict[datetime, Track]
+    base_upsert_data: List[Listen]
 
     def setUp(self) -> None:
         self.db = Database(db_name=DB_TEST_NAME)
@@ -32,14 +32,20 @@ class TestDatabase(unittest.TestCase):
             Album("567", "test album 2"),
             [Artist("678", "test artist 2"), Artist("912", "test artist 3")],
         )
-        self.base_upsert_data = {
-            datetime.strptime(
-                "2024-12-27T22:30:04.214000Z", CLIENT_DATETIME_FORMAT
-            ): self.track_1,
-            datetime.strptime(
-                "2024-12-26T16:48:12.712392Z", CLIENT_DATETIME_FORMAT
-            ): self.track_2,
-        }
+        self.base_upsert_data = [
+            Listen(
+                self.track_1,
+                datetime.strptime(
+                    "2024-12-27T22:30:04.214000Z", CLIENT_DATETIME_FORMAT
+                ),
+            ),
+            Listen(
+                self.track_2,
+                datetime.strptime(
+                    "2024-12-26T16:48:12.712392Z", CLIENT_DATETIME_FORMAT
+                ),
+            ),
+        ]
 
         self.db.upsert_cron_backfill(
             self.user_1,

@@ -101,25 +101,15 @@ class TestSpotifyClient(unittest.TestCase):
         mock_input.assert_called_once()
         mock_getpass.assert_called_once()
         recent_listens = client.gen_most_recent_listens()
+        sorted_listens = sorted(recent_listens)
 
         self.assertEqual(len(recent_listens), 2)
         self.assertEqual(
-            sorted(recent_listens.keys()), [played_at_datetime_2, played_at_datetime_1]
+            [listen.ts for listen in sorted_listens],
+            [played_at_datetime_2, played_at_datetime_1],
         )
         self.assertEqual(
-            recent_listens[played_at_datetime_1],
-            Track(
-                "123",
-                "test track name",
-                Album("234", "test album name"),
-                [
-                    Artist("345", "test artist name"),
-                    Artist("678", "test artist name 2"),
-                ],
-            ),
-        )
-        self.assertEqual(
-            recent_listens[played_at_datetime_2],
+            sorted_listens[0].track,
             Track(
                 "456",
                 "test track name 2",
@@ -127,6 +117,18 @@ class TestSpotifyClient(unittest.TestCase):
                 [
                     Artist("678", "test artist name 2"),
                     Artist("912", "test artist name 3"),
+                ],
+            ),
+        )
+        self.assertEqual(
+            sorted_listens[1].track,
+            Track(
+                "123",
+                "test track name",
+                Album("234", "test album name"),
+                [
+                    Artist("345", "test artist name"),
+                    Artist("678", "test artist name 2"),
                 ],
             ),
         )

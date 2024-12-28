@@ -2,10 +2,10 @@ import json
 import os
 import sqlite3
 from datetime import datetime
-from typing import Dict, Optional, Set
+from typing import List, Optional, Set
 
 from db.constants import DB_DATETIME_FORMAT, DB_DIRECTORY, DB_NAME, LoggerAction
-from spotify.types import Album, Artist, Track, User
+from spotify.types import Album, Artist, Listen, Track, User
 
 """
 Database setup for Gatekeepify. Currently includes the following tables:
@@ -138,8 +138,8 @@ class Database:
     """
 
     # top-level upsert method for all tables
-    def upsert_all_tables(self, user: User, listens: Dict[datetime, Track]):
-        all_tracks = set(listens.values())
+    def upsert_all_tables(self, user: User, listens: List[Listen]):
+        all_tracks = set(listen.track for listen in listens)
         all_albums = set([track.album for track in all_tracks])
         all_artists = set([artist for track in all_tracks for artist in track.artists])
 
@@ -151,14 +151,11 @@ class Database:
         self.__upsert_dim_all_listens(user, listens)
 
     # upserts all tables with logs for the current cron job
-    def upsert_cron_backfill(self, user: User, listens: Dict[datetime, Track]):
+    def upsert_cron_backfill(self, user: User, listens: List[Listen]):
         self.upsert_all_tables(user, listens)
         log_json = {
             "user": user.to_json_str(),
-            "listens": {
-                ts.strftime(DB_DATETIME_FORMAT): track.to_json_str()
-                for ts, track in listens.items()
-            },
+            "listens": [listen.to_json_str() for listen in listens],
         }
         self.__upsert_dim_all_logs(LoggerAction.RUN_CRON_BACKFILL, json.dumps(log_json))
 
@@ -262,7 +259,7 @@ class Database:
         )
 
     # upserts listens into dim_all_listens
-    def __upsert_dim_all_listens(self, user: User, listens: Dict[datetime, Track]):
+    def __upsert_dim_all_listens(self, user: User, listens: List[Listen]):
         query = """
         INSERT INTO dim_all_listens (user_id, track_id, ts)
         VALUES (?, ?, ?)
@@ -270,16 +267,13 @@ class Database:
         ON CONFLICT (user_id, track_id, ts) DO NOTHING
         """
         self.cursor.executemany(
-            query, [(user.id, track.id, ts) for ts, track in listens.items()]
+            query, [(user.id, listen.track.id, listen.ts) for listen in listens]
         )
         self.conn.commit()
 
         log_json = {
             "user": user.to_json_str(),
-            "listens": {
-                ts.strftime(DB_DATETIME_FORMAT): track.to_json_str()
-                for ts, track in listens.items()
-            },
+            "listens": [listen.to_json_str() for listen in listens],
         }
         self.__upsert_dim_all_logs(
             LoggerAction.UPSERT_DIM_ALL_LISTENS, json.dumps(log_json)

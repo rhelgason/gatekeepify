@@ -1,6 +1,6 @@
 import getpass
 from datetime import datetime, timezone
-from typing import Dict, Optional, Tuple
+from typing import List, Optional, Tuple
 
 import spotipy
 from constants import (
@@ -12,7 +12,7 @@ from constants import (
     REDIRECT_URI,
 )
 from db.Database import Database
-from spotify.types import Track, User
+from spotify.types import Listen, Track, User
 from spotipy.oauth2 import SpotifyOAuth
 
 
@@ -64,9 +64,7 @@ class SpotifyClient:
             raise Exception("No user found")
         return User.from_dict(res)
 
-    def gen_most_recent_listens(
-        self, after: Optional[datetime] = None
-    ) -> Dict[datetime, Track]:
+    def gen_most_recent_listens(self, after: Optional[datetime] = None) -> List[Listen]:
         after_ts = (
             int(after.replace(tzinfo=timezone.utc).timestamp() * 1000)
             if after
@@ -79,12 +77,7 @@ class SpotifyClient:
             raise Exception("No recents found")
 
         recent_tracks = res["items"]
-        return {
-            datetime.strptime(
-                track["played_at"], CLIENT_DATETIME_FORMAT
-            ): Track.from_dict(track["track"])
-            for track in recent_tracks
-        }
+        return [Listen.from_dict(track) for track in recent_tracks]
 
     def gen_run_cron_backfill(self, user: User) -> None:
         after_ts = self.db.get_most_recent_listen_time(user)
