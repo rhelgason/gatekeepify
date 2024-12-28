@@ -1,6 +1,8 @@
 import unittest
+from datetime import datetime
 
-from spotify.types import Album, Artist, Track, User
+from constants import CLIENT_DATETIME_FORMAT
+from spotify.types import Album, Artist, Listen, Track, User
 
 
 class TestSpotifyTypes(unittest.TestCase):
@@ -103,4 +105,81 @@ class TestSpotifyTypes(unittest.TestCase):
             '{"id": "123", "name": "test", "album": {"id": "456", '
             '"name": "test_album"}, "artists": [{"id": "789", '
             '"name": "test_artist"}, {"id": "234", "name": "test_artist_2"}]}',
+        )
+
+    def test_listen(self) -> None:
+        test_user = User("12345", "test user")
+        test_track = Track(
+            "123",
+            "test track",
+            Album("234", "test album"),
+            [Artist("345", "test artist"), Artist("678", "test artist 2")],
+        )
+        data = {
+            "track": test_track._to_json(),
+            "played_at": "2024-12-27T22:30:04.214000Z",
+            "user": test_user._to_json(),
+        }
+        listen = Listen.from_dict(data, test_user)
+
+        self.assertEqual(listen.track, test_track)
+        self.assertEqual(listen.user, test_user)
+        self.assertEqual(
+            listen.ts,
+            datetime.strptime("2024-12-27T22:30:04.214000Z", CLIENT_DATETIME_FORMAT),
+        )
+
+        self.assertEqual(
+            listen,
+            Listen(
+                test_user,
+                test_track,
+                datetime.strptime(
+                    "2024-12-27T22:30:04.214000Z", CLIENT_DATETIME_FORMAT
+                ),
+            ),
+        )
+
+        self.assertNotEqual(
+            listen,
+            Listen(
+                User("6789", "test user 2"),
+                test_track,
+                datetime.strptime(
+                    "2024-12-27T22:30:04.214000Z", CLIENT_DATETIME_FORMAT
+                ),
+            ),
+        )
+        self.assertNotEqual(
+            listen,
+            Listen(
+                test_user,
+                Track(
+                    "123",
+                    "test track",
+                    Album("234", "test album"),
+                    [Artist("345", "test artist"), Artist("678", "test artist 3")],
+                ),
+                datetime.strptime(
+                    "2024-12-27T22:30:04.214000Z", CLIENT_DATETIME_FORMAT
+                ),
+            ),
+        )
+        self.assertNotEqual(
+            listen,
+            Listen(
+                test_user,
+                test_track,
+                datetime.strptime(
+                    "2024-11-28T16:33:29.214000Z", CLIENT_DATETIME_FORMAT
+                ),
+            ),
+        )
+
+        self.assertEqual(
+            listen.to_json_str(),
+            '{"track": {"id": "123", "name": "test track", "album": {"id": "234", '
+            '"name": "test album"}, "artists": [{"id": "345", "name": "test artist"}, '
+            '{"id": "678", "name": "test artist 2"}]}, "ts": "2024-12-27 22:30:04.'
+            '214000", "user": {"id": "12345", "name": "test user"}}',
         )
