@@ -2,6 +2,7 @@ from enum import Enum
 
 DB_DIRECTORY = "db"
 DB_NAME = "database.db"
+DB_TEST_NAME = "test_database.db"
 DB_DATETIME_FORMAT = "%Y-%m-%d %H:%M:%S.%f"
 
 

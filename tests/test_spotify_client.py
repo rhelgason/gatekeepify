@@ -15,6 +15,8 @@ CLIENT_SECRET = "test_secret"
 @patch("builtins.input", side_effect=[CLIENT_ID])
 @patch("getpass.getpass", return_value="test_secret")
 class TestSpotifyClient(unittest.TestCase):
+    path: str
+
     def setUp(self) -> None:
         self.path = ".".join((HOST_CONSTANTS_TEST_PATH, "py"))
 

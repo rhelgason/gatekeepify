@@ -29,7 +29,7 @@ class Database:
         self.cursor = self.conn.cursor()
         self.__create_all_tables()
 
-    def close(self):
+    def __del__(self):
         self.conn.close()
 
     """
