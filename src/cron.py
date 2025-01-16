@@ -7,5 +7,4 @@ This is because Spotify API returns a maximum of 50 tracks, and
 they only record a listen if the track was played at least 30 seconds.
 """
 client = SpotifyClient()
-user = client.gen_current_user()
-client.gen_run_cron_backfill(user)
+client.gen_run_cron_backfill()

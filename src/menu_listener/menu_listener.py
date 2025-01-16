@@ -1,19 +1,13 @@
 import os
 from typing import Generic, Optional, Type, TypeVar, Union
 
+from constants import APP_TITLE
+
 from menu_listener.menu_options import MenuOptions
 from pynput import keyboard
 
 MAX_ENTRIES = 9
 ASCII_1 = 49
-APP_TITLE = """
-  ____       _       _                   _  __       
- / ___| __ _| |_ ___| | _____  ___ _ __ (_)/ _|_   _ 
-| |  _ / _` | __/ _ \ |/ / _ \/ _ \ '_ \| | |_| | | |
-| |_| | (_| | ||  __/   <  __/  __/ |_) | |  _| |_| |
- \____|\__,_|\__\___|_|\_\___|\___| .__/|_|_|  \__, |
-                                  |_|          |___/ 
-"""
 
 E = TypeVar("E", bound=MenuOptions)
 

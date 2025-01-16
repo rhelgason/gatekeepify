@@ -203,7 +203,7 @@ class TestDatabase(unittest.TestCase):
         )
 
         self.assertLogsWrittenToDb(LoggerAction.UPSERT_DIM_ALL_LISTENS, 2)
-    
+
     def test_get_all_listens(self) -> None:
         listen_3 = deepcopy(self.listen_2)
         listen_3.user = User("12345", "test user")
@@ -220,7 +220,8 @@ class TestDatabase(unittest.TestCase):
 
         # query by timestamp only
         all_listens = self.db.get_all_listens(
-            None, datetime.strptime("2024-12-27T00:00:00.000000Z", CLIENT_DATETIME_FORMAT)
+            None,
+            datetime.strptime("2024-12-27T00:00:00.000000Z", CLIENT_DATETIME_FORMAT),
         )
         self.assertEqual(len(all_listens), 2)
         self.assertEqual(

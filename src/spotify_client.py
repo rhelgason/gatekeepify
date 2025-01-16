@@ -1,6 +1,6 @@
 import getpass
 from datetime import datetime, timezone
-from typing import List, Optional, Tuple
+from typing import List, Optional, Set, Tuple
 
 import spotipy
 from constants import (
@@ -11,7 +11,7 @@ from constants import (
     REDIRECT_URI,
 )
 from db.Database import Database
-from spotify.types import Listen, Track, User
+from spotify.types import Listen, User
 from spotipy.oauth2 import SpotifyOAuth
 
 
@@ -80,7 +80,11 @@ class SpotifyClient:
         recent_tracks = res["items"]
         return [Listen.from_dict(track, user) for track in recent_tracks]
 
-    def gen_run_cron_backfill(self, user: User) -> None:
+    def gen_run_cron_backfill(self) -> None:
+        user = self.gen_current_user()
         after_ts = self.db.get_most_recent_listen_time(user)
         recent_listens = self.gen_most_recent_listens(user, after_ts)
         self.db.upsert_cron_backfill(recent_listens)
+
+    def gen_all_listens(self, ds: Optional[datetime]) -> Set[Listen]:
+        return self.db.get_all_listens(self.gen_current_user(), ds)
