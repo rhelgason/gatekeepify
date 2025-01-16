@@ -2,6 +2,7 @@ async-timeout==5.0.1
 certifi==2024.8.30
 charset-normalizer==3.4.0
 idna==3.10
+prettytable==3.12.0
 pynput==1.7.7
 pyobjc-core==11.0
 pyobjc-framework-ApplicationServices==11.0
@@ -13,3 +14,4 @@ requests==2.32.3
 six==1.17.0
 spotipy==2.24.0
 urllib3==2.2.3
+wcwidth==0.2.13
