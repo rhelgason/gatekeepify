@@ -8,5 +8,11 @@ class MenuOptions(Enum):
 
 
 class MainMenuOptions(MenuOptions):
-    DO_NOTHING = "Do Nothing"
+    VIEW_MY_STATS = "View My Stats"
     QUIT = "Quit"
+
+class DateOptions(MenuOptions):
+    LAST_MONTH = "Last Month"
+    LAST_YEAR = "Last Year"
+    ALL_TIME = "All Time"
+    RETURN = "Return"

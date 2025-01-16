@@ -20,10 +20,10 @@ E = TypeVar("E", bound=MenuOptions)
 
 class MenuListener(Generic[E]):
     is_key_already_pressed: bool = False
-    verbose: bool = True
-    selected_idx: int = 0
     menu_options: Type[E]
     message: Optional[str] = None
+    selected_idx: int = 0
+    verbose: bool = True
 
     def __init__(
         self, menu_options: Type[E], message: str, verbose: bool = True
