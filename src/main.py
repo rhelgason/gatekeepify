@@ -21,7 +21,6 @@ def main() -> int:
     return exit_program()
 
 def view_my_stats() -> int:
-    print("Viewing my stats")
     option = use_view_my_stats()
     while option != DateOptions.RETURN:
         earliest_ds = None

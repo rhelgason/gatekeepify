@@ -27,7 +27,7 @@ class TestDatabase(unittest.TestCase):
                 Album("234", "test album"),
                 [Artist("345", "test artist"), Artist("678", "test artist 2")],
             ),
-            datetime.strptime("2024-12-27T22:30:04.214000Z", CLIENT_DATETIME_FORMAT),
+            datetime.strptime("2024-12-26T22:30:04.214000Z", CLIENT_DATETIME_FORMAT),
         )
         self.listen_2 = Listen(
             User("6789", "test user 2"),
@@ -37,7 +37,7 @@ class TestDatabase(unittest.TestCase):
                 Album("567", "test album 2"),
                 [Artist("678", "test artist 2"), Artist("912", "test artist 3")],
             ),
-            datetime.strptime("2024-12-26T16:48:12.712392Z", CLIENT_DATETIME_FORMAT),
+            datetime.strptime("2024-12-27T16:48:12.712392Z", CLIENT_DATETIME_FORMAT),
         )
         self.base_upsert_data = [self.listen_1, self.listen_2]
 
@@ -187,7 +187,7 @@ class TestDatabase(unittest.TestCase):
         self.assertEqual(len(all_listens), 2)
         self.assertEqual(
             sorted(list(all_listens)),
-            [self.listen_2, self.listen_1],
+            [self.listen_1, self.listen_2],
         )
 
         # add equivalent listen with different user
@@ -199,10 +199,45 @@ class TestDatabase(unittest.TestCase):
         self.assertEqual(len(all_listens), 3)
         self.assertEqual(
             sorted(list(all_listens)),
-            [listen_3, self.listen_2, self.listen_1],
+            [self.listen_1, listen_3, self.listen_2],
         )
 
         self.assertLogsWrittenToDb(LoggerAction.UPSERT_DIM_ALL_LISTENS, 2)
+    
+    def test_get_all_listens(self) -> None:
+        listen_3 = deepcopy(self.listen_2)
+        listen_3.user = User("12345", "test user")
+        self.base_upsert_data.append(listen_3)
+        self.db.upsert_cron_backfill(self.base_upsert_data)
+
+        # query by user only
+        all_listens = self.db.get_all_listens(User("12345", "test user"))
+        self.assertEqual(len(all_listens), 2)
+        self.assertEqual(
+            sorted(list(all_listens)),
+            [self.listen_1, listen_3],
+        )
+
+        # query by timestamp only
+        all_listens = self.db.get_all_listens(
+            None, datetime.strptime("2024-12-27T00:00:00.000000Z", CLIENT_DATETIME_FORMAT)
+        )
+        self.assertEqual(len(all_listens), 2)
+        self.assertEqual(
+            sorted(list(all_listens)),
+            [listen_3, self.listen_2],
+        )
+
+        # query by user and timestamp
+        all_listens = self.db.get_all_listens(
+            User("12345", "test user"),
+            datetime.strptime("2024-12-27T00:00:00.000000Z", CLIENT_DATETIME_FORMAT),
+        )
+        self.assertEqual(len(all_listens), 1)
+        self.assertEqual(
+            sorted(list(all_listens)),
+            [listen_3],
+        )
 
     def tearDown(self) -> None:
         if self.db.conn:

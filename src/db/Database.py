@@ -342,7 +342,7 @@ class Database:
         results = self.cursor.fetchall()
         return {User(row[0], row[1]) for row in results}
 
-    def get_all_listens(self) -> Set[Listen]:
+    def get_all_listens(self, user: Optional[User] = None, ds: Optional[datetime] = None) -> Set[Listen]:
         query = """
         SELECT
             l.user_id,
@@ -359,9 +359,15 @@ class Database:
         LEFT JOIN dim_all_albums al ON t.album_id=al.album_id
         LEFT JOIN track_to_artist ta ON t.track_id=ta.track_id
         LEFT JOIN dim_all_artists ar ON ta.artist_id=ar.artist_id
+        WHERE
+            CASE WHEN ? IS NOT NULL THEN l.user_id = ? ELSE TRUE END
+            AND CASE WHEN ? IS NOT NULL THEN ts >= ? ELSE TRUE END
         GROUP BY l.user_id, u.user_name, ts, t.track_id, track_name, t.album_id, album_name
         """
-        self.cursor.execute(query)
+        user_id = user.id if user else None
+        ts = ds.strftime(DB_DATETIME_FORMAT) if ds else None
+        
+        self.cursor.execute(query, (user_id, user_id, ts, ts))
         results = self.cursor.fetchall()
         return {
             Listen(
