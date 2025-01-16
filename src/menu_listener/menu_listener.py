@@ -6,6 +6,14 @@ from pynput import keyboard
 
 MAX_ENTRIES = 9
 ASCII_1 = 49
+APP_TITLE = """
+  ____       _       _                   _  __       
+ / ___| __ _| |_ ___| | _____  ___ _ __ (_)/ _|_   _ 
+| |  _ / _` | __/ _ \ |/ / _ \/ _ \ '_ \| | |_| | | |
+| |_| | (_| | ||  __/   <  __/  __/ |_) | |  _| |_| |
+ \____|\__,_|\__\___|_|\_\___|\___| .__/|_|_|  \__, |
+                                  |_|          |___/ 
+"""
 
 E = TypeVar("E", bound=MenuOptions)
 
@@ -44,7 +52,7 @@ class MenuListener(Generic[E]):
             return
 
         os.system("clear")
-        print(f"{self.message}\n")
+        print(f"{APP_TITLE}\n{self.message}\n")
         for i, value in enumerate(self.menu_options.list()):
             if i == self.selected_idx:
                 print(f">  {i+1}. {value}")

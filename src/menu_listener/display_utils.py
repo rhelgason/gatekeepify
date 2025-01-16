@@ -3,7 +3,6 @@ import os
 from menu_listener.menu_listener import MenuListener
 from menu_listener.menu_options import MainMenuOptions
 
-
 def clear_terminal():
     os.system("clear")
 
