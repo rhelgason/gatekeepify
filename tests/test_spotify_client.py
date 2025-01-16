@@ -6,7 +6,7 @@ from unittest.mock import patch
 
 from constants import CLIENT_DATETIME_FORMAT, HOST_CONSTANTS_TEST_PATH
 from spotify.types import Album, Artist, Track, User
-from SpotifyClient import SpotifyClient
+from spotify_client import SpotifyClient
 
 CLIENT_ID = "test_id"
 CLIENT_SECRET = "test_secret"

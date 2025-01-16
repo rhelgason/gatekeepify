@@ -4,7 +4,6 @@ from typing import List, Optional, Tuple
 
 import spotipy
 from constants import (
-    CLIENT_DATETIME_FORMAT,
     DEFAULT_SCOPE,
     HOST_CONSTANTS_PATH,
     HOST_CONSTANTS_TEST_PATH,

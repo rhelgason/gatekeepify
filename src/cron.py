@@ -1,4 +1,4 @@
-from SpotifyClient import SpotifyClient
+from spotify_client import SpotifyClient
 
 """
 Upserts most recent tracks from Spotify API into database.
