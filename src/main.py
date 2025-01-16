@@ -8,16 +8,10 @@ from spotify.stat_viewer import StatViewer
 
 def main() -> int:
     os.system("tput civis")
-    option = use_main_menu()
-    while option != MainMenuOptions.QUIT:
-        res = 0
-        if option == MainMenuOptions.VIEW_MY_STATS:
-            res = view_my_stats()
-
-        if res == 1:
-            exit_program()
-            return 1
-        option = use_main_menu()
+    res = use_main_menu()
+    if res == 1:
+        exit_program()
+        return 1
     return exit_program()
 
 
