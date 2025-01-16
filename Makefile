@@ -7,6 +7,9 @@ requirements:
 test:
 	python3 -m unittest discover .
 
+run:
+	python3 src/main.py
+
 cron:
 	python3 src/cron.py
 

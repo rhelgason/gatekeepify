@@ -1,5 +1,4 @@
 from enum import Enum
-from types import DynamicClassAttribute
 
 
 class MenuOptions(Enum):
@@ -9,4 +8,5 @@ class MenuOptions(Enum):
 
 
 class MainMenuOptions(MenuOptions):
+    DO_NOTHING = "Do Nothing"
     QUIT = "Quit"

@@ -2,7 +2,6 @@ import os
 import unittest
 from copy import deepcopy
 from datetime import datetime
-from logging import Logger
 from typing import List
 
 from constants import CLIENT_DATETIME_FORMAT
