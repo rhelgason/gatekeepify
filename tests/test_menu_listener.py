@@ -1,5 +1,5 @@
 import unittest
-from typing import List, Optional, Union
+from typing import List, Union
 
 from menu_listener.menu_listener import MenuListener
 from menu_listener.menu_options import MenuOptions
@@ -33,7 +33,7 @@ class TestMenuListener(unittest.TestCase):
         self.test_menu = MenuListener[TestOptions](
             menu_options=TestOptions,
             message="Welcome to Gatekeepify! Here are our test options:",
-            verbose=False,
+            is_test=True,
         )
 
     def getMenuResponse(
@@ -73,7 +73,7 @@ class TestMenuListener(unittest.TestCase):
             MenuListener[TestMaximumOptions](
                 menu_options=TestMaximumOptions,
                 message="Welcome to Gatekeepify! Here are our test options:",
-                verbose=False,
+                is_test=True,
             )
         self.assertEqual(
             str(e.exception), "Menu listener only currently supports 9 options."

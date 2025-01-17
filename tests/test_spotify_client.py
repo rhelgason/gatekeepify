@@ -13,7 +13,7 @@ CLIENT_SECRET = "test_secret"
 
 
 @patch("builtins.input", side_effect=[CLIENT_ID])
-@patch("getpass.getpass", return_value="test_secret")
+@patch("getpass.getpass", return_value=CLIENT_SECRET)
 class TestSpotifyClient(unittest.TestCase):
     path: str
 
@@ -25,9 +25,9 @@ class TestSpotifyClient(unittest.TestCase):
             os.remove(self.path)
         except OSError:
             pass
-        self.assertEqual(pl.Path(self.path).resolve().is_file(), False)
 
     def test_get_host_client(self, mock_getpass, mock_input) -> None:
+        self.assertEqual(pl.Path(self.path).resolve().is_file(), False)
         SpotifyClient(is_test=True)
         mock_input.assert_called_once()
         mock_getpass.assert_called_once()

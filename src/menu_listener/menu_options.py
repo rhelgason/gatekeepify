@@ -18,3 +18,9 @@ class DateOptions(MenuOptions):
     LAST_YEAR = "Last Year"
     ALL_TIME = "All Time"
     RETURN = "Return"
+
+
+class StatViewerOptions(MenuOptions):
+    TOP_TRACKS = "Top Tracks"
+    TOP_ARTISTS = "Top Artists"
+    RETURN = "Return"

@@ -2,7 +2,7 @@ import os
 from datetime import datetime, timedelta
 
 from menu_listener.menu_listener import MenuListener
-from menu_listener.menu_options import DateOptions, MainMenuOptions
+from menu_listener.menu_options import DateOptions, MainMenuOptions, StatViewerOptions
 from spotify.stat_viewer import StatViewer
 
 
@@ -24,11 +24,15 @@ def use_main_menu():
 
 
 def use_view_my_stats():
-    stats_menu = MenuListener[DateOptions](
+    date_menu = MenuListener[DateOptions](
         menu_options=DateOptions,
         message="Please select a date range to view your stats for:",
     )
-    date_option = stats_menu.use_menu()
+    stats_menu = MenuListener[StatViewerOptions](
+        menu_options=StatViewerOptions,
+        message="Please select a stat to view:",
+    )
+    date_option = date_menu.use_menu()
 
     while date_option != DateOptions.RETURN:
         earliest_ds = None
@@ -38,8 +42,14 @@ def use_view_my_stats():
             earliest_ds = datetime.today() - timedelta(days=30)
         elif date_option == DateOptions.LAST_YEAR:
             earliest_ds = datetime.today() - timedelta(days=365)
-
         stat_viewer = StatViewer(earliest_ds)
-        stat_viewer.display()
-        date_option = stats_menu.use_menu()
+
+        stat_option = stats_menu.use_menu()
+        while stat_option != StatViewerOptions.RETURN:
+            if stat_option == StatViewerOptions.TOP_TRACKS:
+                stat_viewer.top_tracks()
+            elif stat_option == StatViewerOptions.TOP_ARTISTS:
+                stat_viewer.top_artists()
+            stat_option = stats_menu.use_menu()
+        date_option = date_menu.use_menu()
     return 0

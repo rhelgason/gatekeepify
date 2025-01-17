@@ -14,13 +14,13 @@ E = TypeVar("E", bound=MenuOptions)
 
 class MenuListener(Generic[E]):
     is_key_already_pressed: bool = False
+    is_test: bool = False
     menu_options: Type[E]
     message: Optional[str] = None
     selected_idx: int = 0
-    verbose: bool = True
 
     def __init__(
-        self, menu_options: Type[E], message: str, verbose: bool = True
+        self, menu_options: Type[E], message: str, is_test: bool = False
     ) -> None:
         self.is_key_already_pressed = False
         self.selected_idx = 0
@@ -28,7 +28,7 @@ class MenuListener(Generic[E]):
             raise Exception("Menu listener only currently supports 9 options.")
         self.menu_options = menu_options
         self.message = message
-        self.verbose = verbose
+        self.is_test = is_test
 
     def use_menu(self) -> E:
         self.print_menu()
@@ -42,7 +42,7 @@ class MenuListener(Generic[E]):
         return list(self.menu_options)[self.selected_idx]
 
     def print_menu(self) -> None:
-        if not self.verbose:
+        if self.is_test:
             return
 
         os.system("clear")

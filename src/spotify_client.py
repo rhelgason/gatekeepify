@@ -10,6 +10,7 @@ from constants import (
     MAXIMUM_RECENT_TRACKS,
     REDIRECT_URI,
 )
+from db.constants import DB_NAME, DB_TEST_NAME
 from db.Database import Database
 from spotify.types import Listen, User
 from spotipy.oauth2 import SpotifyOAuth
@@ -29,7 +30,7 @@ class SpotifyClient:
                 scope=DEFAULT_SCOPE,
             )
         )
-        self.db = Database()
+        self.db = Database(db_name=DB_TEST_NAME if is_test else DB_NAME)
 
     # get client id and secret if exists, otherwise get user input
     def get_host_constants(self, is_test: bool = False) -> Tuple[str, str]:
