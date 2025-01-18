@@ -41,6 +41,7 @@ CLIENT_SECRET = "{CLIENT_SECRET}"
                 "test track",
                 Album("234", "test album"),
                 [Artist("345", "test artist"), Artist("678", "test artist 2")],
+                False,
             ),
             datetime.strptime("2024-12-26T22:30:04.214000Z", CLIENT_DATETIME_FORMAT),
         )
@@ -51,6 +52,7 @@ CLIENT_SECRET = "{CLIENT_SECRET}"
                 "test track 2",
                 Album("567", "test album 2"),
                 [Artist("678", "test artist 2"), Artist("912", "test artist 3952")],
+                True,
             ),
             datetime.strptime("2024-12-27T16:48:12.712392Z", CLIENT_DATETIME_FORMAT),
         )
@@ -61,6 +63,7 @@ CLIENT_SECRET = "{CLIENT_SECRET}"
                 "test track",
                 Album("234", "test album"),
                 [Artist("345", "test artist"), Artist("678", "test artist 2")],
+                False,
             ),
             datetime.strptime("2024-12-28T22:30:04.214000Z", CLIENT_DATETIME_FORMAT),
         )
@@ -71,6 +74,7 @@ CLIENT_SECRET = "{CLIENT_SECRET}"
                 "test track",
                 Album("234", "test album"),
                 [Artist("345", "test artist"), Artist("678", "test artist 2")],
+                False,
             ),
             datetime.strptime("2024-12-31T22:30:04.214000Z", CLIENT_DATETIME_FORMAT),
         )
@@ -81,6 +85,7 @@ CLIENT_SECRET = "{CLIENT_SECRET}"
                 "test track 2",
                 Album("567", "test album 2"),
                 [Artist("678", "test artist 2"), Artist("912", "test artist 3952")],
+                True,
             ),
             datetime.strptime("2024-12-27T16:48:12.712392Z", CLIENT_DATETIME_FORMAT),
         )
@@ -91,6 +96,7 @@ CLIENT_SECRET = "{CLIENT_SECRET}"
                 "test track 2",
                 Album("567", "test album 2"),
                 [Artist("678", "test artist 2"), Artist("912", "test artist 3952")],
+                True,
             ),
             datetime.strptime("2024-12-28T16:48:12.712392Z", CLIENT_DATETIME_FORMAT),
         )

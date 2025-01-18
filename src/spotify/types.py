@@ -60,12 +60,14 @@ class User(Artifact):
 class Track(Artifact):
     album: Album
     artists: List[Artist]
+    is_local: bool
 
-    def __init__(self, id, name, album, artists) -> None:
+    def __init__(self, id, name, album, artists, is_local) -> None:
         self.id = id
         self.name = name
         self.album = album
         self.artists = artists
+        self.is_local = is_local
 
     @classmethod
     def from_dict(cls, data):
@@ -74,6 +76,7 @@ class Track(Artifact):
             data["name"],
             Album.from_dict(data["album"]),
             [Artist.from_dict(artist) for artist in data["artists"]],
+            data["is_local"],
         )
 
     def __hash__(self) -> int:
@@ -85,12 +88,14 @@ class Track(Artifact):
             and self.name == other.name
             and self.album == other.album
             and sorted(self.artists) == sorted(other.artists)
+            and self.is_local == other.is_local
         )
 
     def _to_json(self) -> Dict[str, Any]:
         json = super()._to_json()
         json["album"] = self.album._to_json()
         json["artists"] = [artist._to_json() for artist in self.artists]
+        json["is_local"] = self.is_local
         return json
 
 

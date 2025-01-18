@@ -71,6 +71,7 @@ class TestSpotifyClient(unittest.TestCase):
                                 "name": "test artist name 2",
                             },
                         ],
+                        "is_local": False,
                     },
                     "played_at": played_at_1,
                 },
@@ -92,6 +93,7 @@ class TestSpotifyClient(unittest.TestCase):
                                 "name": "test artist name 3",
                             },
                         ],
+                        "is_local": True,
                     },
                     "played_at": played_at_2,
                 },
@@ -119,6 +121,7 @@ class TestSpotifyClient(unittest.TestCase):
                     Artist("678", "test artist name 2"),
                     Artist("912", "test artist name 3"),
                 ],
+                True,
             ),
         )
         self.assertEqual(
@@ -131,6 +134,7 @@ class TestSpotifyClient(unittest.TestCase):
                     Artist("345", "test artist name"),
                     Artist("678", "test artist name 2"),
                 ],
+                False,
             ),
         )
 

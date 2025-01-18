@@ -63,6 +63,7 @@ class Database:
             track_id VARCHAR(255) PRIMARY KEY,
             track_name VARCHAR(255),
             album_id VARCHAR(255),
+            is_local BOOLEAN,
             FOREIGN KEY(album_id) REFERENCES dim_all_albums(album_id)
         )
         """
@@ -177,13 +178,17 @@ class Database:
     # upserts tracks into dim_all_tracks
     def __upsert_dim_all_tracks(self, tracks: Set[Track]):
         query = """
-        INSERT INTO dim_all_tracks (track_id, track_name, album_id)
-        VALUES (?, ?, ?)
-        -- update if track has updated its name or album
-        ON CONFLICT (track_id) DO UPDATE SET track_name=excluded.track_name, album_id=excluded.album_id
+        INSERT INTO dim_all_tracks (track_id, track_name, album_id, is_local)
+        VALUES (?, ?, ?, ?)
+        -- update if track has updated its name, album, or is_local flag
+        ON CONFLICT (track_id) DO UPDATE SET track_name=excluded.track_name, album_id=excluded.album_id, is_local=excluded.is_local
         """
         self.cursor.executemany(
-            query, [(track.id, track.name, track.album.id) for track in tracks]
+            query,
+            [
+                (track.id, track.name, track.album.id, track.is_local)
+                for track in tracks
+            ],
         )
         self.conn.commit()
         self.__upsert_dim_all_logs(
@@ -307,7 +312,8 @@ class Database:
             track_name,
             t.album_id,
             album_name,
-            JSON_GROUP_ARRAY(JSON_ARRAY(ar.artist_id, ar.artist_name)) artists
+            JSON_GROUP_ARRAY(JSON_ARRAY(ar.artist_id, ar.artist_name)) artists,
+            is_local
         FROM dim_all_tracks t
         LEFT JOIN dim_all_albums al ON t.album_id=al.album_id
         LEFT JOIN track_to_artist ta ON t.track_id=ta.track_id
@@ -322,6 +328,7 @@ class Database:
                 row[1],
                 Album(row[2], row[3]),
                 [Artist(artist[0], artist[1]) for artist in json.loads(row[4])],
+                row[5],
             )
             for row in results
         }
@@ -342,7 +349,9 @@ class Database:
         results = self.cursor.fetchall()
         return {User(row[0], row[1]) for row in results}
 
-    def get_all_listens(self, user: Optional[User] = None, ds: Optional[datetime] = None) -> Set[Listen]:
+    def get_all_listens(
+        self, user: Optional[User] = None, ds: Optional[datetime] = None
+    ) -> Set[Listen]:
         query = """
         SELECT
             l.user_id,
@@ -352,7 +361,8 @@ class Database:
             track_name,
             t.album_id,
             album_name,
-            JSON_GROUP_ARRAY(JSON_ARRAY(ar.artist_id, ar.artist_name)) artists
+            JSON_GROUP_ARRAY(JSON_ARRAY(ar.artist_id, ar.artist_name)) artists,
+            is_local
         FROM dim_all_listens l
         LEFT JOIN dim_all_users u ON l.user_id=u.user_id
         LEFT JOIN dim_all_tracks t ON l.track_id=t.track_id
@@ -366,7 +376,7 @@ class Database:
         """
         user_id = user.id if user else None
         ts = ds.strftime(DB_DATETIME_FORMAT) if ds else None
-        
+
         self.cursor.execute(query, (user_id, user_id, ts, ts))
         results = self.cursor.fetchall()
         return {
@@ -377,6 +387,7 @@ class Database:
                     row[4],
                     Album(row[5], row[6]),
                     [Artist(artist[0], artist[1]) for artist in json.loads(row[7])],
+                    row[8],
                 ),
                 datetime.strptime(row[2], DB_DATETIME_FORMAT),
             )

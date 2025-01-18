@@ -26,6 +26,7 @@ class TestDatabase(unittest.TestCase):
                 "test track",
                 Album("234", "test album"),
                 [Artist("345", "test artist"), Artist("678", "test artist 2")],
+                False,
             ),
             datetime.strptime("2024-12-26T22:30:04.214000Z", CLIENT_DATETIME_FORMAT),
         )
@@ -36,6 +37,7 @@ class TestDatabase(unittest.TestCase):
                 "test track 2",
                 Album("567", "test album 2"),
                 [Artist("678", "test artist 2"), Artist("912", "test artist 3")],
+                True,
             ),
             datetime.strptime("2024-12-27T16:48:12.712392Z", CLIENT_DATETIME_FORMAT),
         )
@@ -81,12 +83,13 @@ class TestDatabase(unittest.TestCase):
             [self.listen_1.track, self.listen_2.track],
         )
 
-        # overwrite existing track with new name and artist
+        # overwrite existing track with new name, artist, and is_local flag
         self.listen_1.track.name = "test track new name"
         self.listen_1.track.artists = [
             Artist("678", "test artist 2"),
             Artist("6789", "test artist 4"),
         ]
+        self.listen_1.track.is_local = True
         self.listen_2.track.album = Album("567", "test album 2 new name")
         self.db.upsert_cron_backfill(self.base_upsert_data)
         all_tracks = self.db.get_all_tracks()
