@@ -13,12 +13,18 @@ from spotify.types import Album, Artist, Listen, Track, User
 
 class TestDatabase(unittest.TestCase):
     db: Database
+    artist_1: Artist
+    artist_2: Artist
+    artist_3: Artist
     listen_1: Listen
     listen_2: Listen
     base_upsert_data: List[Listen]
 
     def setUp(self) -> None:
         self.db = Database(db_name=DB_TEST_NAME)
+        self.artist_1 = Artist("345", "test artist", ["test genre", "test genre 2"])
+        self.artist_2 = Artist("678", "test artist 2", ["test genre 2", "test genre 3"])
+        self.artist_3 = Artist("912", "test artist 3", ["test genre", "test genre 3"])
         self.listen_1 = Listen(
             User("12345", "test user"),
             Track(
@@ -26,8 +32,8 @@ class TestDatabase(unittest.TestCase):
                 "test track",
                 Album("234", "test album"),
                 [
-                    Artist("345", "test artist", ["test genre", "test genre 2"]),
-                    Artist("678", "test artist 2", ["test genre 2", "test genre 3"]),
+                    self.artist_1,
+                    self.artist_2,
                 ],
                 False,
             ),
@@ -40,8 +46,8 @@ class TestDatabase(unittest.TestCase):
                 "test track 2",
                 Album("567", "test album 2"),
                 [
-                    Artist("678", "test artist 2", ["test genre 2", "test genre 3"]),
-                    Artist("912", "test artist 3", ["test genre", "test genre 3"]),
+                    self.artist_2,
+                    self.artist_3,
                 ],
                 True,
             ),
@@ -92,7 +98,7 @@ class TestDatabase(unittest.TestCase):
         # overwrite existing track with new name, artist, and is_local flag
         self.listen_1.track.name = "test track new name"
         self.listen_1.track.artists = [
-            Artist("678", "test artist 2", ["test genre 2", "test genre 3"]),
+            self.artist_2,
             Artist("6789", "test artist 4", ["test genre 3"]),
         ]
         self.listen_1.track.is_local = True
@@ -114,16 +120,19 @@ class TestDatabase(unittest.TestCase):
         self.assertEqual(
             sorted(list(all_artists)),
             [
-                Artist("345", "test artist", ["test genre", "test genre 2"]),
-                Artist("678", "test artist 2", ["test genre 2", "test genre 3"]),
-                Artist("912", "test artist 3", ["test genre", "test genre 3"]),
+                self.artist_1,
+                self.artist_2,
+                self.artist_3,
             ],
         )
 
         # overwrite existing artist with new name and genres
+        self.artist_1 = Artist(
+            "345", "test artist new name", ["test genre 2", "test genre 3"]
+        )
         self.listen_1.track.artists = [
-            Artist("345", "test artist new name", ["test genre 2", "test genre 3"]),
-            Artist("678", "test artist 2", ["test genre 2", "test genre 3"]),
+            self.artist_1,
+            self.artist_2,
         ]
         self.db.upsert_cron_backfill(self.base_upsert_data)
         all_artists = self.db.get_all_artists()
@@ -131,9 +140,9 @@ class TestDatabase(unittest.TestCase):
         self.assertEqual(
             sorted(list(all_artists)),
             [
-                Artist("345", "test artist new name", ["test genre 2", "test genre 3"]),
-                Artist("678", "test artist 2", ["test genre 2", "test genre 3"]),
-                Artist("912", "test artist 3", ["test genre", "test genre 3"]),
+                self.artist_1,
+                self.artist_2,
+                self.artist_3,
             ],
         )
 
@@ -155,8 +164,8 @@ class TestDatabase(unittest.TestCase):
 
         # overwrite existing track with new artist
         self.listen_1.track.artists = [
-            Artist("678", "test artist 2", ["test genre 2", "test genre 3"]),
-            Artist("912", "test artist 3", ["test genre", "test genre 3"]),
+            self.artist_2,
+            self.artist_3,
         ]
         self.db.upsert_cron_backfill(self.base_upsert_data)
         self.db.cursor.execute(query)
@@ -181,15 +190,16 @@ class TestDatabase(unittest.TestCase):
         self.assertEqual(
             sorted(list(results)),
             [
-                (self.listen_1.track.artists[0].id, "test genre"),
-                (self.listen_1.track.artists[0].id, "test genre 2"),
+                (self.artist_1.id, "test genre"),
+                (self.artist_1.id, "test genre 2"),
             ],
         )
 
         # overwrite existing artist with new genres
+        self.artist_1 = Artist("345", "test artist", ["test genre 3", "test genre 2"])
         self.listen_1.track.artists = [
-            Artist("345", "test artist", ["test genre 3", "test genre 2"]),
-            Artist("678", "test artist 2", ["test genre 2", "test genre 3"]),
+            self.artist_1,
+            self.artist_2,
         ]
         self.db.upsert_cron_backfill(self.base_upsert_data)
         self.db.cursor.execute(query)
@@ -198,8 +208,8 @@ class TestDatabase(unittest.TestCase):
         self.assertEqual(
             sorted(list(results)),
             [
-                (self.listen_1.track.artists[0].id, "test genre 2"),
-                (self.listen_1.track.artists[0].id, "test genre 3"),
+                (self.artist_1.id, "test genre 2"),
+                (self.artist_1.id, "test genre 3"),
             ],
         )
 
