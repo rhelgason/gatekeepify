@@ -16,6 +16,8 @@ class TestDatabase(unittest.TestCase):
     artist_1: Artist
     artist_2: Artist
     artist_3: Artist
+    track_1: Track
+    track_2: Track
     listen_1: Listen
     listen_2: Listen
     base_upsert_data: List[Listen]
@@ -25,32 +27,34 @@ class TestDatabase(unittest.TestCase):
         self.artist_1 = Artist("345", "test artist", ["test genre", "test genre 2"])
         self.artist_2 = Artist("678", "test artist 2", ["test genre 2", "test genre 3"])
         self.artist_3 = Artist("912", "test artist 3", ["test genre", "test genre 3"])
+        self.track_1 = Track(
+            "123",
+            "test track",
+            Album("234", "test album"),
+            [
+                self.artist_1,
+                self.artist_2,
+            ],
+            False,
+        )
+        self.track_2 = Track(
+            "456",
+            "test track 2",
+            Album("567", "test album 2"),
+            [
+                self.artist_2,
+                self.artist_3,
+            ],
+            True,
+        )
         self.listen_1 = Listen(
             User("12345", "test user"),
-            Track(
-                "123",
-                "test track",
-                Album("234", "test album"),
-                [
-                    self.artist_1,
-                    self.artist_2,
-                ],
-                False,
-            ),
+            self.track_1,
             datetime.strptime("2024-12-26T22:30:04.214000Z", CLIENT_DATETIME_FORMAT),
         )
         self.listen_2 = Listen(
             User("6789", "test user 2"),
-            Track(
-                "456",
-                "test track 2",
-                Album("567", "test album 2"),
-                [
-                    self.artist_2,
-                    self.artist_3,
-                ],
-                True,
-            ),
+            self.track_2,
             datetime.strptime("2024-12-27T16:48:12.712392Z", CLIENT_DATETIME_FORMAT),
         )
         self.base_upsert_data = [self.listen_1, self.listen_2]
@@ -96,13 +100,15 @@ class TestDatabase(unittest.TestCase):
         )
 
         # overwrite existing track with new name, artist, and is_local flag
-        self.listen_1.track.name = "test track new name"
-        self.listen_1.track.artists = [
+        self.track_1.name = "test track new name"
+        self.track_1.artists = [
             self.artist_2,
             Artist("6789", "test artist 4", ["test genre 3"]),
         ]
-        self.listen_1.track.is_local = True
-        self.listen_2.track.album = Album("567", "test album 2 new name")
+        self.track_1.is_local = True
+        self.track_2.album = Album("567", "test album 2 new name")
+        self.listen_1.track = self.track_1
+        self.listen_2.track = self.track_2
         self.db.upsert_cron_backfill(self.base_upsert_data)
         all_tracks = self.db.get_all_tracks()
         self.assertEqual(len(all_tracks), 2)
@@ -159,21 +165,22 @@ class TestDatabase(unittest.TestCase):
         self.assertEqual(len(results), 2)
         self.assertEqual(
             sorted(list(results)),
-            [(self.listen_1.track.id, "345"), (self.listen_1.track.id, "678")],
+            [(self.track_1.id, "345"), (self.track_1.id, "678")],
         )
 
         # overwrite existing track with new artist
-        self.listen_1.track.artists = [
+        self.track_1.artists = [
             self.artist_2,
             self.artist_3,
         ]
+        self.listen_1.track = self.track_1
         self.db.upsert_cron_backfill(self.base_upsert_data)
         self.db.cursor.execute(query)
         results = self.db.cursor.fetchall()
         self.assertEqual(len(results), 2)
         self.assertEqual(
             sorted(list(results)),
-            [(self.listen_1.track.id, "678"), (self.listen_1.track.id, "912")],
+            [(self.track_1.id, "678"), (self.track_1.id, "912")],
         )
 
         self.assertLogsWrittenToDb(LoggerAction.UPSERT_TRACK_TO_ARTIST, 2)
