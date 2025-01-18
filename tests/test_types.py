@@ -27,18 +27,21 @@ class TestSpotifyTypes(unittest.TestCase):
         data = {
             "id": "123",
             "name": "test",
+            "genres": ["genre1", "genre2"],
         }
         artist = Artist.from_dict(data)
 
         self.assertEqual(artist.id, "123")
         self.assertEqual(artist.name, "test")
+        self.assertEqual(artist.genres, ["genre1", "genre2"])
         self.assertEqual(hash(artist), hash("123"))
 
-        self.assertEqual(artist, Artist("123", "test"))
-        self.assertNotEqual(artist, Artist("1234", "test"))
-        self.assertNotEqual(artist, Artist("123", "test2"))
+        self.assertEqual(artist, Artist("123", "test", ["genre2", "genre1"]))
+        self.assertNotEqual(artist, Artist("1234", "test", ["genre1", "genre2"]))
+        self.assertNotEqual(artist, Artist("123", "test2", ["genre1", "genre2"]))
+        self.assertNotEqual(artist, Artist("123", "test", ["genre2", "genre3"]))
 
-        self.assertEqual(artist.to_json_str(), '{"id": "123", "name": "test"}')
+        self.assertEqual(artist.to_json_str(), '{"id": "123", "name": "test", "genres": ["genre1", "genre2"]}')
 
     def test_user(self) -> None:
         data = {
@@ -59,8 +62,8 @@ class TestSpotifyTypes(unittest.TestCase):
 
     def test_track(self) -> None:
         test_album = Album("456", "test_album")
-        test_artist_1 = Artist("789", "test_artist")
-        test_artist_2 = Artist("234", "test_artist_2")
+        test_artist_1 = Artist("789", "test_artist", ["test_genre"])
+        test_artist_2 = Artist("234", "test_artist_2", ["test_genre", "test_genre_2"])
         data = {
             "id": "123",
             "name": "test",
@@ -112,13 +115,18 @@ class TestSpotifyTypes(unittest.TestCase):
             track,
             Track("123", "test2", test_album, [test_artist_1, test_artist_2], True),
         )
+        self.assertNotEqual(
+            track,
+            Track("123", "test2", test_album, [Artist("789", "test_artist", ["test_genre_2"]), test_artist_2], True),
+        )
 
         self.assertEqual(
             track.to_json_str(),
             '{"id": "123", "name": "test", "album": {"id": "456", '
             '"name": "test_album"}, "artists": [{"id": "789", '
-            '"name": "test_artist"}, {"id": "234", "name": "test_artist_2"}], '
-            '"is_local": false}',
+            '"name": "test_artist", "genres": ["test_genre"]}, '
+            '{"id": "234", "name": "test_artist_2", "genres": '
+            '["test_genre", "test_genre_2"]}], "is_local": false}',
         )
 
     def test_listen(self) -> None:
@@ -127,7 +135,7 @@ class TestSpotifyTypes(unittest.TestCase):
             "123",
             "test track",
             Album("234", "test album"),
-            [Artist("345", "test artist"), Artist("678", "test artist 2")],
+            [Artist("345", "test artist", ["test genre"]), Artist("678", "test artist 2", ["test genre 2"])],
             False,
         )
         data = {
@@ -173,7 +181,23 @@ class TestSpotifyTypes(unittest.TestCase):
                     "123",
                     "test track",
                     Album("234", "test album"),
-                    [Artist("345", "test artist"), Artist("678", "test artist 3")],
+                    [Artist("345", "test artist", ["test genre"]), Artist("678", "test artist 3", ["test genre 2"])],
+                    False,
+                ),
+                datetime.strptime(
+                    "2024-12-27T22:30:04.214000Z", CLIENT_DATETIME_FORMAT
+                ),
+            ),
+        )
+        self.assertNotEqual(
+            listen,
+            Listen(
+                test_user,
+                Track(
+                    "123",
+                    "test track",
+                    Album("234", "test album"),
+                    [Artist("345", "test artist", ["test genre 2"]), Artist("678", "test artist 2", ["test genre 2"])],
                     False,
                 ),
                 datetime.strptime(
@@ -195,7 +219,8 @@ class TestSpotifyTypes(unittest.TestCase):
         self.assertEqual(
             listen.to_json_str(),
             '{"track": {"id": "123", "name": "test track", "album": {"id": "234", '
-            '"name": "test album"}, "artists": [{"id": "345", "name": "test artist"}, '
-            '{"id": "678", "name": "test artist 2"}], "is_local": false}, "ts": "2024-12-27 '
+            '"name": "test album"}, "artists": [{"id": "345", "name": "test artist", '
+            '"genres": ["test genre"]}, {"id": "678", "name": "test artist 2", '
+            '"genres": ["test genre 2"]}], "is_local": false}, "ts": "2024-12-27 '
             '22:30:04.214000", "user": {"id": "12345", "name": "test user"}}',
         )

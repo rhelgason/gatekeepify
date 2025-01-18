@@ -41,6 +41,7 @@ class Database:
         self.__create_dim_all_tracks()
         self.__create_dim_all_artists()
         self.__create_track_to_artist()
+        self.__create_artist_to_genre()
         self.__create_dim_all_users()
         self.__create_dim_all_listens()
         self.__create_dim_all_logs()
@@ -89,6 +90,19 @@ class Database:
             artist_id VARCHAR(255),
             PRIMARY KEY(track_id, artist_id),
             FOREIGN KEY(track_id) REFERENCES dim_all_tracks(track_id),
+            FOREIGN KEY(artist_id) REFERENCES dim_all_artists(artist_id)
+        )
+        """
+        self.cursor.execute(query)
+        self.conn.commit()
+
+    # mapping table between artists and genres
+    def __create_artist_to_genre(self):
+        query = """
+        CREATE TABLE IF NOT EXISTS artist_to_genre (
+            artist_id VARCHAR(255),
+            genre VARCHAR(255),
+            PRIMARY KEY(artist_id, genre),
             FOREIGN KEY(artist_id) REFERENCES dim_all_artists(artist_id)
         )
         """
@@ -149,6 +163,7 @@ class Database:
         self.__upsert_dim_all_tracks(all_tracks)
         self.__upsert_dim_all_artists(all_artists)
         self.__upsert_track_to_artist(all_tracks)
+        self.__upsert_artist_to_genre(all_artists)
         self.__upsert_dim_all_users(all_users)
         self.__upsert_dim_all_listens(listens)
 
@@ -249,6 +264,43 @@ class Database:
             json.dumps([track.to_json_str() for track in tracks]),
         )
 
+    # upserts genres to artists into artist_to_genre
+    def __upsert_artist_to_genre(self, artists: Set[Artist]):
+        # remove genres that are no longer associated with artist
+        query = """
+        DELETE FROM artist_to_genre
+        WHERE artist_id=?
+        AND genre NOT IN (?)
+        """
+        self.cursor.executemany(
+            query,
+            [
+                (
+                    artist.id,
+                    ", ".join(artist.genres),
+                )
+                for artist in artists
+            ],
+        )
+        self.conn.commit()
+
+        # upsert new genres to artists
+        query = """
+        INSERT INTO artist_to_genre (artist_id, genre)
+        VALUES (?, ?)
+        -- do nothing, as artist to genre mapping already exists
+        ON CONFLICT (artist_id, genre) DO NOTHING
+        """
+        self.cursor.executemany(
+            query, [(artist.id, genre) for artist in artists for genre in artist.genres]
+        )
+        self.conn.commit()
+
+        self.__upsert_dim_all_logs(
+            LoggerAction.UPSERT_ARTIST_TO_GENRE,
+            json.dumps([artist.to_json_str() for artist in artists]),
+        )
+
     # upserts users into dim_all_users
     def __upsert_dim_all_users(self, users: Set[User]):
         query = """
@@ -312,13 +364,21 @@ class Database:
             track_name,
             t.album_id,
             album_name,
-            JSON_GROUP_ARRAY(JSON_ARRAY(ar.artist_id, ar.artist_name)) artists,
-            is_local
+            is_local,
+            JSON_GROUP_ARRAY(JSON_ARRAY(ar.artist_id, ar.artist_name, ar.genres)) artists
         FROM dim_all_tracks t
         LEFT JOIN dim_all_albums al ON t.album_id=al.album_id
         LEFT JOIN track_to_artist ta ON t.track_id=ta.track_id
-        LEFT JOIN dim_all_artists ar ON ta.artist_id=ar.artist_id
-        GROUP BY t.track_id, track_name, t.album_id, album_name
+        LEFT JOIN (
+            SELECT
+                a.artist_id,
+                artist_name,
+                JSON_GROUP_ARRAY(genre) genres
+            FROM dim_all_artists a
+            LEFT JOIN artist_to_genre ag ON ag.artist_id=a.artist_id
+            GROUP BY a.artist_id, artist_name
+        ) ar ON ta.artist_id=ar.artist_id
+        GROUP BY t.track_id, track_name, t.album_id, album_name, is_local
         """
         self.cursor.execute(query)
         results = self.cursor.fetchall()
@@ -327,19 +387,25 @@ class Database:
                 row[0],
                 row[1],
                 Album(row[2], row[3]),
-                [Artist(artist[0], artist[1]) for artist in json.loads(row[4])],
-                row[5],
+                [Artist(artist[0], artist[1], json.loads(artist[2])) for artist in json.loads(row[5])],
+                row[4],
             )
             for row in results
         }
 
     def get_all_artists(self) -> Set[Artist]:
         query = """
-        SELECT artist_id, artist_name FROM dim_all_artists
+        SELECT
+            ar.artist_id,
+            artist_name,
+            JSON_GROUP_ARRAY(genre) genres
+        FROM dim_all_artists ar
+        LEFT JOIN artist_to_genre ag ON ar.artist_id=ag.artist_id
+        GROUP BY ar.artist_id, artist_name
         """
         self.cursor.execute(query)
         results = self.cursor.fetchall()
-        return {Artist(row[0], row[1]) for row in results}
+        return {Artist(row[0], row[1], json.loads(row[2])) for row in results}
 
     def get_all_users(self) -> Set[User]:
         query = """
@@ -361,14 +427,22 @@ class Database:
             track_name,
             t.album_id,
             album_name,
-            JSON_GROUP_ARRAY(JSON_ARRAY(ar.artist_id, ar.artist_name)) artists,
-            is_local
+            is_local,
+            JSON_GROUP_ARRAY(JSON_ARRAY(ar.artist_id, ar.artist_name, ar.genres)) artists
         FROM dim_all_listens l
         LEFT JOIN dim_all_users u ON l.user_id=u.user_id
         LEFT JOIN dim_all_tracks t ON l.track_id=t.track_id
         LEFT JOIN dim_all_albums al ON t.album_id=al.album_id
         LEFT JOIN track_to_artist ta ON t.track_id=ta.track_id
-        LEFT JOIN dim_all_artists ar ON ta.artist_id=ar.artist_id
+        LEFT JOIN (
+            SELECT
+                a.artist_id,
+                artist_name,
+                JSON_GROUP_ARRAY(genre) genres
+            FROM dim_all_artists a
+            LEFT JOIN artist_to_genre ag ON ag.artist_id=a.artist_id
+            GROUP BY a.artist_id, artist_name
+        ) ar ON ta.artist_id=ar.artist_id
         WHERE
             CASE WHEN ? IS NOT NULL THEN l.user_id = ? ELSE TRUE END
             AND CASE WHEN ? IS NOT NULL THEN ts >= ? ELSE TRUE END
@@ -386,8 +460,8 @@ class Database:
                     row[3],
                     row[4],
                     Album(row[5], row[6]),
-                    [Artist(artist[0], artist[1]) for artist in json.loads(row[7])],
-                    row[8],
+                    [Artist(artist[0], artist[1], json.loads(artist[2])) for artist in json.loads(row[8])],
+                    row[7],
                 ),
                 datetime.strptime(row[2], DB_DATETIME_FORMAT),
             )

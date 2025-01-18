@@ -25,7 +25,7 @@ class TestDatabase(unittest.TestCase):
                 "123",
                 "test track",
                 Album("234", "test album"),
-                [Artist("345", "test artist"), Artist("678", "test artist 2")],
+                [Artist("345", "test artist", ["test genre", "test genre 2"]), Artist("678", "test artist 2", ["test genre 2", "test genre 3"])],
                 False,
             ),
             datetime.strptime("2024-12-26T22:30:04.214000Z", CLIENT_DATETIME_FORMAT),
@@ -36,7 +36,7 @@ class TestDatabase(unittest.TestCase):
                 "456",
                 "test track 2",
                 Album("567", "test album 2"),
-                [Artist("678", "test artist 2"), Artist("912", "test artist 3")],
+                [Artist("678", "test artist 2", ["test genre 2", "test genre 3"]), Artist("912", "test artist 3", ["test genre", "test genre 3"])],
                 True,
             ),
             datetime.strptime("2024-12-27T16:48:12.712392Z", CLIENT_DATETIME_FORMAT),
@@ -86,8 +86,8 @@ class TestDatabase(unittest.TestCase):
         # overwrite existing track with new name, artist, and is_local flag
         self.listen_1.track.name = "test track new name"
         self.listen_1.track.artists = [
-            Artist("678", "test artist 2"),
-            Artist("6789", "test artist 4"),
+            Artist("678", "test artist 2", ["test genre 2", "test genre 3"]),
+            Artist("6789", "test artist 4", ["test genre 3"]),
         ]
         self.listen_1.track.is_local = True
         self.listen_2.track.album = Album("567", "test album 2 new name")
@@ -108,16 +108,16 @@ class TestDatabase(unittest.TestCase):
         self.assertEqual(
             sorted(list(all_artists)),
             [
-                Artist("345", "test artist"),
-                Artist("678", "test artist 2"),
-                Artist("912", "test artist 3"),
+                Artist("345", "test artist", ["test genre", "test genre 2"]),
+                Artist("678", "test artist 2", ["test genre 2", "test genre 3"]),
+                Artist("912", "test artist 3", ["test genre", "test genre 3"]),
             ],
         )
 
-        # overwrite existing artist with new name
+        # overwrite existing artist with new name and genres
         self.listen_1.track.artists = [
-            Artist("345", "test artist new name"),
-            Artist("678", "test artist 2"),
+            Artist("345", "test artist new name", ["test genre 2", "test genre 3"]),
+            Artist("678", "test artist 2", ["test genre 2", "test genre 3"]),
         ]
         self.db.upsert_cron_backfill(self.base_upsert_data)
         all_artists = self.db.get_all_artists()
@@ -125,9 +125,9 @@ class TestDatabase(unittest.TestCase):
         self.assertEqual(
             sorted(list(all_artists)),
             [
-                Artist("345", "test artist new name"),
-                Artist("678", "test artist 2"),
-                Artist("912", "test artist 3"),
+                Artist("345", "test artist new name", ["test genre 2", "test genre 3"]),
+                Artist("678", "test artist 2", ["test genre 2", "test genre 3"]),
+                Artist("912", "test artist 3", ["test genre", "test genre 3"]),
             ],
         )
 
@@ -149,8 +149,8 @@ class TestDatabase(unittest.TestCase):
 
         # overwrite existing track with new artist
         self.listen_1.track.artists = [
-            Artist("678", "test artist 2"),
-            Artist("912", "test artist 3"),
+            Artist("678", "test artist 2", ["test genre 2", "test genre 3"]),
+            Artist("912", "test artist 3", ["test genre", "test genre 3"]),
         ]
         self.db.upsert_cron_backfill(self.base_upsert_data)
         self.db.cursor.execute(query)
@@ -162,6 +162,36 @@ class TestDatabase(unittest.TestCase):
         )
 
         self.assertLogsWrittenToDb(LoggerAction.UPSERT_TRACK_TO_ARTIST, 2)
+
+    def test_upsert_artist_to_genre(self) -> None:
+        # base upsert case
+        query = """
+        SELECT artist_id, genre FROM artist_to_genre
+        WHERE artist_id = '345'
+        """
+        self.db.cursor.execute(query)
+        results = self.db.cursor.fetchall()
+        self.assertEqual(len(results), 2)
+        self.assertEqual(
+            sorted(list(results)),
+            [(self.listen_1.track.artists[0].id, "test genre"), (self.listen_1.track.artists[0].id, "test genre 2")],
+        )
+
+        # overwrite existing artist with new genres
+        self.listen_1.track.artists = [
+            Artist("345", "test artist", ["test genre 3", "test genre 2"]),
+            Artist("678", "test artist 2", ["test genre 2", "test genre 3"])
+        ]
+        self.db.upsert_cron_backfill(self.base_upsert_data)
+        self.db.cursor.execute(query)
+        results = self.db.cursor.fetchall()
+        self.assertEqual(len(results), 2)
+        self.assertEqual(
+            sorted(list(results)),
+            [(self.listen_1.track.artists[0].id, "test genre 2"), (self.listen_1.track.artists[0].id, "test genre 3")],
+        )
+
+        self.assertLogsWrittenToDb(LoggerAction.UPSERT_ARTIST_TO_GENRE, 2)
 
     def test_upsert_dim_all_users(self) -> None:
         # base upsert case

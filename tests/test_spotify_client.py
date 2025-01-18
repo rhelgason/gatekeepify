@@ -42,9 +42,10 @@ class TestSpotifyClient(unittest.TestCase):
         self.assertEqual(host_constants_spec.CLIENT_ID, CLIENT_ID)
         self.assertEqual(host_constants_spec.CLIENT_SECRET, CLIENT_SECRET)
 
+    @patch("spotipy.Spotify.artists")
     @patch("spotipy.Spotify.current_user_recently_played")
     def test_gen_most_recent_listens(
-        self, mock_recently_played, mock_getpass, mock_input
+        self, mock_recently_played, mock_artists, mock_getpass, mock_input
     ) -> None:
         played_at_1 = "2024-12-27T22:30:04.214000Z"
         played_at_2 = "2024-12-26T16:48:12.712392Z"
@@ -65,10 +66,18 @@ class TestSpotifyClient(unittest.TestCase):
                             {
                                 "id": "345",
                                 "name": "test artist name",
+                                "genres": [
+                                    "test genre",
+                                    "test genre 2",
+                                ],
                             },
                             {
                                 "id": "678",
                                 "name": "test artist name 2",
+                                "genres": [
+                                    "test genre 3",
+                                    "test genre 2",
+                                ],
                             },
                         ],
                         "is_local": False,
@@ -87,15 +96,39 @@ class TestSpotifyClient(unittest.TestCase):
                             {
                                 "id": "678",
                                 "name": "test artist name 2",
+                                "genres": [
+                                    "test genre 3",
+                                    "test genre 2",
+                                ],
                             },
                             {
                                 "id": "912",
                                 "name": "test artist name 3",
+                                "genres": [
+                                    "test genre 3",
+                                    "test genre",
+                                ],
                             },
                         ],
                         "is_local": True,
                     },
                     "played_at": played_at_2,
+                },
+            ]
+        }
+        mock_artists.return_value = {
+            "artists": [
+                {
+                    "id": "345",
+                    "genres": ["test genre", "test genre 2"],
+                },
+                {
+                    "id": "678",
+                    "genres": ["test genre 3", "test genre 2"],
+                },
+                {
+                    "id": "912",
+                    "genres": ["test genre", "test genre 3"],
                 },
             ]
         }
@@ -118,8 +151,8 @@ class TestSpotifyClient(unittest.TestCase):
                 "test track name 2",
                 Album("567", "test album name 2"),
                 [
-                    Artist("678", "test artist name 2"),
-                    Artist("912", "test artist name 3"),
+                    Artist("678", "test artist name 2", ["test genre 2", "test genre 3"]),
+                    Artist("912", "test artist name 3", ["test genre", "test genre 3"]),
                 ],
                 True,
             ),
@@ -131,8 +164,8 @@ class TestSpotifyClient(unittest.TestCase):
                 "test track name",
                 Album("234", "test album name"),
                 [
-                    Artist("345", "test artist name"),
-                    Artist("678", "test artist name 2"),
+                    Artist("345", "test artist name", ["test genre", "test genre 2"]),
+                    Artist("678", "test artist name 2", ["test genre 2", "test genre 3"]),
                 ],
                 False,
             ),

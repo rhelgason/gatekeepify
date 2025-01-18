@@ -44,10 +44,6 @@ class Album(Artifact):
     pass
 
 
-class Artist(Artifact):
-    pass
-
-
 class User(Artifact):
     @classmethod
     def from_dict(cls, data):
@@ -55,6 +51,37 @@ class User(Artifact):
             data["id"],
             data["display_name"],
         )
+
+class Artist(Artifact):
+    genres: List[str]
+
+    def __init__(self, id, name, genres) -> None:
+        self.id = id
+        self.name = name
+        self.genres = genres
+
+    @classmethod
+    def from_dict(cls, data):
+        return cls(
+            data["id"],
+            data["name"],
+            data["genres"],
+        )
+
+    def __hash__(self) -> int:
+        return hash(self.id)
+
+    def __eq__(self, other) -> bool:
+        return (
+            self.id == other.id
+            and self.name == other.name
+            and sorted(self.genres) == sorted(other.genres)
+        )
+
+    def _to_json(self) -> Dict[str, Any]:
+        json = super()._to_json()
+        json["genres"] = self.genres
+        return json
 
 
 class Track(Artifact):
