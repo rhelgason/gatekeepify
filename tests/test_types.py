@@ -41,7 +41,10 @@ class TestSpotifyTypes(unittest.TestCase):
         self.assertNotEqual(artist, Artist("123", "test2", ["genre1", "genre2"]))
         self.assertNotEqual(artist, Artist("123", "test", ["genre2", "genre3"]))
 
-        self.assertEqual(artist.to_json_str(), '{"id": "123", "name": "test", "genres": ["genre1", "genre2"]}')
+        self.assertEqual(
+            artist.to_json_str(),
+            '{"id": "123", "name": "test", "genres": ["genre1", "genre2"]}',
+        )
 
     def test_user(self) -> None:
         data = {
@@ -117,7 +120,13 @@ class TestSpotifyTypes(unittest.TestCase):
         )
         self.assertNotEqual(
             track,
-            Track("123", "test2", test_album, [Artist("789", "test_artist", ["test_genre_2"]), test_artist_2], True),
+            Track(
+                "123",
+                "test2",
+                test_album,
+                [Artist("789", "test_artist", ["test_genre_2"]), test_artist_2],
+                True,
+            ),
         )
 
         self.assertEqual(
@@ -135,7 +144,10 @@ class TestSpotifyTypes(unittest.TestCase):
             "123",
             "test track",
             Album("234", "test album"),
-            [Artist("345", "test artist", ["test genre"]), Artist("678", "test artist 2", ["test genre 2"])],
+            [
+                Artist("345", "test artist", ["test genre"]),
+                Artist("678", "test artist 2", ["test genre 2"]),
+            ],
             False,
         )
         data = {
@@ -181,7 +193,10 @@ class TestSpotifyTypes(unittest.TestCase):
                     "123",
                     "test track",
                     Album("234", "test album"),
-                    [Artist("345", "test artist", ["test genre"]), Artist("678", "test artist 3", ["test genre 2"])],
+                    [
+                        Artist("345", "test artist", ["test genre"]),
+                        Artist("678", "test artist 3", ["test genre 2"]),
+                    ],
                     False,
                 ),
                 datetime.strptime(
@@ -197,7 +212,10 @@ class TestSpotifyTypes(unittest.TestCase):
                     "123",
                     "test track",
                     Album("234", "test album"),
-                    [Artist("345", "test artist", ["test genre 2"]), Artist("678", "test artist 2", ["test genre 2"])],
+                    [
+                        Artist("345", "test artist", ["test genre 2"]),
+                        Artist("678", "test artist 2", ["test genre 2"]),
+                    ],
                     False,
                 ),
                 datetime.strptime(

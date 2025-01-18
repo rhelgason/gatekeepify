@@ -387,7 +387,10 @@ class Database:
                 row[0],
                 row[1],
                 Album(row[2], row[3]),
-                [Artist(artist[0], artist[1], json.loads(artist[2])) for artist in json.loads(row[5])],
+                [
+                    Artist(artist[0], artist[1], json.loads(artist[2]))
+                    for artist in json.loads(row[5])
+                ],
                 row[4],
             )
             for row in results
@@ -460,7 +463,10 @@ class Database:
                     row[3],
                     row[4],
                     Album(row[5], row[6]),
-                    [Artist(artist[0], artist[1], json.loads(artist[2])) for artist in json.loads(row[8])],
+                    [
+                        Artist(artist[0], artist[1], json.loads(artist[2]))
+                        for artist in json.loads(row[8])
+                    ],
                     row[7],
                 ),
                 datetime.strptime(row[2], DB_DATETIME_FORMAT),

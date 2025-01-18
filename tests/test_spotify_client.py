@@ -151,7 +151,9 @@ class TestSpotifyClient(unittest.TestCase):
                 "test track name 2",
                 Album("567", "test album name 2"),
                 [
-                    Artist("678", "test artist name 2", ["test genre 2", "test genre 3"]),
+                    Artist(
+                        "678", "test artist name 2", ["test genre 2", "test genre 3"]
+                    ),
                     Artist("912", "test artist name 3", ["test genre", "test genre 3"]),
                 ],
                 True,
@@ -165,7 +167,9 @@ class TestSpotifyClient(unittest.TestCase):
                 Album("234", "test album name"),
                 [
                     Artist("345", "test artist name", ["test genre", "test genre 2"]),
-                    Artist("678", "test artist name 2", ["test genre 2", "test genre 3"]),
+                    Artist(
+                        "678", "test artist name 2", ["test genre 2", "test genre 3"]
+                    ),
                 ],
                 False,
             ),

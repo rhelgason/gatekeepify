@@ -14,7 +14,7 @@ from spotify.types import Album, Artist, Listen, Track, User
 class TestDatabase(unittest.TestCase):
     db: Database
     listen_1: Listen
-    listen_1: Listen
+    listen_2: Listen
     base_upsert_data: List[Listen]
 
     def setUp(self) -> None:
@@ -25,7 +25,10 @@ class TestDatabase(unittest.TestCase):
                 "123",
                 "test track",
                 Album("234", "test album"),
-                [Artist("345", "test artist", ["test genre", "test genre 2"]), Artist("678", "test artist 2", ["test genre 2", "test genre 3"])],
+                [
+                    Artist("345", "test artist", ["test genre", "test genre 2"]),
+                    Artist("678", "test artist 2", ["test genre 2", "test genre 3"]),
+                ],
                 False,
             ),
             datetime.strptime("2024-12-26T22:30:04.214000Z", CLIENT_DATETIME_FORMAT),
@@ -36,7 +39,10 @@ class TestDatabase(unittest.TestCase):
                 "456",
                 "test track 2",
                 Album("567", "test album 2"),
-                [Artist("678", "test artist 2", ["test genre 2", "test genre 3"]), Artist("912", "test artist 3", ["test genre", "test genre 3"])],
+                [
+                    Artist("678", "test artist 2", ["test genre 2", "test genre 3"]),
+                    Artist("912", "test artist 3", ["test genre", "test genre 3"]),
+                ],
                 True,
             ),
             datetime.strptime("2024-12-27T16:48:12.712392Z", CLIENT_DATETIME_FORMAT),
@@ -174,13 +180,16 @@ class TestDatabase(unittest.TestCase):
         self.assertEqual(len(results), 2)
         self.assertEqual(
             sorted(list(results)),
-            [(self.listen_1.track.artists[0].id, "test genre"), (self.listen_1.track.artists[0].id, "test genre 2")],
+            [
+                (self.listen_1.track.artists[0].id, "test genre"),
+                (self.listen_1.track.artists[0].id, "test genre 2"),
+            ],
         )
 
         # overwrite existing artist with new genres
         self.listen_1.track.artists = [
             Artist("345", "test artist", ["test genre 3", "test genre 2"]),
-            Artist("678", "test artist 2", ["test genre 2", "test genre 3"])
+            Artist("678", "test artist 2", ["test genre 2", "test genre 3"]),
         ]
         self.db.upsert_cron_backfill(self.base_upsert_data)
         self.db.cursor.execute(query)
@@ -188,7 +197,10 @@ class TestDatabase(unittest.TestCase):
         self.assertEqual(len(results), 2)
         self.assertEqual(
             sorted(list(results)),
-            [(self.listen_1.track.artists[0].id, "test genre 2"), (self.listen_1.track.artists[0].id, "test genre 3")],
+            [
+                (self.listen_1.track.artists[0].id, "test genre 2"),
+                (self.listen_1.track.artists[0].id, "test genre 3"),
+            ],
         )
 
         self.assertLogsWrittenToDb(LoggerAction.UPSERT_ARTIST_TO_GENRE, 2)

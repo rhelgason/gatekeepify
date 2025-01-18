@@ -1,5 +1,5 @@
 import getpass
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import List, Optional, Set, Tuple
 
 import spotipy
@@ -80,11 +80,19 @@ class SpotifyClient:
 
         # backfill genres for each artist
         recent_tracks = res["items"]
-        all_artist_ids = set([artist["id"] for track in recent_tracks for artist in track["track"]["artists"]])
+        all_artist_ids = set(
+            [
+                artist["id"]
+                for track in recent_tracks
+                for artist in track["track"]["artists"]
+            ]
+        )
         artists_res = self.client.artists(all_artist_ids)
         if not artists_res:
             raise Exception("No artists found")
-        artist_genres = {artist["id"]: artist["genres"] for artist in artists_res["artists"]}
+        artist_genres = {
+            artist["id"]: artist["genres"] for artist in artists_res["artists"]
+        }
         for track in recent_tracks:
             for artist in track["track"]["artists"]:
                 artist["genres"] = artist_genres[artist["id"]]

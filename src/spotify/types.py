@@ -52,6 +52,7 @@ class User(Artifact):
             data["display_name"],
         )
 
+
 class Artist(Artifact):
     genres: List[str]
 
