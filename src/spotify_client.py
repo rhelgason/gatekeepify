@@ -6,7 +6,6 @@ from typing import List, Optional, Set, Tuple
 import spotipy
 from constants import (
     DEFAULT_SCOPE,
-    HOST_CONSTANTS_PATH,
     HOST_CONSTANTS_TEST_PATH,
     MAXIMUM_RECENT_TRACKS,
     REDIRECT_URI,
@@ -14,7 +13,7 @@ from constants import (
 from db.constants import DB_NAME, DB_TEST_NAME
 from db.Database import Database
 from spotify.types import Listen, User
-from spotipy.oauth2 import SpotifyOAuth, SpotifyOauthError
+from spotipy.oauth2 import SpotifyOAuth
 
 
 class SpotifyClient:
