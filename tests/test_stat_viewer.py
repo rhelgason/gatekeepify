@@ -34,88 +34,57 @@ CLIENT_SECRET = "{CLIENT_SECRET}"
 
         # upsert db test data
         db = Database(db_name=DB_TEST_NAME)
+        artist_1 = Artist("345", "test artist", ["test genre", "test genre 2"])
+        artist_2 = Artist("678", "test artist 2", ["test genre 2", "test genre 3"])
+        artist_3 = Artist("912", "test artist 3952", ["test genre", "test genre 3"])
+        track_1 = Track(
+            "123",
+            "test track",
+            Album("234", "test album"),
+            [
+                artist_1,
+                artist_2,
+            ],
+            False,
+        )
+        track_2 = Track(
+            "456",
+            "test track 2",
+            Album("567", "test album 2"),
+            [
+                artist_2,
+                artist_3,
+            ],
+            True,
+        )
         listen_1 = Listen(
             User("12345", "test user"),
-            Track(
-                "123",
-                "test track",
-                Album("234", "test album"),
-                [
-                    Artist("345", "test artist", ["test genre", "test genre 2"]),
-                    Artist("678", "test artist 2", ["test genre 2", "test genre 3"]),
-                ],
-                False,
-            ),
+            track_1,
             datetime.strptime("2024-12-26T22:30:04.214000Z", CLIENT_DATETIME_FORMAT),
         )
         listen_2 = Listen(
             User("12345", "test user 2"),
-            Track(
-                "456",
-                "test track 2",
-                Album("567", "test album 2"),
-                [
-                    Artist("678", "test artist 2", ["test genre 2", "test genre 3"]),
-                    Artist("912", "test artist 3952", ["test genre", "test genre 3"]),
-                ],
-                True,
-            ),
+            track_2,
             datetime.strptime("2024-12-27T16:48:12.712392Z", CLIENT_DATETIME_FORMAT),
         )
         listen_3 = Listen(
             User("12345", "test user"),
-            Track(
-                "123",
-                "test track",
-                Album("234", "test album"),
-                [
-                    Artist("345", "test artist", ["test genre", "test genre 2"]),
-                    Artist("678", "test artist 2", ["test genre 2", "test genre 3"]),
-                ],
-                False,
-            ),
+            track_1,
             datetime.strptime("2024-12-28T22:30:04.214000Z", CLIENT_DATETIME_FORMAT),
         )
         listen_4 = Listen(
             User("12345", "test user"),
-            Track(
-                "123",
-                "test track",
-                Album("234", "test album"),
-                [
-                    Artist("345", "test artist", ["test genre", "test genre 3"]),
-                    Artist("678", "test artist 2", ["test genre 2", "test genre 3"]),
-                ],
-                False,
-            ),
+            track_1,
             datetime.strptime("2024-12-31T22:30:04.214000Z", CLIENT_DATETIME_FORMAT),
         )
         listen_5 = Listen(
             User("6789", "test user 2"),
-            Track(
-                "456",
-                "test track 2",
-                Album("567", "test album 2"),
-                [
-                    Artist("678", "test artist 2", ["test genre 2", "test genre 3"]),
-                    Artist("912", "test artist 3952", ["test genre", "test genre 3"]),
-                ],
-                True,
-            ),
+            track_2,
             datetime.strptime("2024-12-27T16:48:12.712392Z", CLIENT_DATETIME_FORMAT),
         )
         listen_6 = Listen(
             User("6789", "test user 2"),
-            Track(
-                "456",
-                "test track 2",
-                Album("567", "test album 2"),
-                [
-                    Artist("678", "test artist 2", ["test genre 2", "test genre 3"]),
-                    Artist("912", "test artist 3952", ["test genre", "test genre 3"]),
-                ],
-                True,
-            ),
+            track_2,
             datetime.strptime("2024-12-28T16:48:12.712392Z", CLIENT_DATETIME_FORMAT),
         )
         base_upsert_data = [listen_1, listen_2, listen_3, listen_4, listen_5, listen_6]
