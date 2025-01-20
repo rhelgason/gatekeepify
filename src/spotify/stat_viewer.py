@@ -76,12 +76,13 @@ class StatViewer:
         top_artists = Counter(
             [artist for listen in self.listens for artist in listen.track.artists]
         )
-        top_artists_table = PrettyTable(["Rank", "Artist", "Listens"])
+        top_artists_table = PrettyTable(["Rank", "Artist", "Genres", "Listens"])
         top_artists_table.add_rows(
             [
                 [
                     i + 1,
                     self.trim_str(artist.name),
+                    self.trim_str(", ".join(artist.genres or [])),
                     count,
                 ]
                 for i, (artist, count) in enumerate(

@@ -59,7 +59,10 @@ class Artist(Artifact):
     def __init__(self, id, name, genres) -> None:
         self.id = id
         self.name = name
-        self.genres = genres
+        if genres == [None]:
+            self.genres = []
+        else:
+            self.genres = genres
 
     @classmethod
     def from_dict(cls, data):
