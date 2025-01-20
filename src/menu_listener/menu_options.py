@@ -23,4 +23,5 @@ class DateOptions(MenuOptions):
 class StatViewerOptions(MenuOptions):
     TOP_TRACKS = "Top Tracks"
     TOP_ARTISTS = "Top Artists"
+    TOP_GENRES = "Top Genres"
     RETURN = "Return"

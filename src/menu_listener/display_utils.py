@@ -50,6 +50,8 @@ def use_view_my_stats():
                 stat_viewer.top_tracks()
             elif stat_option == StatViewerOptions.TOP_ARTISTS:
                 stat_viewer.top_artists()
+            elif stat_option == StatViewerOptions.TOP_GENRES:
+                stat_viewer.top_genres()
             stat_option = stats_menu.use_menu()
         date_option = date_menu.use_menu()
     return 0

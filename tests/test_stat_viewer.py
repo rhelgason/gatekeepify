@@ -34,9 +34,9 @@ CLIENT_SECRET = "{CLIENT_SECRET}"
 
         # upsert db test data
         db = Database(db_name=DB_TEST_NAME)
-        artist_1 = Artist("345", "test artist", ["test genre", "test genre 2"])
-        artist_2 = Artist("678", "test artist 2", ["test genre 2", "test genre 3"])
-        artist_3 = Artist("912", "test artist 3952", ["test genre", "test genre 3"])
+        artist_1 = Artist("345", "test artist", ["test genre"])
+        artist_2 = Artist("678", "test artist 2", ["test genre 2"])
+        artist_3 = Artist("912", "test artist 3952", ["test genre 3"])
         track_1 = Track(
             "123",
             "test track",
@@ -150,22 +150,25 @@ CLIENT_SECRET = "{CLIENT_SECRET}"
     def test_get_top_artists_table_all_time(self, mock_current_user) -> None:
         stat_viewer = StatViewer(None, True)
         mock_current_user.assert_called_once()
-        top_artists_table = PrettyTable(["Rank", "Artist", "Listens"])
+        top_artists_table = PrettyTable(["Rank", "Artist", "Genres", "Listens"])
         top_artists_table.add_rows(
             [
                 [
                     1,
                     "test artist 2",
+                    "test genre 2",
                     4,
                 ],
                 [
                     2,
                     "test artist",
+                    "test genre",
                     3,
                 ],
                 [
                     3,
                     "test artist 3952",
+                    "test genre 3",
                     1,
                 ],
             ]
@@ -177,28 +180,85 @@ CLIENT_SECRET = "{CLIENT_SECRET}"
     def test_get_top_artists_table_with_ds(self, mock_current_user) -> None:
         stat_viewer = StatViewer(datetime.strptime("2024-12-27", "%Y-%m-%d"), True)
         mock_current_user.assert_called_once()
-        top_artists_table = PrettyTable(["Rank", "Artist", "Listens"])
+        top_artists_table = PrettyTable(["Rank", "Artist", "Genres", "Listens"])
         top_artists_table.add_rows(
             [
                 [
                     1,
                     "test artist 2",
+                    "test genre 2",
                     3,
                 ],
                 [
                     2,
                     "test artist",
+                    "test genre",
                     2,
                 ],
                 [
                     3,
                     "test artist 3952",
+                    "test genre 3",
                     1,
                 ],
             ]
         )
         self.assertEqual(
             stat_viewer.get_top_artists_table().__str__(), top_artists_table.__str__()
+        )
+
+    def test_get_top_genres_table_all_time(self, mock_current_user) -> None:
+        stat_viewer = StatViewer(None, True)
+        mock_current_user.assert_called_once()
+        top_genres_table = PrettyTable(["Rank", "Genre", "Listens"])
+        top_genres_table.add_rows(
+            [
+                [
+                    1,
+                    "test genre 2",
+                    4,
+                ],
+                [
+                    2,
+                    "test genre",
+                    3,
+                ],
+                [
+                    3,
+                    "test genre 3",
+                    1,
+                ],
+            ]
+        )
+        self.assertEqual(
+            stat_viewer.get_top_genres_table().__str__(), top_genres_table.__str__()
+        )
+
+    def test_get_top_genres_table_with_ds(self, mock_current_user) -> None:
+        stat_viewer = StatViewer(datetime.strptime("2024-12-27", "%Y-%m-%d"), True)
+        mock_current_user.assert_called_once()
+        top_genres_table = PrettyTable(["Rank", "Genre", "Listens"])
+        top_genres_table.add_rows(
+            [
+                [
+                    1,
+                    "test genre 2",
+                    3,
+                ],
+                [
+                    2,
+                    "test genre",
+                    2,
+                ],
+                [
+                    3,
+                    "test genre 3",
+                    1,
+                ],
+            ]
+        )
+        self.assertEqual(
+            stat_viewer.get_top_genres_table().__str__(), top_genres_table.__str__()
         )
 
     def tearDown(self) -> None:

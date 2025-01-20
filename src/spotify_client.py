@@ -77,9 +77,11 @@ class SpotifyClient:
         )
         if not res:
             raise Exception("No recents found")
+        recent_tracks = res["items"]
+        if len(recent_tracks) == 0:
+            return []
 
         # backfill genres for each artist
-        recent_tracks = res["items"]
         all_artist_ids = set(
             [
                 artist["id"]
@@ -103,6 +105,8 @@ class SpotifyClient:
         user = self.gen_current_user()
         after_ts = self.db.get_most_recent_listen_time(user)
         recent_listens = self.gen_most_recent_listens(user, after_ts)
+        if len(recent_listens) == 0:
+            return
         self.db.upsert_cron_backfill(recent_listens)
 
     def gen_all_listens(self, ds: Optional[datetime]) -> Set[Listen]:

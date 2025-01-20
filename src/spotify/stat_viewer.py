@@ -109,3 +109,53 @@ class StatViewer:
 
         print("\nPress Enter to return to the previous menu.")
         input()
+
+    def get_top_genres_table(self) -> PrettyTable:
+        top_genres = Counter(
+            [
+                x
+                for y in (
+                    set(
+                        [
+                            genre
+                            for artist in listen.track.artists
+                            for genre in artist.genres
+                        ]
+                    )
+                    for listen in self.listens
+                )
+                for x in y
+            ]
+        )
+        top_genres_table = PrettyTable(["Rank", "Genre", "Listens"])
+        top_genres_table.add_rows(
+            [
+                [
+                    i + 1,
+                    self.trim_str(genre),
+                    count,
+                ]
+                for i, (genre, count) in enumerate(
+                    top_genres.most_common(NUM_DISPLAY_ITEMS)
+                )
+            ]
+        )
+        return top_genres_table
+
+    def top_genres(self) -> None:
+        os.system("clear")
+        print(f"{APP_TITLE}\n")
+        top_genres_table = self.get_top_genres_table()
+        print(
+            "Your top artists "
+            + (
+                "of all time"
+                if self.ds is None
+                else f"since {self.ds.strftime('%Y-%m-%d')}"
+            )
+            + ":\n"
+        )
+        print(top_genres_table)
+
+        print("\nPress Enter to return to the previous menu.")
+        input()
