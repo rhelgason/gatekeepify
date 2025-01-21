@@ -1,11 +1,11 @@
 import getpass
+import os
 from datetime import datetime, timedelta, timezone
 from typing import List, Optional, Set, Tuple
 
 import spotipy
 from constants import (
     DEFAULT_SCOPE,
-    HOST_CONSTANTS_PATH,
     HOST_CONSTANTS_TEST_PATH,
     MAXIMUM_RECENT_TRACKS,
     REDIRECT_URI,
@@ -21,6 +21,7 @@ class SpotifyClient:
     db: Database
 
     def __init__(self, is_test: bool = False) -> None:
+        # TODO: Should call this at start so that we fail if auth is missing.
         client_id, client_secret = self.get_host_constants(is_test)
         self.client = spotipy.Spotify(
             auth_manager=SpotifyOAuth(
@@ -35,28 +36,32 @@ class SpotifyClient:
     # get client id and secret if exists, otherwise get user input
     def get_host_constants(self, is_test: bool = False) -> Tuple[str, str]:
         host_constants_path = (
-            HOST_CONSTANTS_TEST_PATH if is_test else HOST_CONSTANTS_PATH
+            HOST_CONSTANTS_TEST_PATH if is_test else ".env"
         )
-        try:
-            host_constants_spec = __import__(
-                "/".join(host_constants_path.split("/")[1:]),
-                globals(),
-                locals(),
-                ["CLIENT_ID", "CLIENT_SECRET"],
-                0,
-            )
-            return (host_constants_spec.CLIENT_ID, host_constants_spec.CLIENT_SECRET)
-        except:
-            # constants file not found, get user input
+        host_constants_spec = {
+            "GATEKEEPIFY_CLIENT_ID": os.environ.get("GATEKEEPIFY_CLIENT_ID"),
+            "GATEKEEPIFY_CLIENT_SECRET": os.environ.get("GATEKEEPIFY_CLIENT_SECRET"),
+        }
+
+        # if all env vars are found, return them, otherwise prompt user
+        if all(host_constants_spec.values()):
+            return (
+                host_constants_spec["GATEKEEPIFY_CLIENT_ID"],
+                host_constants_spec["GATEKEEPIFY_CLIENT_SECRET"],
+                )
+        else:
+            print("[WARNING] Could not find credential(s) in environment. Check your .env file or build it below.")
+            # .env not found, build it with user input
             client_id = input("Please input your Spotify API client ID: ")
             client_secret = getpass.getpass(
                 "Please input your Spotify API client secret: "
             )
-            f = open(".".join((host_constants_path, "py")), "w")
-            f.write('CLIENT_ID = "' + client_id + '"\n')
-            f.write('CLIENT_SECRET = "' + client_secret + '"')
+            f = open("../" + host_constants_path, "w")
+            f.write('GATEKEEPIFY_CLIENT_ID="' + client_id + '"\n')
+            f.write('GATEKEEPIFY_CLIENT_SECRET="' + client_secret + '"\n')
             f.close()
             return (client_id, client_secret)
+
 
     def gen_current_user(self) -> User:
         res = self.client.current_user()
