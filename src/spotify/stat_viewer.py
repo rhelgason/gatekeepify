@@ -2,7 +2,7 @@ import math
 import os
 from collections import Counter
 from datetime import datetime
-from typing import Optional, Set
+from typing import Dict, List, Optional, Set, Tuple, TypeVar
 
 from constants import APP_TITLE
 
@@ -13,6 +13,8 @@ from spotify_client import SpotifyClient
 
 NUM_DISPLAY_ITEMS = 10
 MAX_ENTRY_LENGTH = 30
+
+T = TypeVar("T")
 
 
 class StatViewer:
@@ -40,6 +42,20 @@ class StatViewer:
     def get_minutes_from_ms(self, ms: int) -> int:
         return math.floor(ms / 1000 / 60)
 
+    # Custom sorting function for each table prior to output. Assumes the invariant
+    # that each key in the counter has an ID that is also in the minutes dict.
+    # Currently sorts by the number of listens first, then by the number of minutes.
+    def sort_counter(
+        self, counter: Counter[T], minutes: Dict[str, int]
+    ) -> List[Tuple[T, int]]:
+        return sorted(
+            counter.most_common(NUM_DISPLAY_ITEMS),
+            key=lambda x: (
+                -x[1],
+                -minutes[x[0] if isinstance(x[0], str) else getattr(x[0], "id", "")],
+            ),
+        )
+
     def get_top_tracks_table(self) -> PrettyTable:
         top_tracks = Counter([listen.track for listen in self.listens])
         top_track_minutes = {}
@@ -61,7 +77,7 @@ class StatViewer:
                     self.get_minutes_from_ms(top_track_minutes[track.id]),
                 ]
                 for i, (track, count) in enumerate(
-                    top_tracks.most_common(NUM_DISPLAY_ITEMS)
+                    self.sort_counter(top_tracks, top_track_minutes)
                 )
             ]
         )
@@ -109,7 +125,7 @@ class StatViewer:
                     self.get_minutes_from_ms(top_artist_minutes[artist.id]),
                 ]
                 for i, (artist, count) in enumerate(
-                    top_artists.most_common(NUM_DISPLAY_ITEMS)
+                    self.sort_counter(top_artists, top_artist_minutes)
                 )
             ]
         )
@@ -159,7 +175,7 @@ class StatViewer:
                     self.get_minutes_from_ms(top_genre_minutes[genre]),
                 ]
                 for i, (genre, count) in enumerate(
-                    top_genres.most_common(NUM_DISPLAY_ITEMS)
+                    self.sort_counter(top_genres, top_genre_minutes)
                 )
             ]
         )
