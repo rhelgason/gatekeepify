@@ -64,6 +64,7 @@ class Database:
             track_id VARCHAR(255) PRIMARY KEY,
             track_name VARCHAR(255),
             album_id VARCHAR(255),
+            duration_ms INTEGER,
             is_local BOOLEAN,
             FOREIGN KEY(album_id) REFERENCES dim_all_albums(album_id)
         )
@@ -193,15 +194,21 @@ class Database:
     # upserts tracks into dim_all_tracks
     def __upsert_dim_all_tracks(self, tracks: Set[Track]):
         query = """
-        INSERT INTO dim_all_tracks (track_id, track_name, album_id, is_local)
-        VALUES (?, ?, ?, ?)
-        -- update if track has updated its name, album, or is_local flag
-        ON CONFLICT (track_id) DO UPDATE SET track_name=excluded.track_name, album_id=excluded.album_id, is_local=excluded.is_local
+        INSERT INTO dim_all_tracks (track_id, track_name, album_id, duration_ms, is_local)
+        VALUES (?, ?, ?, ?, ?)
+        -- update if track has updated its name, album, duration, or is_local flag
+        ON CONFLICT (track_id) DO UPDATE SET track_name=excluded.track_name, album_id=excluded.album_id, duration_ms=excluded.duration_ms, is_local=excluded.is_local
         """
         self.cursor.executemany(
             query,
             [
-                (track.id, track.name, track.album.id, track.is_local)
+                (
+                    track.id,
+                    track.name,
+                    track.album.id,
+                    track.duration_ms,
+                    track.is_local,
+                )
                 for track in tracks
             ],
         )
@@ -364,6 +371,7 @@ class Database:
             track_name,
             t.album_id,
             album_name,
+            duration_ms,
             is_local,
             JSON_GROUP_ARRAY(JSON_ARRAY(ar.artist_id, ar.artist_name, ar.genres)) artists
         FROM dim_all_tracks t
@@ -378,7 +386,7 @@ class Database:
             LEFT JOIN artist_to_genre ag ON ag.artist_id=a.artist_id
             GROUP BY a.artist_id, artist_name
         ) ar ON ta.artist_id=ar.artist_id
-        GROUP BY t.track_id, track_name, t.album_id, album_name, is_local
+        GROUP BY t.track_id, track_name, t.album_id, album_name, duration_ms, is_local
         """
         self.cursor.execute(query)
         results = self.cursor.fetchall()
@@ -389,9 +397,10 @@ class Database:
                 Album(row[2], row[3]),
                 [
                     Artist(artist[0], artist[1], json.loads(artist[2]))
-                    for artist in json.loads(row[5])
+                    for artist in json.loads(row[6])
                 ],
                 row[4],
+                row[5],
             )
             for row in results
         }
@@ -430,6 +439,7 @@ class Database:
             track_name,
             t.album_id,
             album_name,
+            duration_ms,
             is_local,
             JSON_GROUP_ARRAY(JSON_ARRAY(ar.artist_id, ar.artist_name, ar.genres)) artists
         FROM dim_all_listens l
@@ -465,9 +475,10 @@ class Database:
                     Album(row[5], row[6]),
                     [
                         Artist(artist[0], artist[1], json.loads(artist[2]))
-                        for artist in json.loads(row[8])
+                        for artist in json.loads(row[9])
                     ],
                     row[7],
+                    row[8],
                 ),
                 datetime.strptime(row[2], DB_DATETIME_FORMAT),
             )

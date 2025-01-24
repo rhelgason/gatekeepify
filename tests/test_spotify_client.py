@@ -80,6 +80,7 @@ class TestSpotifyClient(unittest.TestCase):
                                 ],
                             },
                         ],
+                        "duration_ms": 200000,
                         "is_local": False,
                     },
                     "played_at": played_at_1,
@@ -110,6 +111,7 @@ class TestSpotifyClient(unittest.TestCase):
                                 ],
                             },
                         ],
+                        "duration_ms": 300000,
                         "is_local": True,
                     },
                     "played_at": played_at_2,
@@ -156,6 +158,7 @@ class TestSpotifyClient(unittest.TestCase):
                     ),
                     Artist("912", "test artist name 3", ["test genre", "test genre 3"]),
                 ],
+                300000,
                 True,
             ),
         )
@@ -171,6 +174,7 @@ class TestSpotifyClient(unittest.TestCase):
                         "678", "test artist name 2", ["test genre 2", "test genre 3"]
                     ),
                 ],
+                200000,
                 False,
             ),
         )

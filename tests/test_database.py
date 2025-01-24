@@ -35,6 +35,7 @@ class TestDatabase(unittest.TestCase):
                 self.artist_1,
                 self.artist_2,
             ],
+            240000,
             False,
         )
         self.track_2 = Track(
@@ -45,6 +46,7 @@ class TestDatabase(unittest.TestCase):
                 self.artist_2,
                 self.artist_3,
             ],
+            240000,
             True,
         )
         self.listen_1 = Listen(
@@ -99,12 +101,13 @@ class TestDatabase(unittest.TestCase):
             [self.listen_1.track, self.listen_2.track],
         )
 
-        # overwrite existing track with new name, artist, and is_local flag
+        # overwrite existing track with new name, artist, duration, and is_local flag
         self.track_1.name = "test track new name"
         self.track_1.artists = [
             self.artist_2,
             Artist("6789", "test artist 4", ["test genre 3"]),
         ]
+        self.track_1.duration_ms = 300000
         self.track_1.is_local = True
         self.track_2.album = Album("567", "test album 2 new name")
         self.listen_1.track = self.track_1

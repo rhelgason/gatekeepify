@@ -45,6 +45,7 @@ CLIENT_SECRET = "{CLIENT_SECRET}"
                 artist_1,
                 artist_2,
             ],
+            240000,
             False,
         )
         track_2 = Track(
@@ -55,6 +56,7 @@ CLIENT_SECRET = "{CLIENT_SECRET}"
                 artist_2,
                 artist_3,
             ],
+            240000,
             True,
         )
         listen_1 = Listen(

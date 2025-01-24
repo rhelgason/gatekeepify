@@ -91,13 +91,15 @@ class Artist(Artifact):
 class Track(Artifact):
     album: Album
     artists: List[Artist]
+    duration_ms: int
     is_local: bool
 
-    def __init__(self, id, name, album, artists, is_local) -> None:
+    def __init__(self, id, name, album, artists, duration_ms, is_local) -> None:
         self.id = id
         self.name = name
         self.album = album
         self.artists = artists
+        self.duration_ms = duration_ms
         self.is_local = is_local
 
     @classmethod
@@ -107,6 +109,7 @@ class Track(Artifact):
             data["name"],
             Album.from_dict(data["album"]),
             [Artist.from_dict(artist) for artist in data["artists"]],
+            data["duration_ms"],
             data["is_local"],
         )
 
@@ -119,6 +122,7 @@ class Track(Artifact):
             and self.name == other.name
             and self.album == other.album
             and sorted(self.artists) == sorted(other.artists)
+            and self.duration_ms == other.duration_ms
             and self.is_local == other.is_local
         )
 
@@ -126,6 +130,7 @@ class Track(Artifact):
         json = super()._to_json()
         json["album"] = self.album._to_json()
         json["artists"] = [artist._to_json() for artist in self.artists]
+        json["duration_ms"] = self.duration_ms
         json["is_local"] = self.is_local
         return json
 
