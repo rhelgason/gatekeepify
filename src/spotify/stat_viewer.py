@@ -1,3 +1,4 @@
+import math
 import os
 from collections import Counter
 from datetime import datetime
@@ -36,9 +37,20 @@ class StatViewer:
             return s[: MAX_ENTRY_LENGTH - 3] + "..."
         return s
 
+    def get_minutes_from_ms(self, ms: int) -> int:
+        return math.floor(ms / 1000 / 60)
+
     def get_top_tracks_table(self) -> PrettyTable:
         top_tracks = Counter([listen.track for listen in self.listens])
-        top_tracks_table = PrettyTable(["Rank", "Title", "Artists", "Listens"])
+        top_track_minutes = {}
+        for listen in self.listens:
+            top_track_minutes[listen.track.id] = (
+                top_track_minutes.get(listen.track.id, 0) + listen.track.duration_ms
+            )
+
+        top_tracks_table = PrettyTable(
+            ["Rank", "Title", "Artists", "Listen Count", "Minutes Listened"]
+        )
         top_tracks_table.add_rows(
             [
                 [
@@ -46,6 +58,7 @@ class StatViewer:
                     self.trim_str(track.name),
                     self.trim_str(", ".join([artist.name for artist in track.artists])),
                     count,
+                    self.get_minutes_from_ms(top_track_minutes[track.id]),
                 ]
                 for i, (track, count) in enumerate(
                     top_tracks.most_common(NUM_DISPLAY_ITEMS)
@@ -76,7 +89,16 @@ class StatViewer:
         top_artists = Counter(
             [artist for listen in self.listens for artist in listen.track.artists]
         )
-        top_artists_table = PrettyTable(["Rank", "Artist", "Genres", "Listens"])
+        top_artist_minutes = {}
+        for listen in self.listens:
+            for artist in listen.track.artists:
+                top_artist_minutes[artist.id] = (
+                    top_artist_minutes.get(artist.id, 0) + listen.track.duration_ms
+                )
+
+        top_artists_table = PrettyTable(
+            ["Rank", "Artist", "Genres", "Listen Count", "Minutes Listened"]
+        )
         top_artists_table.add_rows(
             [
                 [
@@ -84,6 +106,7 @@ class StatViewer:
                     self.trim_str(artist.name),
                     self.trim_str(", ".join(artist.genres or [])),
                     count,
+                    self.get_minutes_from_ms(top_artist_minutes[artist.id]),
                 ]
                 for i, (artist, count) in enumerate(
                     top_artists.most_common(NUM_DISPLAY_ITEMS)
@@ -111,29 +134,29 @@ class StatViewer:
         input()
 
     def get_top_genres_table(self) -> PrettyTable:
-        top_genres = Counter(
-            [
-                x
-                for y in (
-                    set(
-                        [
-                            genre
-                            for artist in listen.track.artists
-                            for genre in artist.genres
-                        ]
-                    )
-                    for listen in self.listens
+        top_genres = Counter()
+        top_genre_minutes = {}
+        for listen in self.listens:
+            track_genres = set()
+            for artist in listen.track.artists:
+                for genre in artist.genres:
+                    track_genres.add(genre)
+            top_genres.update(track_genres)
+            for genre in track_genres:
+                top_genre_minutes[genre] = (
+                    top_genre_minutes.get(genre, 0) + listen.track.duration_ms
                 )
-                for x in y
-            ]
+
+        top_genres_table = PrettyTable(
+            ["Rank", "Genre", "Listen Count", "Minutes Listened"]
         )
-        top_genres_table = PrettyTable(["Rank", "Genre", "Listens"])
         top_genres_table.add_rows(
             [
                 [
                     i + 1,
                     self.trim_str(genre),
                     count,
+                    self.get_minutes_from_ms(top_genre_minutes[genre]),
                 ]
                 for i, (genre, count) in enumerate(
                     top_genres.most_common(NUM_DISPLAY_ITEMS)

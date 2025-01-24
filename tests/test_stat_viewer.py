@@ -101,10 +101,19 @@ CLIENT_SECRET = "{CLIENT_SECRET}"
             "Test input string that is t...",
         )
 
+    def test_get_minutes_from_ms(self, mock_current_user) -> None:
+        stat_viewer = StatViewer(None, True)
+        mock_current_user.assert_called_once()
+        self.assertEqual(stat_viewer.get_minutes_from_ms(0), 0)
+        self.assertEqual(stat_viewer.get_minutes_from_ms(480000), 8)
+        self.assertEqual(stat_viewer.get_minutes_from_ms(363210), 6)
+
     def test_get_top_tracks_table_all_time(self, mock_current_user) -> None:
         stat_viewer = StatViewer(None, True)
         mock_current_user.assert_called_once()
-        top_tracks_table = PrettyTable(["Rank", "Title", "Artists", "Listens"])
+        top_tracks_table = PrettyTable(
+            ["Rank", "Title", "Artists", "Listen Count", "Minutes Listened"]
+        )
         top_tracks_table.add_rows(
             [
                 [
@@ -112,12 +121,14 @@ CLIENT_SECRET = "{CLIENT_SECRET}"
                     "test track",
                     "test artist, test artist 2",
                     3,
+                    12,
                 ],
                 [
                     2,
                     "test track 2",
                     "test artist 2, test artist ...",
                     1,
+                    4,
                 ],
             ]
         )
@@ -128,7 +139,9 @@ CLIENT_SECRET = "{CLIENT_SECRET}"
     def test_get_top_tracks_table_with_ds(self, mock_current_user) -> None:
         stat_viewer = StatViewer(datetime.strptime("2024-12-27", "%Y-%m-%d"), True)
         mock_current_user.assert_called_once()
-        top_tracks_table = PrettyTable(["Rank", "Title", "Artists", "Listens"])
+        top_tracks_table = PrettyTable(
+            ["Rank", "Title", "Artists", "Listen Count", "Minutes Listened"]
+        )
         top_tracks_table.add_rows(
             [
                 [
@@ -136,12 +149,14 @@ CLIENT_SECRET = "{CLIENT_SECRET}"
                     "test track",
                     "test artist, test artist 2",
                     2,
+                    8,
                 ],
                 [
                     2,
                     "test track 2",
                     "test artist 2, test artist ...",
                     1,
+                    4,
                 ],
             ]
         )
@@ -152,7 +167,9 @@ CLIENT_SECRET = "{CLIENT_SECRET}"
     def test_get_top_artists_table_all_time(self, mock_current_user) -> None:
         stat_viewer = StatViewer(None, True)
         mock_current_user.assert_called_once()
-        top_artists_table = PrettyTable(["Rank", "Artist", "Genres", "Listens"])
+        top_artists_table = PrettyTable(
+            ["Rank", "Artist", "Genres", "Listen Count", "Minutes Listened"]
+        )
         top_artists_table.add_rows(
             [
                 [
@@ -160,18 +177,21 @@ CLIENT_SECRET = "{CLIENT_SECRET}"
                     "test artist 2",
                     "test genre 2",
                     4,
+                    16,
                 ],
                 [
                     2,
                     "test artist",
                     "test genre, test genre 2",
                     3,
+                    12,
                 ],
                 [
                     3,
                     "test artist 3952",
                     "test genre 3",
                     1,
+                    4,
                 ],
             ]
         )
@@ -182,7 +202,9 @@ CLIENT_SECRET = "{CLIENT_SECRET}"
     def test_get_top_artists_table_with_ds(self, mock_current_user) -> None:
         stat_viewer = StatViewer(datetime.strptime("2024-12-27", "%Y-%m-%d"), True)
         mock_current_user.assert_called_once()
-        top_artists_table = PrettyTable(["Rank", "Artist", "Genres", "Listens"])
+        top_artists_table = PrettyTable(
+            ["Rank", "Artist", "Genres", "Listen Count", "Minutes Listened"]
+        )
         top_artists_table.add_rows(
             [
                 [
@@ -190,18 +212,21 @@ CLIENT_SECRET = "{CLIENT_SECRET}"
                     "test artist 2",
                     "test genre 2",
                     3,
+                    12,
                 ],
                 [
                     2,
                     "test artist",
                     "test genre, test genre 2",
                     2,
+                    8,
                 ],
                 [
                     3,
                     "test artist 3952",
                     "test genre 3",
                     1,
+                    4,
                 ],
             ]
         )
@@ -212,23 +237,28 @@ CLIENT_SECRET = "{CLIENT_SECRET}"
     def test_get_top_genres_table_all_time(self, mock_current_user) -> None:
         stat_viewer = StatViewer(None, True)
         mock_current_user.assert_called_once()
-        top_genres_table = PrettyTable(["Rank", "Genre", "Listens"])
+        top_genres_table = PrettyTable(
+            ["Rank", "Genre", "Listen Count", "Minutes Listened"]
+        )
         top_genres_table.add_rows(
             [
                 [
                     1,
                     "test genre 2",
                     4,
+                    16,
                 ],
                 [
                     2,
                     "test genre",
                     3,
+                    12,
                 ],
                 [
                     3,
                     "test genre 3",
                     1,
+                    4,
                 ],
             ]
         )
@@ -239,23 +269,28 @@ CLIENT_SECRET = "{CLIENT_SECRET}"
     def test_get_top_genres_table_with_ds(self, mock_current_user) -> None:
         stat_viewer = StatViewer(datetime.strptime("2024-12-27", "%Y-%m-%d"), True)
         mock_current_user.assert_called_once()
-        top_genres_table = PrettyTable(["Rank", "Genre", "Listens"])
+        top_genres_table = PrettyTable(
+            ["Rank", "Genre", "Listen Count", "Minutes Listened"]
+        )
         top_genres_table.add_rows(
             [
                 [
                     1,
                     "test genre 2",
                     3,
+                    12,
                 ],
                 [
                     2,
                     "test genre",
                     2,
+                    8,
                 ],
                 [
                     3,
                     "test genre 3",
                     1,
+                    4,
                 ],
             ]
         )
