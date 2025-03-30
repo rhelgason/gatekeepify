@@ -1,13 +1,8 @@
-import os
 from datetime import datetime, timedelta
 
 from menu_listener.menu_listener import MenuListener
 from menu_listener.menu_options import DateOptions, MainMenuOptions, StatViewerOptions
 from spotify.stat_viewer import StatViewer
-
-
-def clear_terminal():
-    os.system("clear")
 
 
 def use_main_menu():

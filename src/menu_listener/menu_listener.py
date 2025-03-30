@@ -1,10 +1,9 @@
-import os
 from typing import Generic, Optional, Type, TypeVar, Union
-
-from constants import APP_TITLE
 
 from menu_listener.menu_options import MenuOptions
 from pynput import keyboard
+
+from utils import clear_terminal
 
 MAX_ENTRIES = 9
 ASCII_1 = 49
@@ -45,8 +44,8 @@ class MenuListener(Generic[E]):
         if self.is_test:
             return
 
-        os.system("clear")
-        print(f"{APP_TITLE}\n{self.message}\n")
+        clear_terminal()
+        print(f"{self.message}\n")
         for i, value in enumerate(self.menu_options.list()):
             if i == self.selected_idx:
                 print(f">  {i+1}. {value}")

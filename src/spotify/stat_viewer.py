@@ -1,15 +1,14 @@
 import math
-import os
 from collections import Counter
 from datetime import datetime
 from typing import Dict, List, Optional, Set, Tuple, TypeVar
-
-from constants import APP_TITLE
 
 from menu_listener.spinner import Spinner
 from prettytable import PrettyTable
 from spotify.types import Listen
 from spotify_client import SpotifyClient
+
+from utils import clear_terminal
 
 NUM_DISPLAY_ITEMS = 10
 MAX_ENTRY_LENGTH = 30
@@ -29,8 +28,7 @@ class StatViewer:
             self.listens = self.client.gen_all_listens(self.ds)
             return
 
-        os.system("clear")
-        print(f"{APP_TITLE}\n")
+        clear_terminal()
         with Spinner("Fetching listen history..."):
             self.listens = self.client.gen_all_listens(self.ds)
 
@@ -148,14 +146,12 @@ class StatViewer:
         return top_genres_table
 
     def all_stats(self) -> None:
-        os.system("clear")
-        print(f"{APP_TITLE}\n")
+        clear_terminal()
         print("\nPress Enter to return to the previous menu.")
         input()
 
     def top_tracks(self) -> None:
-        os.system("clear")
-        print(f"{APP_TITLE}\n")
+        clear_terminal()
         top_tracks_table = self._get_top_tracks_table()
         print(
             "Your top tracks "
@@ -172,8 +168,7 @@ class StatViewer:
         input()
 
     def top_artists(self) -> None:
-        os.system("clear")
-        print(f"{APP_TITLE}\n")
+        clear_terminal()
         top_artists_table = self._get_top_artists_table()
         print(
             "Your top artists "
@@ -190,8 +185,7 @@ class StatViewer:
         input()
 
     def top_genres(self) -> None:
-        os.system("clear")
-        print(f"{APP_TITLE}\n")
+        clear_terminal()
         top_genres_table = self._get_top_genres_table()
         print(
             "Your top artists "
