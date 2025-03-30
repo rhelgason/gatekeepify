@@ -10,6 +10,7 @@ from spotify_client import SpotifyClient
 
 from utils import clear_terminal
 
+NUM_SPOTIFY_WRAPPED_ITEMS = 5
 NUM_DISPLAY_ITEMS = 10
 MAX_ENTRY_LENGTH = 30
 
@@ -44,10 +45,10 @@ class StatViewer:
     # that each key in the counter has an ID that is also in the minutes dict.
     # Currently sorts by the number of listens first, then by the number of minutes.
     def _sort_counter(
-        self, counter: Counter[T], minutes: Dict[str, int]
+        self, counter: Counter[T], minutes: Dict[str, int], max_values: int
     ) -> List[Tuple[T, int]]:
         return sorted(
-            counter.most_common(NUM_DISPLAY_ITEMS),
+            counter.most_common(max_values),
             key=lambda x: (
                 -x[1],
                 -minutes[x[0] if isinstance(x[0], str) else getattr(x[0], "id", "")],
@@ -55,16 +56,42 @@ class StatViewer:
         )
 
     def _get_all_stats_tables(self) -> List[PrettyTable]:
-        return []
+        top_artists, _ = self._get_top_artists(NUM_SPOTIFY_WRAPPED_ITEMS)
+        num_artists = len(top_artists)
+        top_tracks, _ = self._get_top_tracks(NUM_SPOTIFY_WRAPPED_ITEMS)
+        num_tracks = len(top_tracks)
+        top_items_table = PrettyTable([" ", "Top Artists", "\t", "  ", "Top Songs"])
+        top_items_table.add_rows(
+            [
+                [
+                    i + 1 if i < num_artists else "",
+                    self._trim_str(top_artists[i][0].name) if i < num_artists else "",
+                    "\t",
+                    i + 1 if i < num_tracks else "",
+                    self._trim_str(top_tracks[i][0].name) if i < num_tracks else "",
+                ]
+                for i in range(
+                    min(NUM_SPOTIFY_WRAPPED_ITEMS, max(num_artists, num_tracks))
+                )
+            ]
+        )
 
-    def _get_top_tracks(self) -> Tuple[List[Tuple[Track, int]], Dict[str, int]]:
+        tables = [top_items_table]
+        for table in tables:
+            table.border = False
+            table.align = "l"
+        return tables
+
+    def _get_top_tracks(
+        self, max_values: int = NUM_DISPLAY_ITEMS
+    ) -> Tuple[List[Tuple[Track, int]], Dict[str, int]]:
         top_tracks = Counter([listen.track for listen in self.listens])
         top_track_minutes = {}
         for listen in self.listens:
             top_track_minutes[listen.track.id] = (
                 top_track_minutes.get(listen.track.id, 0) + listen.track.duration_ms
             )
-        top_tracks = self._sort_counter(top_tracks, top_track_minutes)
+        top_tracks = self._sort_counter(top_tracks, top_track_minutes, max_values)
         return top_tracks, top_track_minutes
 
     def _get_top_tracks_table(self) -> PrettyTable:
@@ -88,7 +115,9 @@ class StatViewer:
         )
         return top_tracks_table
 
-    def _get_top_artists(self) -> Tuple[List[Tuple[Artist, int]], Dict[str, int]]:
+    def _get_top_artists(
+        self, max_values: int = NUM_DISPLAY_ITEMS
+    ) -> Tuple[List[Tuple[Artist, int]], Dict[str, int]]:
         top_artists = Counter(
             [artist for listen in self.listens for artist in listen.track.artists]
         )
@@ -98,7 +127,7 @@ class StatViewer:
                 top_artist_minutes[artist.id] = (
                     top_artist_minutes.get(artist.id, 0) + listen.track.duration_ms
                 )
-        top_artists = self._sort_counter(top_artists, top_artist_minutes)
+        top_artists = self._sort_counter(top_artists, top_artist_minutes, max_values)
         return top_artists, top_artist_minutes
 
     def _get_top_artists_table(self) -> PrettyTable:
@@ -120,7 +149,9 @@ class StatViewer:
         )
         return top_artists_table
 
-    def _get_top_genres(self) -> Tuple[List[Tuple[str, int]], Dict[str, int]]:
+    def _get_top_genres(
+        self, max_values: int = NUM_DISPLAY_ITEMS
+    ) -> Tuple[List[Tuple[str, int]], Dict[str, int]]:
         top_genres = Counter()
         top_genre_minutes = {}
         for listen in self.listens:
@@ -133,7 +164,7 @@ class StatViewer:
                 top_genre_minutes[genre] = (
                     top_genre_minutes.get(genre, 0) + listen.track.duration_ms
                 )
-        top_genres = self._sort_counter(top_genres, top_genre_minutes)
+        top_genres = self._sort_counter(top_genres, top_genre_minutes, max_values)
         return top_genres, top_genre_minutes
 
     def _get_top_genres_table(self) -> PrettyTable:
@@ -157,7 +188,11 @@ class StatViewer:
     def all_stats(self) -> None:
         clear_terminal()
         all_stats_tables = self._get_all_stats_tables()
-        print(all_stats_tables)
+        current_year = str(self.ds.year) if self.ds is not None else ""
+        print(f"Your predicted Spotify Wrapper for {current_year}: \n")
+        for table in all_stats_tables:
+            print(table, "\n")
+
         print("\nPress Enter to return to the previous menu.")
         input()
 
