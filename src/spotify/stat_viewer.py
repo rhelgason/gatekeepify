@@ -5,7 +5,7 @@ from typing import Dict, List, Optional, Set, Tuple, TypeVar
 
 from menu_listener.spinner import Spinner
 from prettytable import PrettyTable
-from spotify.types import Listen
+from spotify.types import Artist, Listen, Track
 from spotify_client import SpotifyClient
 
 from utils import clear_terminal
@@ -54,14 +54,21 @@ class StatViewer:
             ),
         )
 
-    def _get_top_tracks_table(self) -> PrettyTable:
+    def _get_all_stats_tables(self) -> List[PrettyTable]:
+        return []
+
+    def _get_top_tracks(self) -> Tuple[List[Tuple[Track, int]], Dict[str, int]]:
         top_tracks = Counter([listen.track for listen in self.listens])
         top_track_minutes = {}
         for listen in self.listens:
             top_track_minutes[listen.track.id] = (
                 top_track_minutes.get(listen.track.id, 0) + listen.track.duration_ms
             )
+        top_tracks = self._sort_counter(top_tracks, top_track_minutes)
+        return top_tracks, top_track_minutes
 
+    def _get_top_tracks_table(self) -> PrettyTable:
+        top_tracks, top_track_minutes = self._get_top_tracks()
         top_tracks_table = PrettyTable(
             ["Rank", "Title", "Artists", "Listen Count", "Minutes Listened"]
         )
@@ -76,14 +83,12 @@ class StatViewer:
                     count,
                     self._get_minutes_from_ms(top_track_minutes[track.id]),
                 ]
-                for i, (track, count) in enumerate(
-                    self._sort_counter(top_tracks, top_track_minutes)
-                )
+                for i, (track, count) in enumerate(top_tracks)
             ]
         )
         return top_tracks_table
 
-    def _get_top_artists_table(self) -> PrettyTable:
+    def _get_top_artists(self) -> Tuple[List[Tuple[Artist, int]], Dict[str, int]]:
         top_artists = Counter(
             [artist for listen in self.listens for artist in listen.track.artists]
         )
@@ -93,7 +98,11 @@ class StatViewer:
                 top_artist_minutes[artist.id] = (
                     top_artist_minutes.get(artist.id, 0) + listen.track.duration_ms
                 )
+        top_artists = self._sort_counter(top_artists, top_artist_minutes)
+        return top_artists, top_artist_minutes
 
+    def _get_top_artists_table(self) -> PrettyTable:
+        top_artists, top_artist_minutes = self._get_top_artists()
         top_artists_table = PrettyTable(
             ["Rank", "Artist", "Genres", "Listen Count", "Minutes Listened"]
         )
@@ -106,14 +115,12 @@ class StatViewer:
                     count,
                     self._get_minutes_from_ms(top_artist_minutes[artist.id]),
                 ]
-                for i, (artist, count) in enumerate(
-                    self._sort_counter(top_artists, top_artist_minutes)
-                )
+                for i, (artist, count) in enumerate(top_artists)
             ]
         )
         return top_artists_table
 
-    def _get_top_genres_table(self) -> PrettyTable:
+    def _get_top_genres(self) -> Tuple[List[Tuple[str, int]], Dict[str, int]]:
         top_genres = Counter()
         top_genre_minutes = {}
         for listen in self.listens:
@@ -126,7 +133,11 @@ class StatViewer:
                 top_genre_minutes[genre] = (
                     top_genre_minutes.get(genre, 0) + listen.track.duration_ms
                 )
+        top_genres = self._sort_counter(top_genres, top_genre_minutes)
+        return top_genres, top_genre_minutes
 
+    def _get_top_genres_table(self) -> PrettyTable:
+        top_genres, top_genre_minutes = self._get_top_genres()
         top_genres_table = PrettyTable(
             ["Rank", "Genre", "Listen Count", "Minutes Listened"]
         )
@@ -138,15 +149,15 @@ class StatViewer:
                     count,
                     self._get_minutes_from_ms(top_genre_minutes[genre]),
                 ]
-                for i, (genre, count) in enumerate(
-                    self._sort_counter(top_genres, top_genre_minutes)
-                )
+                for i, (genre, count) in enumerate(top_genres)
             ]
         )
         return top_genres_table
 
     def all_stats(self) -> None:
         clear_terminal()
+        all_stats_tables = self._get_all_stats_tables()
+        print(all_stats_tables)
         print("\nPress Enter to return to the previous menu.")
         input()
 
