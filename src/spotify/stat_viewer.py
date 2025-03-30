@@ -34,18 +34,18 @@ class StatViewer:
         with Spinner("Fetching listen history..."):
             self.listens = self.client.gen_all_listens(self.ds)
 
-    def trim_str(self, s: str) -> str:
+    def _trim_str(self, s: str) -> str:
         if len(s) > MAX_ENTRY_LENGTH:
             return s[: MAX_ENTRY_LENGTH - 3] + "..."
         return s
 
-    def get_minutes_from_ms(self, ms: int) -> int:
+    def _get_minutes_from_ms(self, ms: int) -> int:
         return math.floor(ms / 1000 / 60)
 
     # Custom sorting function for each table prior to output. Assumes the invariant
     # that each key in the counter has an ID that is also in the minutes dict.
     # Currently sorts by the number of listens first, then by the number of minutes.
-    def sort_counter(
+    def _sort_counter(
         self, counter: Counter[T], minutes: Dict[str, int]
     ) -> List[Tuple[T, int]]:
         return sorted(
@@ -56,7 +56,7 @@ class StatViewer:
             ),
         )
 
-    def get_top_tracks_table(self) -> PrettyTable:
+    def _get_top_tracks_table(self) -> PrettyTable:
         top_tracks = Counter([listen.track for listen in self.listens])
         top_track_minutes = {}
         for listen in self.listens:
@@ -71,37 +71,21 @@ class StatViewer:
             [
                 [
                     i + 1,
-                    self.trim_str(track.name),
-                    self.trim_str(", ".join([artist.name for artist in track.artists])),
+                    self._trim_str(track.name),
+                    self._trim_str(
+                        ", ".join([artist.name for artist in track.artists])
+                    ),
                     count,
-                    self.get_minutes_from_ms(top_track_minutes[track.id]),
+                    self._get_minutes_from_ms(top_track_minutes[track.id]),
                 ]
                 for i, (track, count) in enumerate(
-                    self.sort_counter(top_tracks, top_track_minutes)
+                    self._sort_counter(top_tracks, top_track_minutes)
                 )
             ]
         )
         return top_tracks_table
 
-    def top_tracks(self) -> None:
-        os.system("clear")
-        print(f"{APP_TITLE}\n")
-        top_tracks_table = self.get_top_tracks_table()
-        print(
-            "Your top tracks "
-            + (
-                "of all time"
-                if self.ds is None
-                else f"since {self.ds.strftime('%Y-%m-%d')}"
-            )
-            + ":\n"
-        )
-        print(top_tracks_table)
-
-        print("\nPress Enter to return to the previous menu.")
-        input()
-
-    def get_top_artists_table(self) -> PrettyTable:
+    def _get_top_artists_table(self) -> PrettyTable:
         top_artists = Counter(
             [artist for listen in self.listens for artist in listen.track.artists]
         )
@@ -119,37 +103,19 @@ class StatViewer:
             [
                 [
                     i + 1,
-                    self.trim_str(artist.name),
-                    self.trim_str(", ".join(artist.genres or [])),
+                    self._trim_str(artist.name),
+                    self._trim_str(", ".join(artist.genres or [])),
                     count,
-                    self.get_minutes_from_ms(top_artist_minutes[artist.id]),
+                    self._get_minutes_from_ms(top_artist_minutes[artist.id]),
                 ]
                 for i, (artist, count) in enumerate(
-                    self.sort_counter(top_artists, top_artist_minutes)
+                    self._sort_counter(top_artists, top_artist_minutes)
                 )
             ]
         )
         return top_artists_table
 
-    def top_artists(self) -> None:
-        os.system("clear")
-        print(f"{APP_TITLE}\n")
-        top_artists_table = self.get_top_artists_table()
-        print(
-            "Your top artists "
-            + (
-                "of all time"
-                if self.ds is None
-                else f"since {self.ds.strftime('%Y-%m-%d')}"
-            )
-            + ":\n"
-        )
-        print(top_artists_table)
-
-        print("\nPress Enter to return to the previous menu.")
-        input()
-
-    def get_top_genres_table(self) -> PrettyTable:
+    def _get_top_genres_table(self) -> PrettyTable:
         top_genres = Counter()
         top_genre_minutes = {}
         for listen in self.listens:
@@ -170,21 +136,63 @@ class StatViewer:
             [
                 [
                     i + 1,
-                    self.trim_str(genre),
+                    self._trim_str(genre),
                     count,
-                    self.get_minutes_from_ms(top_genre_minutes[genre]),
+                    self._get_minutes_from_ms(top_genre_minutes[genre]),
                 ]
                 for i, (genre, count) in enumerate(
-                    self.sort_counter(top_genres, top_genre_minutes)
+                    self._sort_counter(top_genres, top_genre_minutes)
                 )
             ]
         )
         return top_genres_table
 
+    def all_stats(self) -> None:
+        os.system("clear")
+        print(f"{APP_TITLE}\n")
+        print("\nPress Enter to return to the previous menu.")
+        input()
+
+    def top_tracks(self) -> None:
+        os.system("clear")
+        print(f"{APP_TITLE}\n")
+        top_tracks_table = self._get_top_tracks_table()
+        print(
+            "Your top tracks "
+            + (
+                "of all time"
+                if self.ds is None
+                else f"since {self.ds.strftime('%Y-%m-%d')}"
+            )
+            + ":\n"
+        )
+        print(top_tracks_table)
+
+        print("\nPress Enter to return to the previous menu.")
+        input()
+
+    def top_artists(self) -> None:
+        os.system("clear")
+        print(f"{APP_TITLE}\n")
+        top_artists_table = self._get_top_artists_table()
+        print(
+            "Your top artists "
+            + (
+                "of all time"
+                if self.ds is None
+                else f"since {self.ds.strftime('%Y-%m-%d')}"
+            )
+            + ":\n"
+        )
+        print(top_artists_table)
+
+        print("\nPress Enter to return to the previous menu.")
+        input()
+
     def top_genres(self) -> None:
         os.system("clear")
         print(f"{APP_TITLE}\n")
-        top_genres_table = self.get_top_genres_table()
+        top_genres_table = self._get_top_genres_table()
         print(
             "Your top artists "
             + (

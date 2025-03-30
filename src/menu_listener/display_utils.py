@@ -18,9 +18,18 @@ def use_main_menu():
     option = main_menu.use_menu()
 
     while option != MainMenuOptions.QUIT:
-        if option == MainMenuOptions.VIEW_MY_STATS:
+        if option == MainMenuOptions.SPOTIFY_WRAPPED:
+            use_spotify_wrapped()
+        elif option == MainMenuOptions.VIEW_MY_STATS:
             use_view_my_stats()
         option = main_menu.use_menu()
+
+
+def use_spotify_wrapped():
+    start_of_year_ds = datetime(datetime.now().year, 1, 1)
+    stat_viewer = StatViewer(start_of_year_ds)
+    stat_viewer.all_stats()
+    return 0
 
 
 def use_view_my_stats():
