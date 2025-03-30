@@ -106,9 +106,10 @@ CLIENT_SECRET = "{CLIENT_SECRET}"
     def test_get_minutes_from_ms(self, mock_current_user) -> None:
         stat_viewer = StatViewer(None, True)
         mock_current_user.assert_called_once()
-        self.assertEqual(stat_viewer._get_minutes_from_ms(0), 0)
-        self.assertEqual(stat_viewer._get_minutes_from_ms(480000), 8)
-        self.assertEqual(stat_viewer._get_minutes_from_ms(363210), 6)
+        self.assertEqual(stat_viewer._get_minutes_from_ms(0), "0")
+        self.assertEqual(stat_viewer._get_minutes_from_ms(480000), "8")
+        self.assertEqual(stat_viewer._get_minutes_from_ms(363210), "6")
+        self.assertEqual(stat_viewer._get_minutes_from_ms(74074020000), "1,234,567")
 
     def test_get_all_stats_table(self, mock_current_user) -> None:
         stat_viewer = StatViewer(datetime(2024, 1, 1), True)
@@ -142,8 +143,26 @@ CLIENT_SECRET = "{CLIENT_SECRET}"
         top_items_table.border = False
         top_items_table.align = "l"
 
+        other_stats_table = PrettyTable(
+            [" ", "Minutes Listened", "\t", "  ", "Top Genre"]
+        )
+        other_stats_table.add_rows(
+            [
+                [
+                    "",
+                    "16",
+                    "\t",
+                    "",
+                    "test genre 2",
+                ],
+            ]
+        )
+        other_stats_table.border = False
+        other_stats_table.align = "l"
+
         all_stats_tables = stat_viewer._get_all_stats_tables()
         self.assertEqual(all_stats_tables[0].__str__(), top_items_table.__str__())
+        self.assertEqual(all_stats_tables[1].__str__(), other_stats_table.__str__())
 
     def test_get_top_tracks_table_all_time(self, mock_current_user) -> None:
         stat_viewer = StatViewer(None, True)

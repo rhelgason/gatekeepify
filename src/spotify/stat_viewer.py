@@ -38,8 +38,8 @@ class StatViewer:
             return s[: MAX_ENTRY_LENGTH - 3] + "..."
         return s
 
-    def _get_minutes_from_ms(self, ms: int) -> int:
-        return math.floor(ms / 1000 / 60)
+    def _get_minutes_from_ms(self, ms: int) -> str:
+        return format(math.floor(ms / 1000 / 60), ",")
 
     # Custom sorting function for each table prior to output. Assumes the invariant
     # that each key in the counter has an ID that is also in the minutes dict.
@@ -76,11 +76,30 @@ class StatViewer:
             ]
         )
 
-        tables = [top_items_table]
+        top_genres, _ = self._get_top_genres(1)
+        top_genre = top_genres[0][0] if len(top_genres) > 0 else ""
+        other_stats_table = PrettyTable(
+            [" ", "Minutes Listened", "\t", "  ", "Top Genre"]
+        )
+        other_stats_table.add_row(
+            [
+                "",
+                self._get_all_minutes_listened(),
+                "\t",
+                "",
+                self._trim_str(top_genre),
+            ]
+        )
+
+        tables = [top_items_table, other_stats_table]
         for table in tables:
             table.border = False
             table.align = "l"
         return tables
+
+    def _get_all_minutes_listened(self) -> str:
+        ms_listened = sum([listen.track.duration_ms for listen in self.listens])
+        return self._get_minutes_from_ms(ms_listened)
 
     def _get_top_tracks(
         self, max_values: int = NUM_DISPLAY_ITEMS
@@ -189,7 +208,7 @@ class StatViewer:
         clear_terminal()
         all_stats_tables = self._get_all_stats_tables()
         current_year = str(self.ds.year) if self.ds is not None else ""
-        print(f"Your predicted Spotify Wrapper for {current_year}: \n")
+        print(f"Your predicted Spotify Wrapped for {current_year}: \n")
         for table in all_stats_tables:
             print(table, "\n")
 
