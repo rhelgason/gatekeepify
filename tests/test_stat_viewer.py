@@ -95,18 +95,20 @@ CLIENT_SECRET = "{CLIENT_SECRET}"
     def test_trim_str(self, mock_current_user) -> None:
         stat_viewer = StatViewer(None, True)
         mock_current_user.assert_called_once()
-        self.assertEqual(stat_viewer.trim_str("Test input string"), "Test input string")
         self.assertEqual(
-            stat_viewer.trim_str("Test input string that is too long"),
+            stat_viewer._trim_str("Test input string"), "Test input string"
+        )
+        self.assertEqual(
+            stat_viewer._trim_str("Test input string that is too long"),
             "Test input string that is t...",
         )
 
     def test_get_minutes_from_ms(self, mock_current_user) -> None:
         stat_viewer = StatViewer(None, True)
         mock_current_user.assert_called_once()
-        self.assertEqual(stat_viewer.get_minutes_from_ms(0), 0)
-        self.assertEqual(stat_viewer.get_minutes_from_ms(480000), 8)
-        self.assertEqual(stat_viewer.get_minutes_from_ms(363210), 6)
+        self.assertEqual(stat_viewer._get_minutes_from_ms(0), 0)
+        self.assertEqual(stat_viewer._get_minutes_from_ms(480000), 8)
+        self.assertEqual(stat_viewer._get_minutes_from_ms(363210), 6)
 
     def test_get_top_tracks_table_all_time(self, mock_current_user) -> None:
         stat_viewer = StatViewer(None, True)
@@ -133,7 +135,7 @@ CLIENT_SECRET = "{CLIENT_SECRET}"
             ]
         )
         self.assertEqual(
-            stat_viewer.get_top_tracks_table().__str__(), top_tracks_table.__str__()
+            stat_viewer._get_top_tracks_table().__str__(), top_tracks_table.__str__()
         )
 
     def test_get_top_tracks_table_with_ds(self, mock_current_user) -> None:
@@ -161,7 +163,7 @@ CLIENT_SECRET = "{CLIENT_SECRET}"
             ]
         )
         self.assertEqual(
-            stat_viewer.get_top_tracks_table().__str__(), top_tracks_table.__str__()
+            stat_viewer._get_top_tracks_table().__str__(), top_tracks_table.__str__()
         )
 
     def test_get_top_artists_table_all_time(self, mock_current_user) -> None:
@@ -196,7 +198,7 @@ CLIENT_SECRET = "{CLIENT_SECRET}"
             ]
         )
         self.assertEqual(
-            stat_viewer.get_top_artists_table().__str__(), top_artists_table.__str__()
+            stat_viewer._get_top_artists_table().__str__(), top_artists_table.__str__()
         )
 
     def test_get_top_artists_table_with_ds(self, mock_current_user) -> None:
@@ -231,7 +233,7 @@ CLIENT_SECRET = "{CLIENT_SECRET}"
             ]
         )
         self.assertEqual(
-            stat_viewer.get_top_artists_table().__str__(), top_artists_table.__str__()
+            stat_viewer._get_top_artists_table().__str__(), top_artists_table.__str__()
         )
 
     def test_get_top_genres_table_all_time(self, mock_current_user) -> None:
@@ -263,7 +265,7 @@ CLIENT_SECRET = "{CLIENT_SECRET}"
             ]
         )
         self.assertEqual(
-            stat_viewer.get_top_genres_table().__str__(), top_genres_table.__str__()
+            stat_viewer._get_top_genres_table().__str__(), top_genres_table.__str__()
         )
 
     def test_get_top_genres_table_with_ds(self, mock_current_user) -> None:
@@ -295,7 +297,7 @@ CLIENT_SECRET = "{CLIENT_SECRET}"
             ]
         )
         self.assertEqual(
-            stat_viewer.get_top_genres_table().__str__(), top_genres_table.__str__()
+            stat_viewer._get_top_genres_table().__str__(), top_genres_table.__str__()
         )
 
     def tearDown(self) -> None:
