@@ -25,13 +25,13 @@ class TestBackfillDataLoader(unittest.TestCase):
                 """
                 [
                     {
-                        "ts": "2024-12-26T22:30:04.214000Z",
+                        "ts": "2024-12-26T22:30:04Z",
                         "ms_played": 51555,
                         "master_metadata_track_name": "test track",
                         "spotify_track_uri": "spotify:track:1234"
                     },
                     {
-                        "ts": "2024-12-28T22:30:05.214000Z",
+                        "ts": "2024-12-28T22:30:05Z",
                         "ms_played": 35000,
                         "master_metadata_track_name": "test track 2",
                         "spotify_track_uri": "spotify:track:5678"
@@ -44,13 +44,13 @@ class TestBackfillDataLoader(unittest.TestCase):
                 """
                 [
                     {
-                        "ts": "2024-12-12T22:30:04.214000Z",
+                        "ts": "2024-12-12T22:30:04Z",
                         "ms_played": 51555,
                         "master_metadata_track_name": "test track",
                         "spotify_track_uri": "spotify:track:1234"
                     },
                     {
-                        "ts": "2024-12-19T22:30:05.214000Z",
+                        "ts": "2024-12-19T22:30:05Z",
                         "ms_played": 3000,
                         "master_metadata_track_name": "test track 2",
                         "spotify_track_uri": "spotify:track:5678"
@@ -86,30 +86,24 @@ class TestBackfillDataLoader(unittest.TestCase):
 
     def test_read_json_files(self, mock_input) -> None:
         self.data_loader = BackfillDataLoader(is_test=True)
-        self.assertEqual(len(self.data_loader.listens_json), 4)
+        self.assertEqual(len(self.data_loader.listens_json), 3)
         self.assertListEqual(
             self.data_loader.listens_json,
             [
                 {
-                    "ts": "2024-12-12T22:30:04.214000Z",
+                    "ts": "2024-12-12T22:30:04Z",
                     "ms_played": 51555,
                     "master_metadata_track_name": "test track",
                     "spotify_track_uri": "spotify:track:1234",
                 },
                 {
-                    "ts": "2024-12-19T22:30:05.214000Z",
-                    "ms_played": 3000,
-                    "master_metadata_track_name": "test track 2",
-                    "spotify_track_uri": "spotify:track:5678",
-                },
-                {
-                    "ts": "2024-12-26T22:30:04.214000Z",
+                    "ts": "2024-12-26T22:30:04Z",
                     "ms_played": 51555,
                     "master_metadata_track_name": "test track",
                     "spotify_track_uri": "spotify:track:1234",
                 },
                 {
-                    "ts": "2024-12-28T22:30:05.214000Z",
+                    "ts": "2024-12-28T22:30:05Z",
                     "ms_played": 35000,
                     "master_metadata_track_name": "test track 2",
                     "spotify_track_uri": "spotify:track:5678",
