@@ -80,7 +80,32 @@ class BackfillDataLoader:
             end = time()
             use_progress_bar(MAX_PERCENTAGE, start, end)
 
-        # TODO: partition by known track ids
+        # populate all listens from recognized tracks
+        start = time()
+        num_complete = 0
+        if verbose:
+            print("Loading all track information from Spotify...")
+        known_tracks = self.db.get_all_tracks(
+            track_ids=list(track_id_to_timestamps.keys())
+        )
+        for known_track in known_tracks:
+            for ts in track_id_to_timestamps[known_track.id]:
+                self.listens.add(
+                    Listen(
+                        user=self.user,
+                        track=known_track,
+                        ts=ts,
+                    )
+                )
+                num_complete += 1
+                if should_update_progress_bar() and verbose:
+                    progress = int((num_complete / num_listens) * MAX_PERCENTAGE)
+                    use_progress_bar(progress, start, time())
+        if verbose:
+            end = time()
+            use_progress_bar(MAX_PERCENTAGE, start, end)
+
+        # TODO: fetch information for unrecognized tracks
 
     def validate_listens(self) -> None:
         pass

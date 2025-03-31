@@ -364,7 +364,7 @@ class Database:
         results = self.cursor.fetchall()
         return {Album(row[0], row[1]) for row in results}
 
-    def get_all_tracks(self) -> Set[Track]:
+    def get_all_tracks(self, track_ids: Optional[List[str]] = None) -> Set[Track]:
         query = """
         SELECT
             t.track_id,
@@ -386,8 +386,11 @@ class Database:
             LEFT JOIN artist_to_genre ag ON ag.artist_id=a.artist_id
             GROUP BY a.artist_id, artist_name
         ) ar ON ta.artist_id=ar.artist_id
-        GROUP BY t.track_id, track_name, t.album_id, album_name, duration_ms, is_local
         """
+        if track_ids:
+            query += "WHERE t.track_id IN (" + ", ".join(track_ids) + ")"
+        query += "GROUP BY t.track_id, track_name, t.album_id, album_name, duration_ms, is_local"
+
         self.cursor.execute(query)
         results = self.cursor.fetchall()
         return {
