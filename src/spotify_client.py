@@ -28,6 +28,7 @@ MAX_RETRIES_SUBSTR = "Max Retries"
 class SpotifyClient:
     client: spotipy.Spotify
     db: Database
+    user: User
 
     def __init__(self, backoff_factor: float = 0.3, is_test: bool = False) -> None:
         client_id, client_secret = self.get_host_constants(is_test)
@@ -40,7 +41,9 @@ class SpotifyClient:
             ),
             backoff_factor=backoff_factor,
         )
-        self.db = Database(db_name=DB_TEST_NAME if is_test else DB_NAME)
+        self.user = self.gen_current_user()
+
+        self.db = Database(user=self.user, db_name=DB_TEST_NAME if is_test else DB_NAME)
 
     # get client id and secret if exists, otherwise get user input
     def get_host_constants(self, is_test: bool = False) -> Tuple[str, str]:
@@ -133,12 +136,11 @@ class SpotifyClient:
                 artist["genres"] = artist_genres[artist["id"]]
 
     def gen_run_cron_backfill(self) -> None:
-        user = self.gen_current_user()
-        after_ts = self.db.get_most_recent_listen_time(user)
-        recent_listens = self.gen_most_recent_listens(user, after_ts)
+        after_ts = self.db.get_most_recent_listen_time(self.user)
+        recent_listens = self.gen_most_recent_listens(self.user, after_ts)
         if len(recent_listens) == 0:
             return
         self.db.upsert_cron_backfill(recent_listens)
 
     def gen_all_listens(self, ds: Optional[datetime]) -> Set[Listen]:
-        return self.db.get_all_listens(self.gen_current_user(), ds)
+        return self.db.get_all_listens(self.user, ds)

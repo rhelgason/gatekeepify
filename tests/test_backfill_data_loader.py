@@ -19,7 +19,7 @@ TEST_FILE_3 = "test_file_3.json"
 
 @patch(
     "spotipy.Spotify.current_user",
-    return_value={"id": "12345", "display_name": "test user"},
+    return_value={"id": "123456789", "display_name": "test user"},
 )
 @patch("builtins.input", side_effect=[CLIENT_ID])
 @patch("getpass.getpass", return_value=CLIENT_SECRET)
@@ -28,6 +28,7 @@ class TestBackfillDataLoader(unittest.TestCase):
     data_loader: BackfillDataLoader
     path: str
 
+    user: User
     track_1: Track
     track_2: Track
     listen_1: Listen
@@ -36,7 +37,11 @@ class TestBackfillDataLoader(unittest.TestCase):
 
     def setUp(self) -> None:
         # set up test database
-        self.db = Database(db_name=DB_TEST_NAME)
+        self.user = User(
+            id="123456789",
+            name="test user"
+        )
+        self.db = Database(user=self.user, db_name=DB_TEST_NAME)
         self.track_1 = Track(
             "123",
             "test track",
@@ -46,17 +51,17 @@ class TestBackfillDataLoader(unittest.TestCase):
             "test track 2",
         )
         self.listen_1 = Listen(
-            User("12345", "test user"),
+            self.user,
             self.track_1,
             datetime.strptime("2024-12-26T22:30:04.000000Z", CLIENT_DATETIME_FORMAT),
         )
         self.listen_2 = Listen(
-            User("12345", "test user"),
+            self.user,
             self.track_2,
             datetime.strptime("2024-12-28T22:30:05.000000Z", CLIENT_DATETIME_FORMAT),
         )
         self.listen_3 = Listen(
-            User("12345", "test user"),
+            self.user,
             self.track_1,
             datetime.strptime("2024-12-12T22:30:04.000000Z", CLIENT_DATETIME_FORMAT),
         )

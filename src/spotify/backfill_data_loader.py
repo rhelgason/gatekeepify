@@ -1,7 +1,7 @@
 import json
 import os
 from datetime import datetime
-from time import time, sleep
+from time import time
 from typing import Any, Dict, List, Set
 
 from db.constants import DB_NAME, DB_TEST_NAME
@@ -13,7 +13,6 @@ from menu_listener.progress_bar import (
 )
 from spotify.types import Listen, Track, User
 from spotify_client import SpotifyClient
-from spotipy.exceptions import SpotifyException
 from utils import clear_terminal
 
 BACKFILL_DATETIME_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
@@ -33,7 +32,11 @@ class BackfillDataLoader:
     listens_json: List[Dict[str, Any]]
 
     def __init__(self, is_test: bool = False) -> None:
-        self.db = Database(db_name=DB_TEST_NAME if is_test else DB_NAME)
+        self.client = SpotifyClient(
+            is_test=is_test
+        )
+        self.user = self.client.gen_current_user()
+        self.db = Database(user=self.user, db_name=DB_TEST_NAME if is_test else DB_NAME)
         self.listens = set()
 
         if is_test:
@@ -46,12 +49,6 @@ class BackfillDataLoader:
         if not os.path.exists(self.directory_path):
             raise ValueError(f"Directory {self.directory_path} does not exist.")
 
-        # write all track data to db
-        # there will almost certainly be gaps left to fill by cron job
-        self.client = SpotifyClient(
-            is_test=is_test
-        )
-        self.user = self.client.gen_current_user()
         self._load_listens()
 
     def _load_listens(self) -> None:
@@ -117,8 +114,6 @@ class BackfillDataLoader:
                 use_progress_bar(progress, start, time())
         end = time()
         use_progress_bar(MAX_PERCENTAGE, start, end)
-
-        print(f"\n\nLoaded {len(self.listens)} listens from JSON.")
 
     def validate_listens(self) -> None:
         pass

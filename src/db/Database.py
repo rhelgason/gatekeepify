@@ -23,16 +23,16 @@ Database setup for Gatekeepify. Currently includes the following tables:
 - track_to_artist: mapping table between tracks and artists
 - dim_all_users: stores information about every user
 - dim_all_listens: stores every track listened to by every user
-- dim_possible_missing_data: stores information for ts that may not be tracked
 - dim_all_logs: stores logging data for every program action
 """
 
 
 class Database:
-    def __init__(self, db_name=DB_NAME):
+    def __init__(self, user: User, db_name=DB_NAME):
         if not os.path.exists(DB_DIRECTORY):
             os.makedirs(DB_DIRECTORY)
         path = os.path.join(DB_DIRECTORY, db_name)
+        self.user = user
         self.conn = sqlite3.connect(path)
         self.cursor = self.conn.cursor()
         self.__create_all_tables()
@@ -133,9 +133,9 @@ class Database:
     def __create_dim_all_listens(self):
         query = """
         CREATE TABLE IF NOT EXISTS dim_all_listens (
+            ts DATETIME,
             user_id VARCHAR(255),
             track_id VARCHAR(255),
-            ts DATETIME,
             PRIMARY KEY(user_id, track_id, ts),
             FOREIGN KEY(user_id) REFERENCES dim_all_users(user_id),
             FOREIGN KEY(track_id) REFERENCES dim_all_tracks(track_id)
@@ -149,9 +149,11 @@ class Database:
         query = """
         CREATE TABLE IF NOT EXISTS dim_all_logs (
             ts DATETIME,
+            user_id VARCHAR(255),
             action VARCHAR(255),
             metadata TEXT,
-            PRIMARY KEY(ts, action)
+            PRIMARY KEY(ts, user_id, action),
+            FOREIGN KEY(user_id) REFERENCES dim_all_users(user_id)
         )
         """
         self.cursor.execute(query)
@@ -344,13 +346,13 @@ class Database:
     # upserts listens into dim_all_listens
     def __upsert_dim_all_listens(self, listens: List[Listen]):
         query = """
-        INSERT INTO dim_all_listens (user_id, track_id, ts)
+        INSERT INTO dim_all_listens (ts, user_id, track_id)
         VALUES (?, ?, ?)
         -- do nothing, as listen already exists for that user and time
         ON CONFLICT (user_id, track_id, ts) DO NOTHING
         """
         self.cursor.executemany(
-            query, [(listen.user.id, listen.track.id, listen.ts) for listen in listens]
+            query, [(listen.ts, listen.user.id, listen.track.id) for listen in listens]
         )
         self.conn.commit()
 
@@ -364,10 +366,10 @@ class Database:
     # upserts logs into dim_all_logs
     def __upsert_dim_all_logs(self, action: LoggerAction, metadata: str):
         query = """
-        INSERT INTO dim_all_logs (ts, action, metadata)
-        VALUES (?, ?, ?)
+        INSERT INTO dim_all_logs (ts, user_id, action, metadata)
+        VALUES (?, ?, ?, ?)
         """
-        self.cursor.execute(query, (datetime.now(), action.value, metadata))
+        self.cursor.execute(query, (datetime.now(), self.user.id, action.value, metadata))
         self.conn.commit()
 
     """

@@ -33,7 +33,8 @@ CLIENT_SECRET = "{CLIENT_SECRET}"
             )
 
         # upsert db test data
-        db = Database(db_name=DB_TEST_NAME)
+        user = User("123456789", "test user")
+        db = Database(user=user, db_name=DB_TEST_NAME)
         artist_1 = Artist("345", "test artist", ["test genre", "test genre 2"])
         artist_2 = Artist("678", "test artist 2", ["test genre 2"])
         artist_3 = Artist("912", "test artist 3952", ["test genre 3"])

@@ -25,9 +25,6 @@ class StatViewer:
     def __init__(self, ds: Optional[datetime], is_test: bool = False) -> None:
         self.client = SpotifyClient(is_test=is_test)
         self.ds = ds
-        if is_test:
-            self.listens = self.client.gen_all_listens(self.ds)
-            return
 
         clear_terminal()
         with Spinner("Fetching listen history..."):

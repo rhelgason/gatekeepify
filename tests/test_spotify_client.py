@@ -11,7 +11,10 @@ from spotify_client import SpotifyClient
 CLIENT_ID = "test_id"
 CLIENT_SECRET = "test_secret"
 
-
+@patch(
+    "spotipy.Spotify.current_user",
+    return_value={"id": "123456789", "display_name": "test user"},
+)
 @patch("builtins.input", side_effect=[CLIENT_ID])
 @patch("getpass.getpass", return_value=CLIENT_SECRET)
 class TestSpotifyClient(unittest.TestCase):
@@ -26,7 +29,7 @@ class TestSpotifyClient(unittest.TestCase):
         except OSError:
             pass
 
-    def test_get_host_client(self, mock_getpass, mock_input) -> None:
+    def test_get_host_client(self, mock_getpass, mock_input, mock_current_user) -> None:
         self.assertEqual(pl.Path(self.path).resolve().is_file(), False)
         SpotifyClient(is_test=True)
         mock_input.assert_called_once()
@@ -45,7 +48,7 @@ class TestSpotifyClient(unittest.TestCase):
     @patch("spotipy.Spotify.artists")
     @patch("spotipy.Spotify.current_user_recently_played")
     def test_gen_most_recent_listens(
-        self, mock_recently_played, mock_artists, mock_getpass, mock_input
+        self, mock_recently_played, mock_artists, mock_getpass, mock_input, mock_current_user
     ) -> None:
         played_at_1 = "2024-12-27T22:30:04.214000Z"
         played_at_2 = "2024-12-26T16:48:12.712392Z"
