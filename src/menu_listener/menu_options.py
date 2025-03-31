@@ -10,6 +10,7 @@ class MenuOptions(Enum):
 class MainMenuOptions(MenuOptions):
     SPOTIFY_WRAPPED = "Spotify Wrapped"
     VIEW_MY_STATS = "View My Stats"
+    BACKFILL_MY_DATA = "Backfill My Data"
     QUIT = "Quit"
 
 

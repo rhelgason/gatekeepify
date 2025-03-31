@@ -3,6 +3,7 @@ from datetime import datetime, timedelta
 from menu_listener.menu_listener import MenuListener
 from menu_listener.menu_options import DateOptions, MainMenuOptions, StatViewerOptions
 from spotify.stat_viewer import StatViewer
+from spotify.backfill_data_loader import BackfillDataLoader
 
 
 def use_main_menu():
@@ -17,6 +18,8 @@ def use_main_menu():
             use_spotify_wrapped()
         elif option == MainMenuOptions.VIEW_MY_STATS:
             use_view_my_stats()
+        elif option == MainMenuOptions.BACKFILL_MY_DATA:
+            use_backfill_my_data()
         option = main_menu.use_menu()
 
 
@@ -58,4 +61,8 @@ def use_view_my_stats():
                 stat_viewer.top_genres()
             stat_option = stats_menu.use_menu()
         date_option = date_menu.use_menu()
+    return 0
+
+def use_backfill_my_data():
+    data_loader = BackfillDataLoader()
     return 0

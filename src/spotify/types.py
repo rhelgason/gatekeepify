@@ -152,6 +152,10 @@ class Listen:
             Track.from_dict(data["track"]),
             datetime.strptime(data["played_at"], CLIENT_DATETIME_FORMAT),
         )
+    
+    @classmethod
+    def from_backfill_json(cls, data, user: User):
+        pass
 
     # TODO: support user field to make hashes unique across users
     def __hash__(self) -> int:

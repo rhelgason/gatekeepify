@@ -1,5 +1,5 @@
 import getpass
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from typing import List, Optional, Set, Tuple
 
 import spotipy
