@@ -19,7 +19,6 @@ from menu_listener.progress_bar import (
     use_progress_bar,
 )
 from spotify.types import Listen, Track, User
-from spotipy.exceptions import SpotifyException
 from spotipy.oauth2 import SpotifyOAuth
 
 MAX_TRACKS_REQUEST = 50
@@ -30,7 +29,7 @@ class SpotifyClient:
     client: spotipy.Spotify
     db: Database
 
-    def __init__(self, is_test: bool = False) -> None:
+    def __init__(self, backoff_factor: float = 0.3, is_test: bool = False) -> None:
         client_id, client_secret = self.get_host_constants(is_test)
         self.client = spotipy.Spotify(
             auth_manager=SpotifyOAuth(
@@ -38,7 +37,8 @@ class SpotifyClient:
                 client_secret=client_secret,
                 redirect_uri=REDIRECT_URI,
                 scope=DEFAULT_SCOPE,
-            )
+            ),
+            backoff_factor=backoff_factor,
         )
         self.db = Database(db_name=DB_TEST_NAME if is_test else DB_NAME)
 

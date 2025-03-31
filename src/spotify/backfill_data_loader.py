@@ -14,6 +14,7 @@ from menu_listener.progress_bar import (
 )
 from spotify.types import Listen, Track, User
 from spotify_client import SpotifyClient
+from spotipy.exceptions import SpotifyException
 from utils import clear_terminal
 
 BACKFILL_DATETIME_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
@@ -33,8 +34,6 @@ class BackfillDataLoader:
     listens_json: List[Dict[str, Any]]
 
     def __init__(self, is_test: bool = False) -> None:
-        self.client = SpotifyClient()
-        self.user = self.client.gen_current_user()
         self.db = Database(db_name=DB_TEST_NAME if is_test else DB_NAME)
         self.listens = set()
 
@@ -45,16 +44,34 @@ class BackfillDataLoader:
             self.directory_path = input(
                 "Enter absolute path to Spotify data directory: "
             )
-
-        # check if directory exists
         if not os.path.exists(self.directory_path):
             raise ValueError(f"Directory {self.directory_path} does not exist.")
 
-        self._load_listens()
+        # try to load all data through Spotify API
+        # if failure, try again with increased backoff factor
+        clear_terminal()
+        backoff_factor = 0.3
+        while True:
+            try:
+                print(
+                    f"Loading data from Spotify with backoff factor {backoff_factor}..."
+                )
+                self.client = SpotifyClient(
+                    backoff_factor=backoff_factor, is_test=is_test
+                )
+                self.user = self.client.gen_current_user()
+                self._load_listens()
+                break
+            except SpotifyException as e:
+                # throw if not max retries
+                if "Max Retries" not in str(e):
+                    raise e
+                clear_terminal()
+                print("Failure occurred, increasing backoff factor and trying again...")
+                backoff_factor *= 2
+                continue
 
     def _load_listens(self) -> None:
-        clear_terminal()
-        print("Loading files from directory...")
         self.listens_json = []
         for file in os.listdir(self.directory_path):
             if file.startswith(FILE_PREFIX) and file.endswith(FILE_SUFFIX):
