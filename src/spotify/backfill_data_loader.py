@@ -1,5 +1,6 @@
 import json
 import os
+from collections.abc import Callable
 from datetime import datetime
 from time import time
 from typing import Any, Dict, List, Set
@@ -11,7 +12,7 @@ from menu_listener.progress_bar import (
     should_update_progress_bar,
     use_progress_bar,
 )
-from spotify.types import Listen, User
+from spotify.types import Listen, Track, User
 from spotify_client import SpotifyClient
 from utils import clear_terminal
 
@@ -20,6 +21,7 @@ FILE_PREFIX = "Streaming_History_Audio"
 FILE_SUFFIX = ".json"
 MIN_PLAY_TIME_MS = 30000  # 30 seconds
 TRACK_URI_PREFIX = "spotify:track:"
+TEST_DIRECTORY = "tests/test_data"
 
 
 class BackfillDataLoader:
@@ -34,15 +36,23 @@ class BackfillDataLoader:
         self.client = SpotifyClient()
         self.user = self.client.gen_current_user()
         self.db = Database(db_name=DB_TEST_NAME if is_test else DB_NAME)
-        self.directory_path = input("Enter absolute path to Spotify data directory: ")
+        self.listens = set()
+
+        if is_test:
+            self.directory_path = TEST_DIRECTORY
+        else:
+            clear_terminal()
+            self.directory_path = input(
+                "Enter absolute path to Spotify data directory: "
+            )
 
         # check if directory exists
         if not os.path.exists(self.directory_path):
             raise ValueError(f"Directory {self.directory_path} does not exist.")
 
-        self.load_listens(verbose=not is_test)
+        self._load_listens(verbose=not is_test)
 
-    def load_listens(self, verbose: bool) -> None:
+    def _load_listens(self, verbose: bool) -> None:
         if verbose:
             clear_terminal()
             print("Loading files from directory...")
@@ -80,32 +90,67 @@ class BackfillDataLoader:
             end = time()
             use_progress_bar(MAX_PERCENTAGE, start, end)
 
-        # populate all listens from recognized tracks
         start = time()
-        num_complete = 0
+
+        def update_progress_bar(num_complete: int) -> None:
+            if not verbose:
+                return
+            progress = int((num_complete / num_listens) * MAX_PERCENTAGE)
+            use_progress_bar(progress, start, time())
+
+        # populate all listens for recognized tracks in batches
         if verbose:
-            print("Loading all track information from Spotify...")
-        known_tracks = self.db.get_all_tracks(
-            track_ids=list(track_id_to_timestamps.keys())
+            print("\n\nLoading all recognized track information from Spotify...")
+        known_tracks = self.db.get_all_tracks_batched(
+            track_ids=list(track_id_to_timestamps.keys()), verbose=verbose
         )
-        for known_track in known_tracks:
-            for ts in track_id_to_timestamps[known_track.id]:
-                self.listens.add(
-                    Listen(
-                        user=self.user,
-                        track=known_track,
-                        ts=ts,
-                    )
-                )
-                num_complete += 1
-                if should_update_progress_bar() and verbose:
-                    progress = int((num_complete / num_listens) * MAX_PERCENTAGE)
-                    use_progress_bar(progress, start, time())
+        num_complete = self._populate_listens_from_tracks(
+            known_tracks, track_id_to_timestamps, update_progress_bar, 0
+        )
+
+        # fetch information for unrecognized tracks
+        if verbose:
+            print("\n\nLoading all unrecognized track information from Spotify...")
+        unknown_tracks = self.client.gen_tracks_batched(
+            track_ids=list(track_id_to_timestamps.keys()),
+            verbose=verbose,
+        )
+        self._populate_listens_from_tracks(
+            unknown_tracks, track_id_to_timestamps, update_progress_bar, num_complete
+        )
         if verbose:
             end = time()
             use_progress_bar(MAX_PERCENTAGE, start, end)
 
-        # TODO: fetch information for unrecognized tracks
+        # throw error if there are still unrecognized tracks
+        if len(track_id_to_timestamps) > 0:
+            raise ValueError(
+                f"Unrecognized track IDs: {', '.join(track_id_to_timestamps.keys())}"
+            )
+
+    # iterates through a set of tracks to populate listens
+    # returns the number of listens completed so far
+    def _populate_listens_from_tracks(
+        self,
+        tracks: Set[Track],
+        track_id_to_timestamps: Dict[str, List[datetime]],
+        update_progress_bar: Callable[[int], None],
+        num_complete: int,
+    ) -> int:
+        for track in tracks:
+            for ts in track_id_to_timestamps[track.id]:
+                self.listens.add(
+                    Listen(
+                        user=self.user,
+                        track=track,
+                        ts=ts,
+                    )
+                )
+                num_complete += 1
+                if should_update_progress_bar():
+                    update_progress_bar(num_complete)
+            track_id_to_timestamps.pop(track.id, None)
+        return num_complete
 
     def validate_listens(self) -> None:
         pass

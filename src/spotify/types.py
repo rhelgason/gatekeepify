@@ -100,7 +100,7 @@ class Track(Artifact):
         self.album = album
         self.artists = artists
         self.duration_ms = duration_ms
-        self.is_local = is_local
+        self.is_local = bool(is_local)
 
     @classmethod
     def from_dict(cls, data):

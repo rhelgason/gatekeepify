@@ -2,10 +2,18 @@ import json
 import os
 import sqlite3
 from datetime import datetime
+from time import time
 from typing import List, Optional, Set
 
 from db.constants import DB_DATETIME_FORMAT, DB_DIRECTORY, DB_NAME, LoggerAction
+from menu_listener.progress_bar import (
+    MAX_PERCENTAGE,
+    should_update_progress_bar,
+    use_progress_bar,
+)
 from spotify.types import Album, Artist, Listen, Track, User
+
+MAX_TRACKS_REQUEST = 50
 
 """
 Database setup for Gatekeepify. Currently includes the following tables:
@@ -364,6 +372,24 @@ class Database:
         results = self.cursor.fetchall()
         return {Album(row[0], row[1]) for row in results}
 
+    def get_all_tracks_batched(self, track_ids: List[str], verbose=False) -> Set[Track]:
+        # batch track requests by maximum request size
+        start = time()
+        num_tracks = len(track_ids)
+        tracks = set()
+        for i in range(0, len(track_ids), MAX_TRACKS_REQUEST):
+            res = self.get_all_tracks(track_ids[i : i + MAX_TRACKS_REQUEST])
+            if not res:
+                continue
+            tracks.update(res)
+            if should_update_progress_bar() and verbose:
+                progress = int((i / num_tracks) * MAX_PERCENTAGE)
+                use_progress_bar(progress, start, time())
+        if verbose:
+            end = time()
+            use_progress_bar(MAX_PERCENTAGE, start, end)
+        return tracks
+
     def get_all_tracks(self, track_ids: Optional[List[str]] = None) -> Set[Track]:
         query = """
         SELECT
@@ -388,8 +414,10 @@ class Database:
         ) ar ON ta.artist_id=ar.artist_id
         """
         if track_ids:
-            query += "WHERE t.track_id IN (" + ", ".join(track_ids) + ")"
-        query += "GROUP BY t.track_id, track_name, t.album_id, album_name, duration_ms, is_local"
+            query += "\nWHERE t.track_id IN ('{}')".format(
+                "', '".join(map(str, track_ids))
+            )
+        query += "\nGROUP BY t.track_id, track_name, t.album_id, album_name, duration_ms, is_local"
 
         self.cursor.execute(query)
         results = self.cursor.fetchall()
