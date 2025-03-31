@@ -372,7 +372,7 @@ class Database:
         results = self.cursor.fetchall()
         return {Album(row[0], row[1]) for row in results}
 
-    def get_all_tracks_batched(self, track_ids: List[str], verbose=False) -> Set[Track]:
+    def get_all_tracks_batched(self, track_ids: List[str]) -> Set[Track]:
         # batch track requests by maximum request size
         start = time()
         num_tracks = len(track_ids)
@@ -382,12 +382,11 @@ class Database:
             if not res:
                 continue
             tracks.update(res)
-            if should_update_progress_bar() and verbose:
+            if should_update_progress_bar():
                 progress = int((i / num_tracks) * MAX_PERCENTAGE)
                 use_progress_bar(progress, start, time())
-        if verbose:
-            end = time()
-            use_progress_bar(MAX_PERCENTAGE, start, end)
+        end = time()
+        use_progress_bar(MAX_PERCENTAGE, start, end)
         return tracks
 
     def get_all_tracks(self, track_ids: Optional[List[str]] = None) -> Set[Track]:

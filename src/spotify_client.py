@@ -1,9 +1,6 @@
 import getpass
-import io
-import random
-from contextlib import redirect_stdout
 from datetime import datetime, timezone
-from time import sleep, time
+from time import time
 from typing import Any, Dict, List, Optional, Set, Tuple
 
 import spotipy
@@ -77,41 +74,24 @@ class SpotifyClient:
             raise Exception("No user found")
         return User.from_dict(res)
 
-    def gen_tracks_batched(
-        self, track_ids: List[str], verbose: bool = False
-    ) -> Set[Track]:
+    def gen_tracks_batched(self, track_ids: List[str]) -> Set[Track]:
         # batch track requests by maximum request size
         start = time()
         num_tracks = len(track_ids)
         tracks = set()
-        f = io.StringIO()
         for i in range(0, len(track_ids), MAX_TRACKS_REQUEST):
-            try:
-                with redirect_stdout(f):
-                    res = self.client.tracks(track_ids[i : i + MAX_TRACKS_REQUEST])
-                    if not res:
-                        raise Exception("No tracks found")
+            res = self.client.tracks(track_ids[i : i + MAX_TRACKS_REQUEST])
+            if not res:
+                raise Exception("No tracks found")
 
-                    tracks_batch = [{"track": track} for track in res["tracks"]]
-                    self.load_artist_genres_for_track_dict(tracks_batch)
-                tracks.update(
-                    [Track.from_dict(track["track"]) for track in tracks_batch]
-                )
-                if should_update_progress_bar() and verbose:
-                    progress = int((i / num_tracks) * MAX_PERCENTAGE)
-                    use_progress_bar(progress, start, time())
-            except SpotifyException as e:
-                # confirm max retry error
-                if MAX_RETRIES_SUBSTR not in str(e):
-                    raise e
-
-                # sleep and retry
-                sleep(random.uniform(10, 30))
-                i -= MAX_TRACKS_REQUEST
-                continue
-        if verbose:
-            end = time()
-            use_progress_bar(MAX_PERCENTAGE, start, end)
+            tracks_batch = [{"track": track} for track in res["tracks"]]
+            self.load_artist_genres_for_track_dict(tracks_batch)
+            tracks.update([Track.from_dict(track["track"]) for track in tracks_batch])
+            if should_update_progress_bar():
+                progress = int((i / num_tracks) * MAX_PERCENTAGE)
+                use_progress_bar(progress, start, time())
+        end = time()
+        use_progress_bar(MAX_PERCENTAGE, start, end)
         return tracks
 
     def gen_most_recent_listens(

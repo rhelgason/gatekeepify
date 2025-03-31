@@ -5,7 +5,7 @@ requirements:
 	pip3 freeze > requirements.txt
 
 test:
-	python3 -m unittest discover .
+	python3 -m unittest discover . -b
 
 run:
 	python3 src/main.py

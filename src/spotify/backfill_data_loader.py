@@ -50,12 +50,11 @@ class BackfillDataLoader:
         if not os.path.exists(self.directory_path):
             raise ValueError(f"Directory {self.directory_path} does not exist.")
 
-        self._load_listens(verbose=not is_test)
+        self._load_listens()
 
-    def _load_listens(self, verbose: bool) -> None:
-        if verbose:
-            clear_terminal()
-            print("Loading files from directory...")
+    def _load_listens(self) -> None:
+        clear_terminal()
+        print("Loading files from directory...")
         self.listens_json = []
         for file in os.listdir(self.directory_path):
             if file.startswith(FILE_PREFIX) and file.endswith(FILE_SUFFIX):
@@ -83,44 +82,37 @@ class BackfillDataLoader:
             track_id_to_timestamps[track_id].append(
                 datetime.strptime(listen_json["ts"], BACKFILL_DATETIME_FORMAT)
             )
-            if should_update_progress_bar() and verbose:
+            if should_update_progress_bar():
                 progress = int((i / num_listens) * MAX_PERCENTAGE)
                 use_progress_bar(progress, start, time())
-        if verbose:
-            end = time()
-            use_progress_bar(MAX_PERCENTAGE, start, end)
+        end = time()
+        use_progress_bar(MAX_PERCENTAGE, start, end)
 
         start = time()
 
         def update_progress_bar(num_complete: int) -> None:
-            if not verbose:
-                return
             progress = int((num_complete / num_listens) * MAX_PERCENTAGE)
             use_progress_bar(progress, start, time())
 
         # populate all listens for recognized tracks in batches
-        if verbose:
-            print("\n\nLoading all recognized track information from Spotify...")
+        print("\n\nLoading all recognized track information from Spotify...")
         known_tracks = self.db.get_all_tracks_batched(
-            track_ids=list(track_id_to_timestamps.keys()), verbose=verbose
+            track_ids=list(track_id_to_timestamps.keys())
         )
         num_complete = self._populate_listens_from_tracks(
             known_tracks, track_id_to_timestamps, update_progress_bar, 0
         )
 
         # fetch information for unrecognized tracks
-        if verbose:
-            print("\n\nLoading all unrecognized track information from Spotify...")
+        print("\n\nLoading all unrecognized track information from Spotify...")
         unknown_tracks = self.client.gen_tracks_batched(
             track_ids=list(track_id_to_timestamps.keys()),
-            verbose=verbose,
         )
         self._populate_listens_from_tracks(
             unknown_tracks, track_id_to_timestamps, update_progress_bar, num_complete
         )
-        if verbose:
-            end = time()
-            use_progress_bar(MAX_PERCENTAGE, start, end)
+        end = time()
+        use_progress_bar(MAX_PERCENTAGE, start, end)
 
         # throw error if there are still unrecognized tracks
         if len(track_id_to_timestamps) > 0:
