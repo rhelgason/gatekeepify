@@ -94,13 +94,19 @@ class Track(Artifact):
     duration_ms: int
     is_local: bool
 
-    def __init__(self, id, name, album, artists, duration_ms, is_local) -> None:
+    def __init__(self, id, name, album = None, artists = None, duration_ms = None, is_local = None) -> None:
         self.id = id
         self.name = name
-        self.album = album
-        self.artists = artists
-        self.duration_ms = duration_ms
-        self.is_local = bool(is_local)
+        self.album = album or Album(
+            id="",
+            name=""
+        )
+        self.artists = artists or []
+        self.duration_ms = duration_ms or -1
+        if is_local is None:
+            self.is_local = True
+        else:
+            self.is_local = bool(is_local)
 
     @classmethod
     def from_dict(cls, data):

@@ -17,8 +17,6 @@ TEST_FILE_2 = FILE_PREFIX + "_test_file_2.json"
 TEST_FILE_3 = "test_file_3.json"
 
 
-@patch("spotipy.Spotify.artists")
-@patch("spotipy.Spotify.tracks")
 @patch(
     "spotipy.Spotify.current_user",
     return_value={"id": "12345", "display_name": "test user"},
@@ -30,8 +28,6 @@ class TestBackfillDataLoader(unittest.TestCase):
     data_loader: BackfillDataLoader
     path: str
 
-    artist_1: Artist
-    artist_2: Artist
     track_1: Track
     track_2: Track
     listen_1: Listen
@@ -41,28 +37,13 @@ class TestBackfillDataLoader(unittest.TestCase):
     def setUp(self) -> None:
         # set up test database
         self.db = Database(db_name=DB_TEST_NAME)
-        self.artist_1 = Artist("345", "test artist", ["test genre", "test genre 2"])
-        self.artist_2 = Artist("678", "test artist 2", ["test genre 2", "test genre 3"])
         self.track_1 = Track(
             "123",
             "test track",
-            Album("234", "test album"),
-            [
-                self.artist_1,
-                self.artist_2,
-            ],
-            240000,
-            False,
         )
         self.track_2 = Track(
             "456",
             "test track 2",
-            Album("567", "test album 2"),
-            [
-                self.artist_2,
-            ],
-            240000,
-            False,
         )
         self.listen_1 = Listen(
             User("12345", "test user"),
@@ -145,38 +126,8 @@ class TestBackfillDataLoader(unittest.TestCase):
             )
 
     def test_full_backfill(
-        self, mock_getpass, mock_input, mock_current_user, mock_tracks, mock_artists
+        self, mock_getpass, mock_input, mock_current_user
     ) -> None:
-        mock_tracks.return_value = {
-            "tracks": [
-                {
-                    "id": self.track_2.id,
-                    "name": self.track_2.name,
-                    "album": {
-                        "id": self.track_2.album.id,
-                        "name": self.track_2.album.name,
-                    },
-                    "artists": [
-                        {
-                            "id": self.artist_2.id,
-                            "name": self.artist_2.name,
-                            "genres": self.artist_2.genres,
-                        }
-                    ],
-                    "duration_ms": self.track_2.duration_ms,
-                    "is_local": self.track_2.is_local,
-                },
-            ]
-        }
-        mock_artists.return_value = {
-            "artists": [
-                {
-                    "id": "678",
-                    "genres": ["test genre 2", "test genre 3"],
-                },
-            ]
-        }
-
         self.data_loader = BackfillDataLoader(is_test=True)
         self.assertEqual(len(self.data_loader.listens_json), 3)
         self.assertListEqual(

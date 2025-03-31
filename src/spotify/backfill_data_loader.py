@@ -1,8 +1,7 @@
 import json
 import os
-from collections.abc import Callable
 from datetime import datetime
-from time import time
+from time import time, sleep
 from typing import Any, Dict, List, Set
 
 from db.constants import DB_NAME, DB_TEST_NAME
@@ -47,31 +46,18 @@ class BackfillDataLoader:
         if not os.path.exists(self.directory_path):
             raise ValueError(f"Directory {self.directory_path} does not exist.")
 
-        # try to load all data through Spotify API
-        # if failure, try again with increased backoff factor
-        clear_terminal()
-        backoff_factor = 0.3
-        while True:
-            try:
-                print(
-                    f"Loading data from Spotify with backoff factor {backoff_factor}..."
-                )
-                self.client = SpotifyClient(
-                    backoff_factor=backoff_factor, is_test=is_test
-                )
-                self.user = self.client.gen_current_user()
-                self._load_listens()
-                break
-            except SpotifyException as e:
-                # throw if not max retries
-                if "Max Retries" not in str(e):
-                    raise e
-                clear_terminal()
-                print("Failure occurred, increasing backoff factor and trying again...")
-                backoff_factor *= 2
-                continue
+        # write all track data to db
+        # there will almost certainly be gaps left to fill by cron job
+        self.client = SpotifyClient(
+            is_test=is_test
+        )
+        self.user = self.client.gen_current_user()
+        self._load_listens()
 
     def _load_listens(self) -> None:
+        print(
+            "Loading data from local files..."
+        )
         self.listens_json = []
         for file in os.listdir(self.directory_path):
             if file.startswith(FILE_PREFIX) and file.endswith(FILE_SUFFIX):
@@ -89,14 +75,22 @@ class BackfillDataLoader:
         # map json to dict of track id to list of timestamps
         start = time()
         num_listens = len(self.listens_json)
-        track_id_to_timestamps: Dict[str, List[datetime]] = {}
+        track_to_timestamps: Dict[Track, List[datetime]] = {}
         for i, listen_json in enumerate(self.listens_json):
             track_id = str(
                 listen_json["spotify_track_uri"].removeprefix(TRACK_URI_PREFIX)
             )
-            if track_id not in track_id_to_timestamps:
-                track_id_to_timestamps[track_id] = []
-            track_id_to_timestamps[track_id].append(
+            track_name = str(listen_json["master_metadata_track_name"])
+            if not track_id or not track_name:
+                continue
+            track = Track(
+                id=track_id,
+                name=track_name,
+            )
+
+            if track not in track_to_timestamps:
+                track_to_timestamps[track] = []
+            track_to_timestamps[track].append(
                 datetime.strptime(listen_json["ts"], BACKFILL_DATETIME_FORMAT)
             )
             if should_update_progress_bar():
@@ -105,49 +99,12 @@ class BackfillDataLoader:
         end = time()
         use_progress_bar(MAX_PERCENTAGE, start, end)
 
+        print("\n\nMapping JSON data to object type...")
         start = time()
-
-        def update_progress_bar(num_complete: int) -> None:
-            progress = int((num_complete / num_listens) * MAX_PERCENTAGE)
-            use_progress_bar(progress, start, time())
-
-        # populate all listens for recognized tracks in batches
-        print("\n\nLoading all recognized track information from Spotify...")
-        known_tracks = self.db.get_all_tracks_batched(
-            track_ids=list(track_id_to_timestamps.keys())
-        )
-        num_complete = self._populate_listens_from_tracks(
-            known_tracks, track_id_to_timestamps, update_progress_bar, 0
-        )
-
-        # fetch information for unrecognized tracks
-        print("\n\nLoading all unrecognized track information from Spotify...")
-        unknown_tracks = self.client.gen_tracks_batched(
-            track_ids=list(track_id_to_timestamps.keys()),
-        )
-        self._populate_listens_from_tracks(
-            unknown_tracks, track_id_to_timestamps, update_progress_bar, num_complete
-        )
-        end = time()
-        use_progress_bar(MAX_PERCENTAGE, start, end)
-
-        # throw error if there are still unrecognized tracks
-        if len(track_id_to_timestamps) > 0:
-            raise ValueError(
-                f"Unrecognized track IDs: {', '.join(track_id_to_timestamps.keys())}"
-            )
-
-    # iterates through a set of tracks to populate listens
-    # returns the number of listens completed so far
-    def _populate_listens_from_tracks(
-        self,
-        tracks: Set[Track],
-        track_id_to_timestamps: Dict[str, List[datetime]],
-        update_progress_bar: Callable[[int], None],
-        num_complete: int,
-    ) -> int:
-        for track in tracks:
-            for ts in track_id_to_timestamps[track.id]:
+        num_tracks = len(track_to_timestamps)
+        self.listens = set()
+        for i, (track, timestamps) in enumerate(track_to_timestamps.items()):
+            for ts in timestamps:
                 self.listens.add(
                     Listen(
                         user=self.user,
@@ -155,11 +112,13 @@ class BackfillDataLoader:
                         ts=ts,
                     )
                 )
-                num_complete += 1
-                if should_update_progress_bar():
-                    update_progress_bar(num_complete)
-            track_id_to_timestamps.pop(track.id, None)
-        return num_complete
+            if should_update_progress_bar():
+                progress = int((i / num_tracks) * MAX_PERCENTAGE)
+                use_progress_bar(progress, start, time())
+        end = time()
+        use_progress_bar(MAX_PERCENTAGE, start, end)
+
+        print(f"\n\nLoaded {len(self.listens)} listens from JSON.")
 
     def validate_listens(self) -> None:
         pass

@@ -15,3 +15,4 @@ class LoggerAction(Enum):
     UPSERT_DIM_ALL_USERS = "upsertDimAllUsers"
     UPSERT_DIM_ALL_LISTENS = "upsertDimAllListens"
     RUN_CRON_BACKFILL = "runCronBackfill"
+    RUN_SCHEDULED_BACKFILL = "runScheduledBackfill"

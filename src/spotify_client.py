@@ -1,6 +1,6 @@
 import getpass
 from datetime import datetime, timezone
-from time import time
+from time import sleep, time
 from typing import Any, Dict, List, Optional, Set, Tuple
 
 import spotipy
@@ -81,9 +81,13 @@ class SpotifyClient:
         tracks = set()
         for i in range(0, len(track_ids), MAX_TRACKS_REQUEST):
             res = self.client.tracks(track_ids[i : i + MAX_TRACKS_REQUEST])
+            if should_update_progress_bar():
+                progress = int((i / num_tracks) * MAX_PERCENTAGE)
+                use_progress_bar(progress, start, time())
             if not res:
                 raise Exception("No tracks found")
 
+            # TODO: greatly reduce the number of API requests here
             tracks_batch = [{"track": track} for track in res["tracks"]]
             self.load_artist_genres_for_track_dict(tracks_batch)
             tracks.update([Track.from_dict(track["track"]) for track in tracks_batch])

@@ -176,6 +176,16 @@ class Database:
         self.__upsert_dim_all_users(all_users)
         self.__upsert_dim_all_listens(listens)
 
+    #upserts only users and listens table for data backfill
+    def upsert_scheduled_backfill(self, listens: List[Listen]):
+        all_users = set(listen.user for listen in listens)
+        self.__upsert_dim_all_users(all_users)
+        self.__upsert_dim_all_listens(listens)
+        log_json = {
+            "listens": [listen.to_json_str() for listen in listens],
+        }
+        self.__upsert_dim_all_logs(LoggerAction.RUN_SCHEDULED_BACKFILL, json.dumps(log_json))
+
     # upserts all tables with logs for the current cron job
     def upsert_cron_backfill(self, listens: List[Listen]):
         self.upsert_all_tables(listens)
@@ -379,9 +389,8 @@ class Database:
         tracks = set()
         for i in range(0, len(track_ids), MAX_TRACKS_REQUEST):
             res = self.get_all_tracks(track_ids[i : i + MAX_TRACKS_REQUEST])
-            if not res:
-                continue
-            tracks.update(res)
+            if res:
+                tracks.update(res)
             if should_update_progress_bar():
                 progress = int((i / num_tracks) * MAX_PERCENTAGE)
                 use_progress_bar(progress, start, time())
