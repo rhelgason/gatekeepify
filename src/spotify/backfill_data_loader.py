@@ -1,12 +1,13 @@
+import json
+import os
+from typing import Dict, List, Optional
+
 from db.constants import DB_NAME, DB_TEST_NAME
 from db.Database import Database
-from spotify.types import Listen
-from typing import Dict, List, Optional, Set
-import os
-import json
 
 FILE_PREFIX = "Streaming_History_Audio"
 FILE_SUFFIX = ".json"
+
 
 class BackfillDataLoader:
     db: Database
@@ -28,7 +29,7 @@ class BackfillDataLoader:
                 with open(os.path.join(self.directory_path, file), "r") as f:
                     json_arr = json.load(f)
                     self.listens_json.extend(json_arr)
-    
+
     def validate_listens(self) -> None:
         pass
 
