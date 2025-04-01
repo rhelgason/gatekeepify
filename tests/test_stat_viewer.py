@@ -91,7 +91,7 @@ CLIENT_SECRET = "{CLIENT_SECRET}"
             datetime.strptime("2024-12-28T16:48:12.712392Z", CLIENT_DATETIME_FORMAT),
         )
         base_upsert_data = [listen_1, listen_2, listen_3, listen_4, listen_5, listen_6]
-        db.upsert_cron_backfill(base_upsert_data)
+        db.upsert_cron_recent_listens(base_upsert_data)
 
     def test_trim_str(self, mock_current_user) -> None:
         stat_viewer = StatViewer(None, True)

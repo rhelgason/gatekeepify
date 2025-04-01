@@ -182,8 +182,25 @@ class Database:
             LoggerAction.RUN_FULL_BACKFILL_JOB, json.dumps(log_json)
         )
 
-    # upserts all tables with logs for the current cron job
-    def upsert_cron_backfill(self, listens: List[Listen]):
+    # upserts all tables with logs for the missing info job
+    def upsert_cron_tracks_missing_info(self, all_tracks: Set[Track]):
+        all_albums = set([track.album for track in all_tracks])
+        all_artists = set([artist for track in all_tracks for artist in track.artists])
+
+        self.__upsert_dim_all_albums(all_albums)
+        self.__upsert_dim_all_tracks(all_tracks)
+        self.__upsert_dim_all_artists(all_artists)
+        self.__upsert_track_to_artist(all_tracks)
+        self.__upsert_artist_to_genre(all_artists)
+        log_json = {
+            "tracks": [track.to_json_str() for track in all_tracks],
+        }
+        self.__upsert_dim_all_logs(
+            LoggerAction.RUN_LOAD_UNKNOWN_TRACKS_JOBS, json.dumps(log_json)
+        )
+
+    # upserts all tables with logs for the recent listens job
+    def upsert_cron_recent_listens(self, listens: List[Listen]):
         self.upsert_all_tables(listens)
         log_json = {
             "listens": [listen.to_json_str() for listen in listens],
@@ -532,3 +549,20 @@ class Database:
         self.cursor.execute(query, (user.id,))
         result = self.cursor.fetchone()
         return datetime.strptime(result[0], DB_DATETIME_FORMAT) if result[0] else None
+
+    # query track IDs that are missing information
+    def get_track_ids_missing_info(self, limit: int) -> Set[str]:
+        query = """
+        SELECT
+            l.track_id,
+            COUNT(*) AS num_listens
+        FROM dim_all_listens l
+        LEFT JOIN dim_all_tracks t ON l.track_id=t.track_id
+        WHERE track_name IS NULL
+        GROUP BY l.track_id
+        ORDER BY num_listens DESC
+        LIMIT ?
+        """
+        self.cursor.execute(query, (limit,))
+        results = self.cursor.fetchall()
+        return {row[0] for row in results}

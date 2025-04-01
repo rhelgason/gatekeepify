@@ -1,6 +1,5 @@
 import getpass
 from datetime import datetime, timezone
-from time import sleep, time
 from typing import Any, Dict, List, Optional, Set, Tuple
 
 import spotipy
@@ -13,15 +12,10 @@ from constants import (
 )
 from db.constants import DB_NAME, DB_TEST_NAME
 from db.Database import Database
-from menu_listener.progress_bar import (
-    MAX_PERCENTAGE,
-    should_update_progress_bar,
-    use_progress_bar,
-)
 from spotify.types import Listen, Track, User
 from spotipy.oauth2 import SpotifyOAuth
 
-MAX_TRACKS_REQUEST = 50
+MAX_TRACKS_REQUEST = 30
 MAX_RETRIES_SUBSTR = "Max Retries"
 
 
@@ -77,29 +71,19 @@ class SpotifyClient:
             raise Exception("No user found")
         return User.from_dict(res)
 
-    def gen_tracks_batched(self, track_ids: List[str]) -> Set[Track]:
-        # batch track requests by maximum request size
-        start = time()
-        num_tracks = len(track_ids)
-        tracks = set()
-        for i in range(0, len(track_ids), MAX_TRACKS_REQUEST):
-            res = self.client.tracks(track_ids[i : i + MAX_TRACKS_REQUEST])
-            if should_update_progress_bar():
-                progress = int((i / num_tracks) * MAX_PERCENTAGE)
-                use_progress_bar(progress, start, time())
-            if not res:
-                raise Exception("No tracks found")
+    def gen_tracks(self, track_ids: List[str]) -> Set[Track]:
+        if len(track_ids) > MAX_TRACKS_REQUEST:
+            raise Exception(
+                f"Too many tracks requested. Max tracks per request is {MAX_TRACKS_REQUEST}"
+            )
 
-            # TODO: greatly reduce the number of API requests here
-            tracks_batch = [{"track": track} for track in res["tracks"]]
-            self.load_artist_genres_for_track_dict(tracks_batch)
-            tracks.update([Track.from_dict(track["track"]) for track in tracks_batch])
-            if should_update_progress_bar():
-                progress = int((i / num_tracks) * MAX_PERCENTAGE)
-                use_progress_bar(progress, start, time())
-        end = time()
-        use_progress_bar(MAX_PERCENTAGE, start, end)
-        return tracks
+        res = self.client.tracks(track_ids)
+        if not res:
+            raise Exception("No tracks found")
+
+        tracks_batch = [{"track": track} for track in res["tracks"]]
+        self.load_artist_genres_for_track_dict(tracks_batch)
+        return {Track.from_dict(track["track"]) for track in tracks_batch}
 
     def gen_most_recent_listens(
         self, user: User, after: Optional[datetime] = None
@@ -135,12 +119,19 @@ class SpotifyClient:
             for artist in track["track"]["artists"]:
                 artist["genres"] = artist_genres[artist["id"]]
 
-    def gen_run_cron_backfill(self) -> None:
+    def gen_run_cron_recent_listens(self) -> None:
         after_ts = self.db.get_most_recent_listen_time(self.user)
         recent_listens = self.gen_most_recent_listens(self.user, after_ts)
         if len(recent_listens) == 0:
             return
-        self.db.upsert_cron_backfill(recent_listens)
+        self.db.upsert_cron_recent_listens(recent_listens)
+
+    def gen_run_cron_unknown_tracks(self) -> None:
+        unknown_track_ids = self.db.get_track_ids_missing_info(MAX_TRACKS_REQUEST)
+        if len(unknown_track_ids) == 0:
+            return
+        tracks = self.gen_tracks(list(unknown_track_ids))
+        self.db.upsert_cron_tracks_missing_info(tracks)
 
     def gen_all_listens(self, ds: Optional[datetime]) -> Set[Listen]:
         return self.db.get_all_listens(self.user, ds)

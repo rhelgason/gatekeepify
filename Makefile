@@ -10,8 +10,11 @@ test:
 run:
 	python3 src/main.py
 
-cron:
+recent:
 	python3 src/cron_recent_listens.py
+
+missing:
+	python3 src/cron_load_unknown_tracks.py
 
 clean: clean-build clean-pyc clean-test
 

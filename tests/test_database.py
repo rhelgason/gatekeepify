@@ -62,7 +62,7 @@ class TestDatabase(unittest.TestCase):
         )
         self.base_upsert_data = [self.listen_1, self.listen_2]
 
-        self.db.upsert_cron_backfill(self.base_upsert_data)
+        self.db.upsert_cron_recent_listens(self.base_upsert_data)
 
     def assertLogsWrittenToDb(self, action: LoggerAction, count: int) -> None:
         query = """
@@ -83,7 +83,7 @@ class TestDatabase(unittest.TestCase):
 
         # overwrite existing album with new name
         self.listen_1.track.album = Album("234", "test album new name")
-        self.db.upsert_cron_backfill(self.base_upsert_data)
+        self.db.upsert_cron_recent_listens(self.base_upsert_data)
         all_albums = self.db.get_all_albums()
         self.assertEqual(len(all_albums), 2)
         self.assertEqual(
@@ -113,7 +113,7 @@ class TestDatabase(unittest.TestCase):
         self.track_2.album = Album("567", "test album 2 new name")
         self.listen_1.track = self.track_1
         self.listen_2.track = self.track_2
-        self.db.upsert_cron_backfill(self.base_upsert_data)
+        self.db.upsert_cron_recent_listens(self.base_upsert_data)
         all_tracks = self.db.get_all_tracks()
         self.assertEqual(len(all_tracks), 2)
         self.assertEqual(
@@ -144,7 +144,7 @@ class TestDatabase(unittest.TestCase):
             self.artist_1,
             self.artist_2,
         ]
-        self.db.upsert_cron_backfill(self.base_upsert_data)
+        self.db.upsert_cron_recent_listens(self.base_upsert_data)
         all_artists = self.db.get_all_artists()
         self.assertEqual(len(all_artists), 3)
         self.assertEqual(
@@ -178,7 +178,7 @@ class TestDatabase(unittest.TestCase):
             self.artist_3,
         ]
         self.listen_1.track = self.track_1
-        self.db.upsert_cron_backfill(self.base_upsert_data)
+        self.db.upsert_cron_recent_listens(self.base_upsert_data)
         self.db.cursor.execute(query)
         results = self.db.cursor.fetchall()
         self.assertEqual(len(results), 2)
@@ -212,7 +212,7 @@ class TestDatabase(unittest.TestCase):
             self.artist_1,
             self.artist_2,
         ]
-        self.db.upsert_cron_backfill(self.base_upsert_data)
+        self.db.upsert_cron_recent_listens(self.base_upsert_data)
         self.db.cursor.execute(query)
         results = self.db.cursor.fetchall()
         self.assertEqual(len(results), 2)
@@ -237,7 +237,7 @@ class TestDatabase(unittest.TestCase):
 
         # overwrite existing user with new name
         self.listen_1.user.name = "test user new name"
-        self.db.upsert_cron_backfill(self.base_upsert_data)
+        self.db.upsert_cron_recent_listens(self.base_upsert_data)
         all_users = self.db.get_all_users()
         self.assertEqual(len(all_users), 2)
         self.assertEqual(
@@ -260,7 +260,7 @@ class TestDatabase(unittest.TestCase):
         listen_3 = deepcopy(self.listen_2)
         listen_3.user = User("12345", "test user")
         self.base_upsert_data.append(listen_3)
-        self.db.upsert_cron_backfill(self.base_upsert_data)
+        self.db.upsert_cron_recent_listens(self.base_upsert_data)
         all_listens = self.db.get_all_listens()
         self.assertEqual(len(all_listens), 3)
         self.assertEqual(
@@ -274,7 +274,7 @@ class TestDatabase(unittest.TestCase):
         listen_3 = deepcopy(self.listen_2)
         listen_3.user = User("12345", "test user")
         self.base_upsert_data.append(listen_3)
-        self.db.upsert_cron_backfill(self.base_upsert_data)
+        self.db.upsert_cron_recent_listens(self.base_upsert_data)
 
         # query by user only
         all_listens = self.db.get_all_listens(User("12345", "test user"))

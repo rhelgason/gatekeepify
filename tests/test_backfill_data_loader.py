@@ -18,6 +18,40 @@ TEST_FILE_3 = "test_file_3.json"
 
 
 @patch(
+    "spotipy.Spotify.artists",
+    return_value={
+        "artists": [
+            {
+                "id": "654",
+                "genres": ["test genre 2", "test genre 3"],
+            },
+        ]
+    },
+)
+@patch(
+    "spotipy.Spotify.tracks",
+    return_value={
+        "tracks": [
+            {
+                "album": {
+                    "id": "987",
+                    "name": "test album 2",
+                },
+                "artists": [
+                    {
+                        "id": "654",
+                        "name": "test artist 2",
+                    }
+                ],
+                "duration_ms": 240000,
+                "id": "456",
+                "name": "test track 2",
+                "is_local": False,
+            }
+        ]
+    },
+)
+@patch(
     "spotipy.Spotify.current_user",
     return_value={"id": "123456789", "display_name": "test user"},
 )
@@ -70,7 +104,7 @@ class TestBackfillDataLoader(unittest.TestCase):
             self.track_1,
             datetime.strptime("2024-12-12T22:30:04.000000Z", CLIENT_DATETIME_FORMAT),
         )
-        self.db.upsert_cron_backfill([self.listen_1])
+        self.db.upsert_cron_recent_listens([self.listen_1])
 
         # set up spotify client
         self.path = ".".join((HOST_CONSTANTS_TEST_PATH, "py"))
@@ -135,7 +169,9 @@ class TestBackfillDataLoader(unittest.TestCase):
                 """
             )
 
-    def test_full_backfill(self, mock_getpass, mock_input, mock_current_user) -> None:
+    def test_full_backfill(
+        self, mock_getpass, mock_input, mock_current_user, mock_tracks, mock_artists
+    ) -> None:
         # assert json files are read correctly
         self.data_loader = BackfillDataLoader(is_test=True)
         self.assertEqual(len(self.data_loader.listens_json), 3)
@@ -209,6 +245,53 @@ class TestBackfillDataLoader(unittest.TestCase):
                             self.track_2.id,
                             "",
                         ),
+                        self.listen_2.ts,
+                    ),
+                    self.listen_3,
+                ]
+            ),
+        )
+
+    def test_load_unknown_tracks(
+        self, mock_getpass, mock_input, mock_current_user, mock_tracks, mock_artists
+    ) -> None:
+        self.data_loader = BackfillDataLoader(is_test=True)
+        self.data_loader.write_listens()
+
+        # missing track id is loaded from database
+        track_ids = self.db.get_track_ids_missing_info(10)
+        self.assertEqual(len(track_ids), 1)
+        self.assertEqual(track_ids, {self.track_2.id})
+
+        # missing track info is loaded from spotify
+        track_2_data = Track(
+            self.track_2.id,
+            self.track_2.name,
+            Album(
+                "987",
+                "test album 2",
+            ),
+            [
+                Artist(
+                    "654",
+                    "test artist 2",
+                    ["test genre 2", "test genre 3"],
+                )
+            ],
+            240000,
+            False,
+        )
+        self.db.upsert_cron_tracks_missing_info({track_2_data})
+        all_listens = self.db.get_all_listens()
+        self.assertEqual(len(all_listens), 3)
+        self.assertEqual(
+            sorted(list(all_listens)),
+            sorted(
+                [
+                    self.listen_1,
+                    Listen(
+                        self.user,
+                        track_2_data,
                         self.listen_2.ts,
                     ),
                     self.listen_3,
