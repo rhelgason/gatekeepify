@@ -11,7 +11,7 @@ run:
 	python3 src/main.py
 
 cron:
-	python3 src/cron.py
+	python3 src/cron_recent_listens.py
 
 clean: clean-build clean-pyc clean-test
 

@@ -11,8 +11,8 @@ from menu_listener.progress_bar import (
     should_update_progress_bar,
     use_progress_bar,
 )
+from spotify.spotify_client import SpotifyClient
 from spotify.types import Listen, Track, User
-from spotify_client import SpotifyClient
 from utils import clear_terminal
 
 BACKFILL_DATETIME_FORMAT = "%Y-%m-%dT%H:%M:%SZ"

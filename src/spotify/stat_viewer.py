@@ -5,8 +5,8 @@ from typing import Dict, List, Optional, Set, Tuple, TypeVar
 
 from menu_listener.spinner import Spinner
 from prettytable import PrettyTable
+from spotify.spotify_client import SpotifyClient
 from spotify.types import Artist, Listen, Track
-from spotify_client import SpotifyClient
 
 from utils import clear_terminal
 

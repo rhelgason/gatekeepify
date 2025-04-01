@@ -15,7 +15,7 @@ CLIENT_SECRET = "test_secret"
 
 
 @patch(
-    "spotify_client.SpotifyClient.gen_current_user",
+    "spotify.spotify_client.SpotifyClient.gen_current_user",
     return_value=User("12345", "test user"),
 )
 class TestStatViewer(unittest.TestCase):

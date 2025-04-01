@@ -5,11 +5,12 @@ from datetime import datetime
 from unittest.mock import patch
 
 from constants import CLIENT_DATETIME_FORMAT, HOST_CONSTANTS_TEST_PATH
+from spotify.spotify_client import SpotifyClient
 from spotify.types import Album, Artist, Track, User
-from spotify_client import SpotifyClient
 
 CLIENT_ID = "test_id"
 CLIENT_SECRET = "test_secret"
+
 
 @patch(
     "spotipy.Spotify.current_user",
@@ -48,7 +49,12 @@ class TestSpotifyClient(unittest.TestCase):
     @patch("spotipy.Spotify.artists")
     @patch("spotipy.Spotify.current_user_recently_played")
     def test_gen_most_recent_listens(
-        self, mock_recently_played, mock_artists, mock_getpass, mock_input, mock_current_user
+        self,
+        mock_recently_played,
+        mock_artists,
+        mock_getpass,
+        mock_input,
+        mock_current_user,
     ) -> None:
         played_at_1 = "2024-12-27T22:30:04.214000Z"
         played_at_2 = "2024-12-26T16:48:12.712392Z"
