@@ -170,8 +170,8 @@ class Database:
         self.__upsert_dim_all_users(all_users)
         self.__upsert_dim_all_listens(listens)
 
-    # upserts only users and listens table for data backfill
-    def upsert_scheduled_backfill(self, listens: List[Listen]):
+    # upserts only users and listens table for full user history backfill
+    def upsert_full_backfill(self, listens: List[Listen]):
         all_users = set(listen.user for listen in listens)
         self.__upsert_dim_all_users(all_users)
         self.__upsert_dim_all_listens(listens)
@@ -458,7 +458,7 @@ class Database:
             l.user_id,
             u.user_name,
             ts,
-            t.track_id,
+            l.track_id,
             track_name,
             t.album_id,
             album_name,
@@ -482,28 +482,47 @@ class Database:
         WHERE
             CASE WHEN ? IS NOT NULL THEN l.user_id = ? ELSE TRUE END
             AND CASE WHEN ? IS NOT NULL THEN ts >= ? ELSE TRUE END
-        GROUP BY l.user_id, u.user_name, ts, t.track_id, track_name, t.album_id, album_name
+        GROUP BY l.user_id, u.user_name, ts, l.track_id, track_name, t.album_id, album_name
         """
         user_id = user.id if user else None
         ts = ds.strftime(DB_DATETIME_FORMAT) if ds else None
 
         self.cursor.execute(query, (user_id, user_id, ts, ts))
         results = self.cursor.fetchall()
+        print()
+        print(results)
+        print()
+        null_artists_row = "[[null,null,null]]"
         return {
             Listen(
                 User(row[0], row[1]),
                 Track(
                     row[3],
-                    row[4],
-                    Album(row[5], row[6]),
-                    [
-                        Artist(artist[0], artist[1], json.loads(artist[2]))
-                        for artist in json.loads(row[9])
-                    ],
+                    row[4] or "",
+                    Album(row[5] or "", row[6] or ""),
+                    (
+                        [
+                            Artist(
+                                artist[0],
+                                artist[1],
+                                json.loads(artist[2]),
+                            )
+                            for artist in json.loads(row[9])
+                        ]
+                        if row[9] != null_artists_row
+                        else []
+                    ),
                     row[7],
                     row[8],
                 ),
-                datetime.strptime(row[2], DB_DATETIME_FORMAT),
+                datetime.strptime(
+                    row[2],
+                    (
+                        DB_DATETIME_FORMAT[:-3]
+                        if len(row[2]) == 19
+                        else DB_DATETIME_FORMAT
+                    ),
+                ),
             )
             for row in results
         }

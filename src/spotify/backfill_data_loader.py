@@ -11,6 +11,7 @@ from menu_listener.progress_bar import (
     should_update_progress_bar,
     use_progress_bar,
 )
+from menu_listener.spinner import Spinner
 from spotify.spotify_client import SpotifyClient
 from spotify.types import Listen, Track, User
 from utils import clear_terminal
@@ -118,4 +119,5 @@ class BackfillDataLoader:
         pass
 
     def write_listens(self) -> None:
-        pass
+        with Spinner("\n\nWriting data to database..."):
+            self.db.upsert_full_backfill(list(self.listens))
