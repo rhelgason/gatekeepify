@@ -489,9 +489,6 @@ class Database:
 
         self.cursor.execute(query, (user_id, user_id, ts, ts))
         results = self.cursor.fetchall()
-        print()
-        print(results)
-        print()
         null_artists_row = "[[null,null,null]]"
         return {
             Listen(
