@@ -32,9 +32,7 @@ class BackfillDataLoader:
     listens_json: List[Dict[str, Any]]
 
     def __init__(self, is_test: bool = False) -> None:
-        self.client = SpotifyClient(
-            is_test=is_test
-        )
+        self.client = SpotifyClient(is_test=is_test)
         self.user = self.client.gen_current_user()
         self.db = Database(user=self.user, db_name=DB_TEST_NAME if is_test else DB_NAME)
         self.listens = set()
@@ -52,9 +50,7 @@ class BackfillDataLoader:
         self._load_listens()
 
     def _load_listens(self) -> None:
-        print(
-            "Loading data from local files..."
-        )
+        print("Loading data from local files...")
         self.listens_json = []
         for file in os.listdir(self.directory_path):
             if file.startswith(FILE_PREFIX) and file.endswith(FILE_SUFFIX):
@@ -114,6 +110,9 @@ class BackfillDataLoader:
                 use_progress_bar(progress, start, time())
         end = time()
         use_progress_bar(MAX_PERCENTAGE, start, end)
+
+        # TODO: add validations
+        # self.validate_listens()
 
     def validate_listens(self) -> None:
         pass

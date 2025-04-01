@@ -2,18 +2,10 @@ import json
 import os
 import sqlite3
 from datetime import datetime
-from time import time
 from typing import List, Optional, Set
 
 from db.constants import DB_DATETIME_FORMAT, DB_DIRECTORY, DB_NAME, LoggerAction
-from menu_listener.progress_bar import (
-    MAX_PERCENTAGE,
-    should_update_progress_bar,
-    use_progress_bar,
-)
 from spotify.types import Album, Artist, Listen, Track, User
-
-MAX_TRACKS_REQUEST = 50
 
 """
 Database setup for Gatekeepify. Currently includes the following tables:
@@ -178,7 +170,7 @@ class Database:
         self.__upsert_dim_all_users(all_users)
         self.__upsert_dim_all_listens(listens)
 
-    #upserts only users and listens table for data backfill
+    # upserts only users and listens table for data backfill
     def upsert_scheduled_backfill(self, listens: List[Listen]):
         all_users = set(listen.user for listen in listens)
         self.__upsert_dim_all_users(all_users)
@@ -186,7 +178,9 @@ class Database:
         log_json = {
             "listens": [listen.to_json_str() for listen in listens],
         }
-        self.__upsert_dim_all_logs(LoggerAction.RUN_SCHEDULED_BACKFILL, json.dumps(log_json))
+        self.__upsert_dim_all_logs(
+            LoggerAction.RUN_FULL_BACKFILL_JOB, json.dumps(log_json)
+        )
 
     # upserts all tables with logs for the current cron job
     def upsert_cron_backfill(self, listens: List[Listen]):
@@ -194,7 +188,9 @@ class Database:
         log_json = {
             "listens": [listen.to_json_str() for listen in listens],
         }
-        self.__upsert_dim_all_logs(LoggerAction.RUN_CRON_BACKFILL, json.dumps(log_json))
+        self.__upsert_dim_all_logs(
+            LoggerAction.RUN_RECENT_LISTENS_JOB, json.dumps(log_json)
+        )
 
     # upserts albums into dim_all_albums
     def __upsert_dim_all_albums(self, albums: Set[Album]):
@@ -369,7 +365,9 @@ class Database:
         INSERT INTO dim_all_logs (ts, user_id, action, metadata)
         VALUES (?, ?, ?, ?)
         """
-        self.cursor.execute(query, (datetime.now(), self.user.id, action.value, metadata))
+        self.cursor.execute(
+            query, (datetime.now(), self.user.id, action.value, metadata)
+        )
         self.conn.commit()
 
     """
@@ -383,22 +381,6 @@ class Database:
         self.cursor.execute(query)
         results = self.cursor.fetchall()
         return {Album(row[0], row[1]) for row in results}
-
-    def get_all_tracks_batched(self, track_ids: List[str]) -> Set[Track]:
-        # batch track requests by maximum request size
-        start = time()
-        num_tracks = len(track_ids)
-        tracks = set()
-        for i in range(0, len(track_ids), MAX_TRACKS_REQUEST):
-            res = self.get_all_tracks(track_ids[i : i + MAX_TRACKS_REQUEST])
-            if res:
-                tracks.update(res)
-            if should_update_progress_bar():
-                progress = int((i / num_tracks) * MAX_PERCENTAGE)
-                use_progress_bar(progress, start, time())
-        end = time()
-        use_progress_bar(MAX_PERCENTAGE, start, end)
-        return tracks
 
     def get_all_tracks(self, track_ids: Optional[List[str]] = None) -> Set[Track]:
         query = """

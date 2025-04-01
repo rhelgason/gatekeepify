@@ -66,4 +66,5 @@ def use_view_my_stats():
 
 def use_backfill_my_data():
     data_loader = BackfillDataLoader()
+    data_loader.write_listens()
     return 0

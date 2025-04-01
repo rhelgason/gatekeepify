@@ -7,6 +7,7 @@ DB_DATETIME_FORMAT = "%Y-%m-%d %H:%M:%S.%f"
 
 
 class LoggerAction(Enum):
+    # table upserts
     UPSERT_DIM_ALL_ALBUMS = "upsertDimAllAlbums"
     UPSERT_DIM_ALL_ARTISTS = "upsertDimAllArtists"
     UPSERT_DIM_ALL_TRACKS = "upsertDimAllTracks"
@@ -14,5 +15,9 @@ class LoggerAction(Enum):
     UPSERT_ARTIST_TO_GENRE = "upsertArtistToGenre"
     UPSERT_DIM_ALL_USERS = "upsertDimAllUsers"
     UPSERT_DIM_ALL_LISTENS = "upsertDimAllListens"
-    RUN_CRON_BACKFILL = "runCronBackfill"
-    RUN_SCHEDULED_BACKFILL = "runScheduledBackfill"
+    # cron or scheduled jobs
+    RUN_RECENT_LISTENS_JOB = "runRecentListensJob"
+    RUN_FULL_BACKFILL_JOB = "runFullBackfill"
+    RUN_LOAD_UNKNOWN_TRACKS_JOBS = "runUnknownTracksBackfill"
+    # errors
+    ERROR_TRACK_NOT_FOUND = "errorTrackNotFound"

@@ -23,10 +23,7 @@ class TestDatabase(unittest.TestCase):
     base_upsert_data: List[Listen]
 
     def setUp(self) -> None:
-        self.user = User(
-            id="123456789",
-            name="test user"
-        )
+        self.user = User(id="123456789", name="test user")
         self.db = Database(user=self.user, db_name=DB_TEST_NAME)
         self.artist_1 = Artist("345", "test artist", ["test genre", "test genre 2"])
         self.artist_2 = Artist("678", "test artist 2", ["test genre 2", "test genre 3"])

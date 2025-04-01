@@ -8,7 +8,7 @@ from constants import CLIENT_DATETIME_FORMAT, HOST_CONSTANTS_TEST_PATH
 from db.constants import DB_DIRECTORY, DB_TEST_NAME
 from db.Database import Database
 from spotify.backfill_data_loader import BackfillDataLoader, FILE_PREFIX, TEST_DIRECTORY
-from spotify.types import Album, Artist, Listen, Track, User
+from spotify.types import Listen, Track, User
 
 CLIENT_ID = "test_id"
 CLIENT_SECRET = "test_secret"
@@ -37,10 +37,7 @@ class TestBackfillDataLoader(unittest.TestCase):
 
     def setUp(self) -> None:
         # set up test database
-        self.user = User(
-            id="123456789",
-            name="test user"
-        )
+        self.user = User(id="123456789", name="test user")
         self.db = Database(user=self.user, db_name=DB_TEST_NAME)
         self.track_1 = Track(
             "123",
@@ -130,9 +127,7 @@ class TestBackfillDataLoader(unittest.TestCase):
                 """
             )
 
-    def test_full_backfill(
-        self, mock_getpass, mock_input, mock_current_user
-    ) -> None:
+    def test_full_backfill(self, mock_getpass, mock_input, mock_current_user) -> None:
         self.data_loader = BackfillDataLoader(is_test=True)
         self.assertEqual(len(self.data_loader.listens_json), 3)
         self.assertListEqual(
