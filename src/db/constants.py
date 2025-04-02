@@ -20,4 +20,4 @@ class LoggerAction(Enum):
     RUN_FULL_BACKFILL_JOB = "runFullBackfill"
     RUN_LOAD_UNKNOWN_TRACKS_JOBS = "runUnknownTracksBackfill"
     # errors
-    ERROR_TRACK_NOT_FOUND = "errorTrackNotFound"
+    ERROR_TRACKS_NOT_FOUND = "errorTrackNotFound"

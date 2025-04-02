@@ -183,7 +183,9 @@ class Database:
         )
 
     # upserts all tables with logs for the missing info job
-    def upsert_cron_tracks_missing_info(self, all_tracks: Set[Track]):
+    def upsert_cron_tracks_missing_info(
+        self, all_tracks: Set[Track], track_ids: Set[str]
+    ):
         all_albums = set([track.album for track in all_tracks])
         all_artists = set([artist for track in all_tracks for artist in track.artists])
 
@@ -197,6 +199,13 @@ class Database:
         }
         self.__upsert_dim_all_logs(
             LoggerAction.RUN_LOAD_UNKNOWN_TRACKS_JOBS, json.dumps(log_json)
+        )
+
+        # log track ids that were not returned from the API
+        not_found_track_ids = track_ids - {track.id for track in all_tracks}
+        self.__upsert_dim_all_logs(
+            LoggerAction.ERROR_TRACKS_NOT_FOUND,
+            json.dumps([{"id": track_id} for track_id in not_found_track_ids]),
         )
 
     # upserts all tables with logs for the recent listens job

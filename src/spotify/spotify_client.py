@@ -131,7 +131,7 @@ class SpotifyClient:
         if len(unknown_track_ids) == 0:
             return
         tracks = self.gen_tracks(list(unknown_track_ids))
-        self.db.upsert_cron_tracks_missing_info(tracks)
+        self.db.upsert_cron_tracks_missing_info(tracks, unknown_track_ids)
 
     def gen_all_listens(self, ds: Optional[datetime]) -> Set[Listen]:
         return self.db.get_all_listens(self.user, ds)

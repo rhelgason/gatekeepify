@@ -1,3 +1,4 @@
+import json
 import os
 import unittest
 from datetime import datetime
@@ -5,7 +6,7 @@ from unittest.mock import patch
 
 from constants import CLIENT_DATETIME_FORMAT, HOST_CONSTANTS_TEST_PATH
 
-from db.constants import DB_DIRECTORY, DB_TEST_NAME
+from db.constants import DB_DIRECTORY, DB_TEST_NAME, LoggerAction
 from db.Database import Database
 from spotify.backfill_data_loader import BackfillDataLoader, FILE_PREFIX, TEST_DIRECTORY
 from spotify.types import Album, Artist, Listen, Track, User
@@ -67,9 +68,11 @@ class TestBackfillDataLoader(unittest.TestCase):
     artist_1: Artist
     track_1: Track
     track_2: Track
+    track_3: Track
     listen_1: Listen
     listen_2: Listen
     listen_3: Listen
+    listen_4: Listen
 
     def setUp(self) -> None:
         # set up test database
@@ -89,6 +92,10 @@ class TestBackfillDataLoader(unittest.TestCase):
             "456",
             "test track 2",
         )
+        self.track_3 = Track(
+            "789",
+            "test track 3",
+        )
         self.listen_1 = Listen(
             self.user,
             self.track_1,
@@ -103,6 +110,11 @@ class TestBackfillDataLoader(unittest.TestCase):
             self.user,
             self.track_1,
             datetime.strptime("2024-12-12T22:30:04.000000Z", CLIENT_DATETIME_FORMAT),
+        )
+        self.listen_4 = Listen(
+            self.user,
+            self.track_3,
+            datetime.strptime("2025-01-02T22:30:05.000000Z", CLIENT_DATETIME_FORMAT),
         )
         self.db.upsert_cron_recent_listens([self.listen_1])
 
@@ -149,6 +161,12 @@ class TestBackfillDataLoader(unittest.TestCase):
                         "ms_played": 3000,
                         "master_metadata_track_name": "test track 2",
                         "spotify_track_uri": "spotify:track:456"
+                    },
+                    {
+                        "ts": "2025-01-02T22:30:05Z",
+                        "ms_played": 45732,
+                        "master_metadata_track_name": "test track 3",
+                        "spotify_track_uri": "spotify:track:789"
                     }
                 ]
                 """
@@ -174,7 +192,7 @@ class TestBackfillDataLoader(unittest.TestCase):
     ) -> None:
         # assert json files are read correctly
         self.data_loader = BackfillDataLoader(is_test=True)
-        self.assertEqual(len(self.data_loader.listens_json), 3)
+        self.assertEqual(len(self.data_loader.listens_json), 4)
         self.assertListEqual(
             self.data_loader.listens_json,
             [
@@ -183,6 +201,12 @@ class TestBackfillDataLoader(unittest.TestCase):
                     "ms_played": 51555,
                     "master_metadata_track_name": "test track",
                     "spotify_track_uri": "spotify:track:123",
+                },
+                {
+                    "ts": "2025-01-02T22:30:05Z",
+                    "ms_played": 45732,
+                    "master_metadata_track_name": "test track 3",
+                    "spotify_track_uri": "spotify:track:789",
                 },
                 {
                     "ts": "2024-12-26T22:30:04Z",
@@ -200,7 +224,7 @@ class TestBackfillDataLoader(unittest.TestCase):
         )
 
         # assert listen objects are created correctly
-        self.assertEqual(len(self.data_loader.listens), 3)
+        self.assertEqual(len(self.data_loader.listens), 4)
         track_1_unknown = Track(
             self.track_1.id,
             self.track_1.name,
@@ -220,6 +244,7 @@ class TestBackfillDataLoader(unittest.TestCase):
                         track_1_unknown,
                         self.listen_3.ts,
                     ),
+                    self.listen_4,
                 ]
             ),
         )
@@ -233,7 +258,7 @@ class TestBackfillDataLoader(unittest.TestCase):
             [self.user],
         )
         all_listens = self.db.get_all_listens()
-        self.assertEqual(len(all_listens), 3)
+        self.assertEqual(len(all_listens), 4)
         self.assertEqual(
             sorted(list(all_listens)),
             sorted(
@@ -248,6 +273,14 @@ class TestBackfillDataLoader(unittest.TestCase):
                         self.listen_2.ts,
                     ),
                     self.listen_3,
+                    Listen(
+                        self.user,
+                        Track(
+                            self.track_3.id,
+                            "",
+                        ),
+                        self.listen_4.ts,
+                    ),
                 ]
             ),
         )
@@ -258,10 +291,10 @@ class TestBackfillDataLoader(unittest.TestCase):
         self.data_loader = BackfillDataLoader(is_test=True)
         self.data_loader.write_listens()
 
-        # missing track id is loaded from database
+        # missing track ids are loaded from database
         track_ids = self.db.get_track_ids_missing_info(10)
-        self.assertEqual(len(track_ids), 1)
-        self.assertEqual(track_ids, {self.track_2.id})
+        self.assertEqual(len(track_ids), 2)
+        self.assertEqual(track_ids, {self.track_2.id, self.track_3.id})
 
         # missing track info is loaded from spotify
         track_2_data = Track(
@@ -281,9 +314,11 @@ class TestBackfillDataLoader(unittest.TestCase):
             240000,
             False,
         )
-        self.db.upsert_cron_tracks_missing_info({track_2_data})
+        self.db.upsert_cron_tracks_missing_info(
+            {track_2_data}, {self.track_2.id, self.track_3.id}
+        )
         all_listens = self.db.get_all_listens()
-        self.assertEqual(len(all_listens), 3)
+        self.assertEqual(len(all_listens), 4)
         self.assertEqual(
             sorted(list(all_listens)),
             sorted(
@@ -295,9 +330,26 @@ class TestBackfillDataLoader(unittest.TestCase):
                         self.listen_2.ts,
                     ),
                     self.listen_3,
+                    Listen(
+                        self.user,
+                        Track(
+                            self.track_3.id,
+                            "",
+                        ),
+                        self.listen_4.ts,
+                    ),
                 ]
             ),
         )
+
+        # logs are written for track ids that are not found
+        query = """
+        SELECT metadata FROM dim_all_logs WHERE action = ?
+        """
+        self.db.cursor.execute(query, (LoggerAction.ERROR_TRACKS_NOT_FOUND.value,))
+        results = self.db.cursor.fetchall()
+        self.assertEqual(len(results), 1)
+        self.assertEqual(json.loads(results[0][0]), [{"id": self.track_3.id}])
 
     def tearDown(self) -> None:
         os.remove(os.path.join(TEST_DIRECTORY, TEST_FILE_1))
