@@ -49,3 +49,6 @@ coverage.xml
 # IDEs
 .idea/
 .vscode/
+
+# DS Store
+**/.DS_Store
