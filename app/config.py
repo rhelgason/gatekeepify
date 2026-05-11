@@ -11,6 +11,9 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     jwt_expiration_hours: int = 24 * 7
     encryption_key: str = ""
+    redis_url: str = "redis://localhost:6379/0"
+    poll_interval_seconds: int = 900
+    backfill_interval_seconds: int = 120
 
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 
