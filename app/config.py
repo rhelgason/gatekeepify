@@ -1,0 +1,18 @@
+from pydantic_settings import BaseSettings
+
+
+class Settings(BaseSettings):
+    database_url: str = "sqlite:///db/gatekeepify.db"
+    spotify_client_id: str = ""
+    spotify_client_secret: str = ""
+    spotify_redirect_uri: str = "http://localhost:8000/auth/callback"
+    spotify_scopes: str = "user-read-private user-read-email user-read-recently-played user-top-read"
+    jwt_secret: str = "dev-secret-change-in-production"
+    jwt_algorithm: str = "HS256"
+    jwt_expiration_hours: int = 24 * 7
+    encryption_key: str = ""
+
+    model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
+
+
+settings = Settings()

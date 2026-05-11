@@ -1,0 +1,109 @@
+import enum
+from datetime import datetime
+from typing import List, Optional
+
+from pydantic import BaseModel
+
+
+class TimePeriod(str, enum.Enum):
+    today = "today"
+    month = "month"
+    year = "year"
+    all = "all"
+
+
+class AlbumResponse(BaseModel):
+    album_id: str
+    album_name: Optional[str] = None
+
+    model_config = {"from_attributes": True}
+
+
+class ArtistResponse(BaseModel):
+    artist_id: str
+    artist_name: Optional[str] = None
+    genres: List[str] = []
+
+    model_config = {"from_attributes": True}
+
+
+class TrackResponse(BaseModel):
+    track_id: str
+    track_name: Optional[str] = None
+    album: Optional[AlbumResponse] = None
+    duration_ms: Optional[int] = None
+    is_local: Optional[bool] = None
+
+    model_config = {"from_attributes": True}
+
+
+class TopTrackEntry(BaseModel):
+    rank: int
+    track_id: str
+    track_name: Optional[str] = None
+    album_name: Optional[str] = None
+    listen_count: int
+    total_minutes: int
+
+
+class TopArtistEntry(BaseModel):
+    rank: int
+    artist_id: str
+    artist_name: Optional[str] = None
+    genres: List[str] = []
+    listen_count: int
+    total_minutes: int
+
+
+class TopGenreEntry(BaseModel):
+    rank: int
+    genre: str
+    listen_count: int
+    total_minutes: int
+
+
+class StatsResponse(BaseModel):
+    items: list
+    period: str
+    total_listens: int
+    total_minutes: int
+
+
+class WrappedResponse(BaseModel):
+    top_artists: List[TopArtistEntry]
+    top_tracks: List[TopTrackEntry]
+    top_genre: Optional[str] = None
+    total_minutes: int
+    year: Optional[int] = None
+
+
+class UserResponse(BaseModel):
+    user_id: str
+    user_name: Optional[str] = None
+    email: Optional[str] = None
+    created_at: Optional[datetime] = None
+
+    model_config = {"from_attributes": True}
+
+
+class AuthResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    user: UserResponse
+
+
+class AuthUrlResponse(BaseModel):
+    auth_url: str
+
+
+class BackfillUploadResponse(BaseModel):
+    total_listens_processed: int
+    total_listens_accepted: int
+    total_listens_rejected: int
+    rejection_reasons: dict
+
+
+class BackfillStatusResponse(BaseModel):
+    tracks_missing_metadata: int
+    total_listens: int
+    total_tracks: int
