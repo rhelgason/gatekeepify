@@ -13,6 +13,7 @@ from app.models import Album, Listen, ListenSource, Track, User
 from app.models import User as UserModel
 from app.routers.auth import get_current_user
 from app.schemas import BackfillStatusResponse, BackfillUploadResponse
+from app.services.audit import log_action
 
 router = APIRouter(prefix="/backfill", tags=["backfill"])
 
@@ -204,12 +205,24 @@ def upload_data_export(
 ):
 
     if not file.filename or not file.filename.endswith(".zip"):
+        log_action(
+            db, "backfill.upload",
+            user_id=user.user_id,
+            status="error",
+            details={"reason": "invalid_file_type", "filename": file.filename},
+        )
         raise HTTPException(
             status_code=400, detail="Please upload a ZIP file"
         )
 
     raw_listens = _extract_json_from_zip(file)
     if not raw_listens:
+        log_action(
+            db, "backfill.upload",
+            user_id=user.user_id,
+            status="error",
+            details={"reason": "no_streaming_history_files"},
+        )
         raise HTTPException(
             status_code=400,
             detail="No streaming history files found in the ZIP",
@@ -245,6 +258,17 @@ def upload_data_export(
         inserted += 1
 
     db.commit()
+
+    log_action(
+        db, "backfill.upload",
+        user_id=user.user_id,
+        details={
+            "total_processed": len(raw_listens),
+            "total_accepted": inserted,
+            "total_rejected": len(raw_listens) - len(accepted),
+            "rejection_reasons": rejection_reasons,
+        },
+    )
 
     return BackfillUploadResponse(
         total_listens_processed=len(raw_listens),

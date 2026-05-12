@@ -145,6 +145,26 @@ class FriendInvite(Base):
     accepted_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
 
 
+class AuditLog(Base):
+    __tablename__ = "audit_log"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    ts: Mapped[datetime] = mapped_column(DateTime)
+    user_id: Mapped[Optional[str]] = mapped_column(
+        String(255), ForeignKey("dim_all_users.user_id"), nullable=True
+    )
+    action: Mapped[str] = mapped_column(String(255), index=True)
+    entity_type: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    entity_id: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    details: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    status: Mapped[str] = mapped_column(String(50), default="success")
+
+    __table_args__ = (
+        Index("ix_audit_user_ts", "user_id", "ts"),
+        Index("ix_audit_action_ts", "action", "ts"),
+    )
+
+
 class JobRun(Base):
     __tablename__ = "job_runs"
 

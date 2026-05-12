@@ -31,6 +31,7 @@ The app is mid-migration from a local CLI tool to a web service. Both exist in t
 - `app/routers/backfill.py` -- ZIP upload with 5-layer fraud validation
 - `app/services/spotify.py` -- Multi-user Spotify API client + token encryption
 - `app/services/ingestion.py` -- Data upsert logic for all tables
+- `app/services/audit.py` -- `log_action()` writes to `audit_log` table + stdout
 - `app/routers/friends.py` -- Friend invites, acceptance, listing
 - `app/routers/gatekeep.py` -- Artist/track comparison, leaderboard, challenge cards
 - `app/celery_app.py` -- Celery config + beat schedule
@@ -47,6 +48,7 @@ The app is mid-migration from a local CLI tool to a web service. Both exist in t
 - `dim_all_listens` (composite PK: ts+user_id+track_id, **source**, **export_metadata**)
 - `friendships` (composite PK: user_id_1+user_id_2, created_at) -- both directions stored
 - `friend_invites` (id PK, from_user_id, invite_code UNIQUE, created_at, accepted_by_user_id, accepted_at)
+- `audit_log` (id PK, ts, user_id FK, **action** indexed, entity_type, entity_id, details JSON, status) -- indexes on (user_id, ts) and (action, ts)
 - `job_runs` (id PK, job_name, user_id, started_at, completed_at, status, record_count)
 
 Bold columns are new additions from the architecture overhaul.
@@ -157,6 +159,8 @@ The legacy `stat_viewer.py` loaded all listens into memory and used `Counter`. T
 - Spotify's `played_at` format (`%Y-%m-%dT%H:%M:%S.%fZ`) differs from the data export format (`%Y-%m-%dT%H:%M:%SZ`) -- both are handled
 - Tracks can exist in `dim_all_listens` with no corresponding `dim_all_tracks` row (from backfill imports). The `backfill_track_metadata` task finds these via LEFT JOIN + IS NULL
 - When two tracks share the same artist, SQLAlchemy needs a `db.flush()` between merges to avoid duplicate INSERT errors (fixed in `_upsert_track_and_relations`)
+- All user-facing actions are logged to the `audit_log` table via `log_action()`. Actions follow `module.verb` naming: `auth.callback`, `backfill.upload`, `friends.invite_created`, `friends.invite_accepted`, `gatekeep.artist_viewed`, `gatekeep.challenge_created`, `stats.top_tracks_viewed`, etc. Failures use status `"error"` or `"denied"` with details explaining why.
+- HTTP request logging (method, path, status, duration) goes to stdout via FastAPI middleware -- not to the database
 - The gatekeep queries use `SUM(CASE WHEN ... THEN 1 ELSE 0 END)` instead of `COUNT(*) FILTER (WHERE ...)` because SQLite doesn't support FILTER
 - Friendships are stored bidirectionally (two rows). If you add a friendship A↔B, insert both (A,B) and (B,A) rows. This makes querying simple but requires keeping both in sync
 - The leaderboard only counts "contested" artists (those with 2+ listeners in the friend group). An artist only you've listened to doesn't earn a crown

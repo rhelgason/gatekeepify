@@ -9,6 +9,7 @@ from app.config import settings
 from app.database import get_db
 from app.models import User
 from app.schemas import AuthResponse, AuthUrlResponse, UserResponse
+from app.services.audit import log_action
 from app.services.spotify import SpotifyService, encrypt_token
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -57,7 +58,12 @@ def login():
 def callback(code: str = Query(...), db: Session = Depends(get_db)):
     service = SpotifyService()
 
-    token_info = service.exchange_code(code)
+    try:
+        token_info = service.exchange_code(code)
+    except Exception as e:
+        log_action(db, "auth.callback", status="error", details={"error": str(e)})
+        raise HTTPException(status_code=400, detail="Failed to exchange auth code")
+
     access_token = token_info["access_token"]
     refresh_token = token_info.get("refresh_token", "")
 
@@ -66,6 +72,7 @@ def callback(code: str = Query(...), db: Session = Depends(get_db)):
     display_name = spotify_user.get("display_name", "")
     email = spotify_user.get("email")
 
+    is_new = False
     user = db.query(User).filter(User.user_id == user_id).first()
     if user:
         user.user_name = display_name
@@ -73,6 +80,7 @@ def callback(code: str = Query(...), db: Session = Depends(get_db)):
         if refresh_token:
             user.spotify_refresh_token = encrypt_token(refresh_token)
     else:
+        is_new = True
         user = User(
             user_id=user_id,
             user_name=display_name,
@@ -83,6 +91,13 @@ def callback(code: str = Query(...), db: Session = Depends(get_db)):
         db.add(user)
     db.commit()
     db.refresh(user)
+
+    log_action(
+        db,
+        "auth.callback",
+        user_id=user_id,
+        details={"is_new_user": is_new, "display_name": display_name},
+    )
 
     token = create_jwt(user_id)
     return AuthResponse(

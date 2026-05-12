@@ -20,6 +20,7 @@ from app.models import (
 from app.models import User as UserModel
 from app.routers.auth import get_current_user
 from app.routers.friends import get_friend_ids
+from app.services.audit import log_action
 from app.schemas import (
     ChallengeResponse,
     GatekeepArtistResponse,
@@ -121,6 +122,19 @@ def gatekeep_artist(
 
     entries = _build_gatekeep_entries(db, rows, "artist", artist_id)
 
+    winner_id = entries[0].user_id if entries else None
+    log_action(
+        db, "gatekeep.artist_viewed",
+        user_id=user.user_id,
+        entity_type="artist",
+        entity_id=artist_id,
+        details={
+            "artist_name": artist.artist_name,
+            "num_participants": len(entries),
+            "winner": winner_id,
+        },
+    )
+
     return GatekeepArtistResponse(
         artist_id=artist_id,
         artist_name=artist.artist_name,
@@ -163,6 +177,19 @@ def gatekeep_track(
     rows = db.execute(stmt).all()
 
     entries = _build_gatekeep_entries(db, rows, "track", track_id)
+
+    winner_id = entries[0].user_id if entries else None
+    log_action(
+        db, "gatekeep.track_viewed",
+        user_id=user.user_id,
+        entity_type="track",
+        entity_id=track_id,
+        details={
+            "track_name": track.track_name,
+            "num_participants": len(entries),
+            "winner": winner_id,
+        },
+    )
 
     return GatekeepTrackResponse(
         track_id=track_id,
@@ -241,6 +268,15 @@ def leaderboard(
         for i, row in enumerate(rows)
     ]
 
+    log_action(
+        db, "gatekeep.leaderboard_viewed",
+        user_id=user.user_id,
+        details={
+            "total_artists_contested": contested_count,
+            "num_entries": len(entries),
+        },
+    )
+
     return LeaderboardResponse(
         entries=entries,
         total_artists_contested=contested_count,
@@ -270,6 +306,14 @@ def create_challenge(
     result = db.execute(stmt).first()
 
     if not result or not result.first_listen:
+        log_action(
+            db, "gatekeep.challenge_created",
+            user_id=user.user_id,
+            entity_type="artist",
+            entity_id=artist_id,
+            status="error",
+            details={"reason": "no_listening_data"},
+        )
         raise HTTPException(
             status_code=400,
             detail="You have no listening data for this artist",
@@ -284,6 +328,18 @@ def create_challenge(
         )
     )
     db.commit()
+
+    log_action(
+        db, "gatekeep.challenge_created",
+        user_id=user.user_id,
+        entity_type="artist",
+        entity_id=artist_id,
+        details={
+            "artist_name": artist.artist_name,
+            "total_listens": result.total_listens,
+            "invite_code": code,
+        },
+    )
 
     artist_name = artist.artist_name or "this artist"
     challenge_text = (

@@ -11,6 +11,7 @@ from app.models import FriendInvite, Friendship, User
 from app.models import User as UserModel
 from app.routers.auth import get_current_user
 from app.schemas import FriendResponse, InviteAcceptResponse, InviteResponse
+from app.services.audit import log_action
 
 router = APIRouter(prefix="/friends", tags=["friends"])
 
@@ -65,6 +66,13 @@ def create_invite(
     )
     db.add(invite)
     db.commit()
+
+    log_action(
+        db, "friends.invite_created",
+        user_id=user.user_id,
+        entity_type="invite",
+        entity_id=code,
+    )
     return InviteResponse(invite_code=code)
 
 
@@ -81,12 +89,36 @@ def accept_invite(
         .first()
     )
     if not invite:
+        log_action(
+            db, "friends.invite_accepted",
+            user_id=user.user_id,
+            entity_type="invite",
+            entity_id=invite_code,
+            status="error",
+            details={"reason": "not_found"},
+        )
         raise HTTPException(status_code=404, detail="Invite not found")
 
     if invite.accepted_by_user_id is not None:
+        log_action(
+            db, "friends.invite_accepted",
+            user_id=user.user_id,
+            entity_type="invite",
+            entity_id=invite_code,
+            status="denied",
+            details={"reason": "already_used"},
+        )
         raise HTTPException(status_code=400, detail="Invite already used")
 
     if invite.from_user_id == user.user_id:
+        log_action(
+            db, "friends.invite_accepted",
+            user_id=user.user_id,
+            entity_type="invite",
+            entity_id=invite_code,
+            status="denied",
+            details={"reason": "self_accept"},
+        )
         raise HTTPException(status_code=400, detail="Cannot accept your own invite")
 
     existing = db.execute(
@@ -96,6 +128,14 @@ def accept_invite(
         )
     ).first()
     if existing:
+        log_action(
+            db, "friends.invite_accepted",
+            user_id=user.user_id,
+            entity_type="invite",
+            entity_id=invite_code,
+            status="denied",
+            details={"reason": "already_friends", "friend_id": invite.from_user_id},
+        )
         raise HTTPException(status_code=400, detail="Already friends")
 
     now = datetime.now(timezone.utc)
@@ -109,11 +149,27 @@ def accept_invite(
         .values(accepted_by_user_id=user.user_id, accepted_at=now)
     )
     if result.rowcount == 0:
+        log_action(
+            db, "friends.invite_accepted",
+            user_id=user.user_id,
+            entity_type="invite",
+            entity_id=invite_code,
+            status="denied",
+            details={"reason": "race_condition"},
+        )
         raise HTTPException(status_code=400, detail="Invite already used")
 
     db.add(Friendship(user_id_1=user.user_id, user_id_2=invite.from_user_id, created_at=now))
     db.add(Friendship(user_id_1=invite.from_user_id, user_id_2=user.user_id, created_at=now))
     db.commit()
+
+    log_action(
+        db, "friends.invite_accepted",
+        user_id=user.user_id,
+        entity_type="invite",
+        entity_id=invite_code,
+        details={"friend_id": invite.from_user_id},
+    )
 
     sender = db.query(User).filter(User.user_id == invite.from_user_id).first()
     return InviteAcceptResponse(

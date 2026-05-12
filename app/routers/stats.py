@@ -18,6 +18,7 @@ from app.models import (
 )
 from app.models import User as UserModel
 from app.routers.auth import get_current_user
+from app.services.audit import log_action
 from app.schemas import (
     TimePeriod,
     TopArtistEntry,
@@ -223,7 +224,10 @@ def top_tracks(
     db: Session = Depends(get_db),
 ):
     since = _period_to_since(period)
-    return _get_top_tracks(db, user.user_id, since, _clamp_limit(limit), offset)
+    results = _get_top_tracks(db, user.user_id, since, _clamp_limit(limit), offset)
+    log_action(db, "stats.top_tracks_viewed", user_id=user.user_id,
+               details={"period": period.value, "limit": limit, "offset": offset, "results": len(results)})
+    return results
 
 
 @router.get("/top-artists", response_model=List[TopArtistEntry])
@@ -235,7 +239,10 @@ def top_artists(
     db: Session = Depends(get_db),
 ):
     since = _period_to_since(period)
-    return _get_top_artists(db, user.user_id, since, _clamp_limit(limit), offset)
+    results = _get_top_artists(db, user.user_id, since, _clamp_limit(limit), offset)
+    log_action(db, "stats.top_artists_viewed", user_id=user.user_id,
+               details={"period": period.value, "limit": limit, "offset": offset, "results": len(results)})
+    return results
 
 
 @router.get("/top-genres", response_model=List[TopGenreEntry])
@@ -247,7 +254,10 @@ def top_genres(
     db: Session = Depends(get_db),
 ):
     since = _period_to_since(period)
-    return _get_top_genres(db, user.user_id, since, _clamp_limit(limit), offset)
+    results = _get_top_genres(db, user.user_id, since, _clamp_limit(limit), offset)
+    log_action(db, "stats.top_genres_viewed", user_id=user.user_id,
+               details={"period": period.value, "limit": limit, "offset": offset, "results": len(results)})
+    return results
 
 
 @router.get("/wrapped", response_model=WrappedResponse)
@@ -267,6 +277,9 @@ def wrapped(
     top_artists = _get_top_artists(db, user.user_id, since, WRAPPED_LIMIT)
     top_genres = _get_top_genres(db, user.user_id, since, 1)
     total_minutes = _get_total_minutes(db, user.user_id, since)
+
+    log_action(db, "stats.wrapped_viewed", user_id=user.user_id,
+               details={"year": year, "total_minutes": total_minutes})
 
     return WrappedResponse(
         top_artists=top_artists,
