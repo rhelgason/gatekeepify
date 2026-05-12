@@ -3,6 +3,8 @@ from datetime import datetime, timezone
 from jose import jwt
 
 from app.config import settings
+from sqlalchemy import update
+
 from app.models import FriendInvite, Friendship, User
 
 
@@ -79,6 +81,39 @@ class TestAcceptInvite:
     def test_cannot_accept_nonexistent_invite(self, client, seeded_db, auth_headers):
         resp = client.post("/friends/accept/fake_code", headers=auth_headers)
         assert resp.status_code == 404
+
+    def test_atomic_claim_prevents_race(self, client, seeded_db, auth_headers):
+        """Simulate a race: another user claims the invite between SELECT and UPDATE."""
+        seeded_db.add(User(user_id="user_2", user_name="User Two"))
+        seeded_db.add(User(user_id="user_3", user_name="User Three"))
+        seeded_db.commit()
+
+        resp = client.post("/friends/invite", headers=auth_headers)
+        code = resp.json()["invite_code"]
+
+        # Simulate user_3 claiming the invite directly in the DB (as if a
+        # concurrent request completed between user_2's SELECT and UPDATE)
+        seeded_db.execute(
+            update(FriendInvite)
+            .where(FriendInvite.invite_code == code)
+            .values(
+                accepted_by_user_id="user_3",
+                accepted_at=datetime.now(timezone.utc),
+            )
+        )
+        seeded_db.commit()
+
+        # user_2's request should fail even though the initial SELECT would
+        # have seen accepted_by_user_id as NULL before the concurrent update
+        resp = client.post(f"/friends/accept/{code}", headers=_auth("user_2"))
+        assert resp.status_code == 400
+        assert "already used" in resp.json()["detail"].lower()
+
+        # No friendship should have been created for user_2
+        f = seeded_db.query(Friendship).filter(
+            Friendship.user_id_1 == "user_2"
+        ).first()
+        assert f is None
 
     def test_already_friends(self, client, seeded_db, auth_headers):
         seeded_db.add(User(user_id="user_2", user_name="User Two"))

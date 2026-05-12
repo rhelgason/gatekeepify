@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -92,11 +92,19 @@ def accept_invite(
 
     now = datetime.now(timezone.utc)
 
+    result = db.execute(
+        update(FriendInvite)
+        .where(
+            FriendInvite.id == invite.id,
+            FriendInvite.accepted_by_user_id.is_(None),
+        )
+        .values(accepted_by_user_id=user.user_id, accepted_at=now)
+    )
+    if result.rowcount == 0:
+        raise HTTPException(status_code=400, detail="Invite already used")
+
     db.add(Friendship(user_id_1=user.user_id, user_id_2=invite.from_user_id, created_at=now))
     db.add(Friendship(user_id_1=invite.from_user_id, user_id_2=user.user_id, created_at=now))
-
-    invite.accepted_by_user_id = user.user_id
-    invite.accepted_at = now
     db.commit()
 
     sender = db.query(User).filter(User.user_id == invite.from_user_id).first()
