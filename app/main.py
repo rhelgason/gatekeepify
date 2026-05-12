@@ -1,11 +1,17 @@
 import logging
 import time
+import traceback
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from sqlalchemy.exc import OperationalError, SQLAlchemyError
+from spotipy.exceptions import SpotifyException
+from spotipy.oauth2 import SpotifyOauthError
 
-from app.database import Base, engine
+from app.database import Base, SessionLocal, engine
 from app.routers import auth, backfill, friends, gatekeep, search, stats
+from app.services.audit import log_action
 
 logging.basicConfig(
     level=logging.INFO,
@@ -30,6 +36,81 @@ app.include_router(gatekeep.router)
 app.include_router(search.router)
 
 
+def _error_response(status_code: int, error: str, detail: str) -> JSONResponse:
+    return JSONResponse(
+        status_code=status_code,
+        content={"error": error, "detail": detail},
+    )
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    errors = []
+    for err in exc.errors():
+        field = " -> ".join(str(loc) for loc in err.get("loc", []))
+        errors.append(f"{field}: {err.get('msg', 'invalid')}")
+    detail = "; ".join(errors)
+    logger.warning(f"Validation error on {request.method} {request.url.path}: {detail}")
+    return _error_response(422, "validation_error", detail)
+
+
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request: Request, exc: HTTPException):
+    return _error_response(exc.status_code, "http_error", str(exc.detail))
+
+
+@app.exception_handler(OperationalError)
+async def database_exception_handler(request: Request, exc: OperationalError):
+    logger.error(f"Database error on {request.method} {request.url.path}: {exc}")
+    try:
+        db = SessionLocal()
+        log_action(
+            db, "system.database_error",
+            status="error",
+            details={"path": request.url.path, "error": str(exc)},
+        )
+        db.close()
+    except Exception:
+        pass
+    return _error_response(503, "database_error", "Database is temporarily unavailable")
+
+
+@app.exception_handler(SpotifyOauthError)
+async def spotify_oauth_exception_handler(request: Request, exc: SpotifyOauthError):
+    logger.error(f"Spotify OAuth error on {request.method} {request.url.path}: {exc}")
+    return _error_response(502, "spotify_auth_error", "Spotify authentication failed")
+
+
+@app.exception_handler(SpotifyException)
+async def spotify_api_exception_handler(request: Request, exc: SpotifyException):
+    logger.error(f"Spotify API error on {request.method} {request.url.path}: {exc}")
+    return _error_response(502, "spotify_api_error", "Spotify API request failed")
+
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception):
+    logger.error(
+        f"Unhandled exception on {request.method} {request.url.path}: {exc}\n"
+        f"{traceback.format_exc()}"
+    )
+    try:
+        db = SessionLocal()
+        log_action(
+            db, "system.unhandled_error",
+            status="error",
+            details={
+                "path": request.url.path,
+                "method": request.method,
+                "error_type": type(exc).__name__,
+                "error": str(exc),
+            },
+        )
+        db.close()
+    except Exception:
+        pass
+    return _error_response(500, "internal_error", "Internal server error")
+
+
 @app.middleware("http")
 async def request_logging_middleware(request: Request, call_next):
     start = time.time()
@@ -46,12 +127,6 @@ async def request_logging_middleware(request: Request, call_next):
         f"{request.method} {request.url.path} -> {response.status_code} ({duration:.3f}s)"
     )
     return response
-
-
-@app.exception_handler(Exception)
-async def unhandled_exception_handler(request: Request, exc: Exception):
-    logger.error(f"Unhandled exception on {request.method} {request.url.path}: {exc}")
-    return JSONResponse(status_code=500, content={"detail": "Internal server error"})
 
 
 @app.get("/health")

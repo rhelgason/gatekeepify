@@ -5,6 +5,11 @@ from typing import List, Optional
 from pydantic import BaseModel
 
 
+class ErrorResponse(BaseModel):
+    error: str
+    detail: str
+
+
 class TimePeriod(str, enum.Enum):
     today = "today"
     month = "month"
