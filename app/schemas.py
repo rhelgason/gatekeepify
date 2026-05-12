@@ -164,6 +164,24 @@ class LeaderboardResponse(BaseModel):
     total_artists_contested: int
 
 
+# --- Search ---
+
+
+class ArtistSearchResult(BaseModel):
+    artist_id: str
+    artist_name: Optional[str] = None
+    genres: List[str] = []
+    your_listen_count: int
+
+
+class TrackSearchResult(BaseModel):
+    track_id: str
+    track_name: Optional[str] = None
+    album_name: Optional[str] = None
+    artist_names: List[str] = []
+    your_listen_count: int
+
+
 class ChallengeResponse(BaseModel):
     challenge_text: str
     invite_code: str

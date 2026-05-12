@@ -5,7 +5,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
 from app.database import Base, engine
-from app.routers import auth, backfill, friends, gatekeep, stats
+from app.routers import auth, backfill, friends, gatekeep, search, stats
 
 logging.basicConfig(
     level=logging.INFO,
@@ -27,6 +27,7 @@ app.include_router(stats.router)
 app.include_router(backfill.router)
 app.include_router(friends.router)
 app.include_router(gatekeep.router)
+app.include_router(search.router)
 
 
 @app.middleware("http")
