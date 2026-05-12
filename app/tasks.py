@@ -12,6 +12,7 @@ from app.services.ingestion import (
     get_active_users,
     get_tracks_missing_metadata,
     log_job_run,
+    retroactively_validate_export_listens,
     upsert_from_recent_listens,
     upsert_track_metadata,
 )
@@ -133,6 +134,12 @@ def backfill_track_metadata():
         count = 0
         if items:
             count = upsert_track_metadata(db, items)
+
+        removed = retroactively_validate_export_listens(db, missing)
+        if removed:
+            logger.info(
+                f"Removed {removed} export listens that predate track release dates"
+            )
 
         log_job_run(
             db,

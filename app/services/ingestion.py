@@ -131,6 +131,51 @@ def _upsert_track_and_relations(db: Session, track_data: dict) -> None:
     db.flush()
 
 
+def retroactively_validate_export_listens(
+    db: Session, track_ids: Set[str]
+) -> int:
+    if not track_ids:
+        return 0
+
+    stmt = (
+        select(Track.track_id, Album.release_date)
+        .join(Album, Track.album_id == Album.album_id)
+        .where(
+            Track.track_id.in_(list(track_ids)),
+            Album.release_date.isnot(None),
+        )
+    )
+    track_release_dates: dict[str, datetime] = {}
+    for row in db.execute(stmt).all():
+        track_release_dates[row.track_id] = datetime(
+            row.release_date.year, row.release_date.month, row.release_date.day
+        )
+
+    if not track_release_dates:
+        return 0
+
+    removed = 0
+    for track_id, release_dt in track_release_dates.items():
+        invalid = (
+            db.execute(
+                select(Listen).where(
+                    Listen.track_id == track_id,
+                    Listen.source == ListenSource.export.value,
+                    Listen.ts < release_dt,
+                )
+            )
+            .scalars()
+            .all()
+        )
+        for listen in invalid:
+            db.delete(listen)
+            removed += 1
+
+    if removed:
+        db.commit()
+    return removed
+
+
 def get_tracks_missing_metadata(db: Session, limit: int = 50) -> Set[str]:
     stmt = (
         select(Listen.track_id, func.count().label("cnt"))

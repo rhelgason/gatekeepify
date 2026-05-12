@@ -16,6 +16,7 @@ from app.services.ingestion import (
     get_active_users,
     get_tracks_missing_metadata,
     parse_release_date,
+    retroactively_validate_export_listens,
     upsert_from_recent_listens,
     upsert_track_metadata,
 )
@@ -288,6 +289,92 @@ class TestGetTracksMissingMetadata:
 
         missing = get_tracks_missing_metadata(db)
         assert len(missing) == 0
+
+
+class TestRetroactiveValidation:
+    def test_removes_export_listen_before_release_date(self, db):
+        db.add(User(user_id="usr_1", user_name="User"))
+        db.add(Album(album_id="alb_1", album_name="Album", release_date=date(2022, 6, 1)))
+        db.add(Track(track_id="trk_1", track_name="Track", album_id="alb_1"))
+        db.add(Listen(
+            ts=datetime(2020, 1, 1), user_id="usr_1", track_id="trk_1",
+            source=ListenSource.export.value,
+        ))
+        db.commit()
+
+        removed = retroactively_validate_export_listens(db, {"trk_1"})
+        assert removed == 1
+        assert db.query(Listen).count() == 0
+
+    def test_keeps_export_listen_after_release_date(self, db):
+        db.add(User(user_id="usr_1", user_name="User"))
+        db.add(Album(album_id="alb_1", album_name="Album", release_date=date(2020, 1, 1)))
+        db.add(Track(track_id="trk_1", track_name="Track", album_id="alb_1"))
+        db.add(Listen(
+            ts=datetime(2022, 6, 1), user_id="usr_1", track_id="trk_1",
+            source=ListenSource.export.value,
+        ))
+        db.commit()
+
+        removed = retroactively_validate_export_listens(db, {"trk_1"})
+        assert removed == 0
+        assert db.query(Listen).count() == 1
+
+    def test_does_not_remove_api_sourced_listens(self, db):
+        db.add(User(user_id="usr_1", user_name="User"))
+        db.add(Album(album_id="alb_1", album_name="Album", release_date=date(2022, 6, 1)))
+        db.add(Track(track_id="trk_1", track_name="Track", album_id="alb_1"))
+        db.add(Listen(
+            ts=datetime(2020, 1, 1), user_id="usr_1", track_id="trk_1",
+            source=ListenSource.api.value,
+        ))
+        db.commit()
+
+        removed = retroactively_validate_export_listens(db, {"trk_1"})
+        assert removed == 0
+        assert db.query(Listen).count() == 1
+
+    def test_skips_tracks_without_release_date(self, db):
+        db.add(User(user_id="usr_1", user_name="User"))
+        db.add(Album(album_id="alb_1", album_name="Album", release_date=None))
+        db.add(Track(track_id="trk_1", track_name="Track", album_id="alb_1"))
+        db.add(Listen(
+            ts=datetime(2020, 1, 1), user_id="usr_1", track_id="trk_1",
+            source=ListenSource.export.value,
+        ))
+        db.commit()
+
+        removed = retroactively_validate_export_listens(db, {"trk_1"})
+        assert removed == 0
+        assert db.query(Listen).count() == 1
+
+    def test_handles_empty_track_ids(self, db):
+        removed = retroactively_validate_export_listens(db, set())
+        assert removed == 0
+
+    def test_removes_only_invalid_from_mixed_batch(self, db):
+        db.add(User(user_id="usr_1", user_name="User"))
+        db.add(Album(album_id="alb_1", album_name="Album 1", release_date=date(2022, 1, 1)))
+        db.add(Album(album_id="alb_2", album_name="Album 2", release_date=date(2020, 1, 1)))
+        db.add(Track(track_id="trk_1", track_name="Track 1", album_id="alb_1"))
+        db.add(Track(track_id="trk_2", track_name="Track 2", album_id="alb_2"))
+        # trk_1 listen is before release (invalid)
+        db.add(Listen(
+            ts=datetime(2021, 6, 1), user_id="usr_1", track_id="trk_1",
+            source=ListenSource.export.value,
+        ))
+        # trk_2 listen is after release (valid)
+        db.add(Listen(
+            ts=datetime(2023, 6, 1), user_id="usr_1", track_id="trk_2",
+            source=ListenSource.export.value,
+        ))
+        db.commit()
+
+        removed = retroactively_validate_export_listens(db, {"trk_1", "trk_2"})
+        assert removed == 1
+        remaining = db.query(Listen).all()
+        assert len(remaining) == 1
+        assert remaining[0].track_id == "trk_2"
 
 
 class TestGetActiveUsers:
