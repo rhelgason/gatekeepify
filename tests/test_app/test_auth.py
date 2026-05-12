@@ -7,15 +7,15 @@ from app.models import User
 
 
 class TestAuthMe:
-    def test_get_me(self, client, seeded_db, test_user_token):
-        resp = client.get("/auth/me", params={"token": test_user_token})
+    def test_get_me(self, client, seeded_db, auth_headers):
+        resp = client.get("/auth/me", headers=auth_headers)
         assert resp.status_code == 200
         data = resp.json()
         assert data["user_id"] == "test_user_1"
         assert data["user_name"] == "Test User"
 
     def test_get_me_invalid_token(self, client, seeded_db):
-        resp = client.get("/auth/me", params={"token": "garbage"})
+        resp = client.get("/auth/me", headers={"Authorization": "Bearer garbage"})
         assert resp.status_code == 401
 
     def test_get_me_expired_token(self, client, seeded_db):
@@ -27,7 +27,7 @@ class TestAuthMe:
         token = jwt.encode(
             payload, settings.jwt_secret, algorithm=settings.jwt_algorithm
         )
-        resp = client.get("/auth/me", params={"token": token})
+        resp = client.get("/auth/me", headers={"Authorization": f"Bearer {token}"})
         assert resp.status_code == 401
 
     def test_get_me_nonexistent_user(self, client, db):
@@ -39,8 +39,12 @@ class TestAuthMe:
         token = jwt.encode(
             payload, settings.jwt_secret, algorithm=settings.jwt_algorithm
         )
-        resp = client.get("/auth/me", params={"token": token})
+        resp = client.get("/auth/me", headers={"Authorization": f"Bearer {token}"})
         assert resp.status_code == 401
+
+    def test_get_me_no_auth_header(self, client, seeded_db):
+        resp = client.get("/auth/me")
+        assert resp.status_code in (401, 403)
 
 
 class TestAuthLogin:

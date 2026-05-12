@@ -33,7 +33,7 @@ def _make_listen_json(
 
 
 class TestBackfillUpload:
-    def test_upload_valid_zip(self, client, seeded_db, test_user_token):
+    def test_upload_valid_zip(self, client, seeded_db, auth_headers):
         listens = [
             _make_listen_json("new_track_1", "New Track 1", "2024-01-01T10:00:00Z"),
             _make_listen_json("new_track_2", "New Track 2", "2024-01-02T10:00:00Z"),
@@ -41,7 +41,7 @@ class TestBackfillUpload:
         zip_buf = _make_zip({"Streaming_History_Audio_0.json": listens})
         resp = client.post(
             "/backfill/upload",
-            params={"token": test_user_token},
+            headers=auth_headers,
             files={"file": ("data.zip", zip_buf, "application/zip")},
         )
         assert resp.status_code == 200
@@ -50,7 +50,7 @@ class TestBackfillUpload:
         assert data["total_listens_accepted"] == 2
         assert data["total_listens_rejected"] == 0
 
-    def test_upload_filters_short_listens(self, client, seeded_db, test_user_token):
+    def test_upload_filters_short_listens(self, client, seeded_db, auth_headers):
         listens = [
             _make_listen_json(ms_played=5000),
             _make_listen_json(track_id="valid", ms_played=60000),
@@ -58,14 +58,14 @@ class TestBackfillUpload:
         zip_buf = _make_zip({"Streaming_History_Audio_0.json": listens})
         resp = client.post(
             "/backfill/upload",
-            params={"token": test_user_token},
+            headers=auth_headers,
             files={"file": ("data.zip", zip_buf, "application/zip")},
         )
         data = resp.json()
         assert data["total_listens_accepted"] == 1
         assert data["rejection_reasons"]["too_short"] == 1
 
-    def test_upload_filters_null_uri(self, client, seeded_db, test_user_token):
+    def test_upload_filters_null_uri(self, client, seeded_db, auth_headers):
         listens = [
             {
                 "ts": "2024-01-01T10:00:00Z",
@@ -77,14 +77,14 @@ class TestBackfillUpload:
         zip_buf = _make_zip({"Streaming_History_Audio_0.json": listens})
         resp = client.post(
             "/backfill/upload",
-            params={"token": test_user_token},
+            headers=auth_headers,
             files={"file": ("data.zip", zip_buf, "application/zip")},
         )
         data = resp.json()
         assert data["total_listens_accepted"] == 0
         assert data["rejection_reasons"]["no_track_uri"] == 1
 
-    def test_upload_ignores_non_audio_files(self, client, seeded_db, test_user_token):
+    def test_upload_ignores_non_audio_files(self, client, seeded_db, auth_headers):
         audio_listens = [_make_listen_json()]
         other_data = [{"some": "data"}]
         zip_buf = _make_zip(
@@ -95,18 +95,18 @@ class TestBackfillUpload:
         )
         resp = client.post(
             "/backfill/upload",
-            params={"token": test_user_token},
+            headers=auth_headers,
             files={"file": ("data.zip", zip_buf, "application/zip")},
         )
         data = resp.json()
         assert data["total_listens_processed"] == 1
 
-    def test_upload_tags_source_as_export(self, client, seeded_db, test_user_token):
+    def test_upload_tags_source_as_export(self, client, seeded_db, auth_headers):
         listens = [_make_listen_json("export_track", "Export Track")]
         zip_buf = _make_zip({"Streaming_History_Audio_0.json": listens})
         client.post(
             "/backfill/upload",
-            params={"token": test_user_token},
+            headers=auth_headers,
             files={"file": ("data.zip", zip_buf, "application/zip")},
         )
         result = (
@@ -117,7 +117,7 @@ class TestBackfillUpload:
         assert result is not None
         assert result.source == ListenSource.export.value
 
-    def test_upload_stores_extra_metadata(self, client, seeded_db, test_user_token):
+    def test_upload_stores_extra_metadata(self, client, seeded_db, auth_headers):
         listens = [
             _make_listen_json(
                 "meta_track",
@@ -128,7 +128,7 @@ class TestBackfillUpload:
         zip_buf = _make_zip({"Streaming_History_Audio_0.json": listens})
         client.post(
             "/backfill/upload",
-            params={"token": test_user_token},
+            headers=auth_headers,
             files={"file": ("data.zip", zip_buf, "application/zip")},
         )
         result = (
@@ -141,12 +141,12 @@ class TestBackfillUpload:
         assert meta["platform"] == "iOS"
         assert meta["shuffle"] is True
 
-    def test_upload_creates_skeleton_tracks(self, client, seeded_db, test_user_token):
+    def test_upload_creates_skeleton_tracks(self, client, seeded_db, auth_headers):
         listens = [_make_listen_json("brand_new_track", "Brand New")]
         zip_buf = _make_zip({"Streaming_History_Audio_0.json": listens})
         client.post(
             "/backfill/upload",
-            params={"token": test_user_token},
+            headers=auth_headers,
             files={"file": ("data.zip", zip_buf, "application/zip")},
         )
         track = (
@@ -159,15 +159,15 @@ class TestBackfillUpload:
         assert track.album_id is None
         assert track.duration_ms is None
 
-    def test_upload_rejects_non_zip(self, client, seeded_db, test_user_token):
+    def test_upload_rejects_non_zip(self, client, seeded_db, auth_headers):
         resp = client.post(
             "/backfill/upload",
-            params={"token": test_user_token},
+            headers=auth_headers,
             files={"file": ("data.txt", b"not a zip", "text/plain")},
         )
         assert resp.status_code == 400
 
-    def test_upload_deduplicates(self, client, seeded_db, test_user_token):
+    def test_upload_deduplicates(self, client, seeded_db, auth_headers):
         listens = [
             _make_listen_json("dedup_track", "Dedup", "2024-01-01T10:00:00Z")
         ]
@@ -175,7 +175,7 @@ class TestBackfillUpload:
 
         resp1 = client.post(
             "/backfill/upload",
-            params={"token": test_user_token},
+            headers=auth_headers,
             files={"file": ("data.zip", zip_buf, "application/zip")},
         )
         assert resp1.json()["total_listens_accepted"] == 1
@@ -183,7 +183,7 @@ class TestBackfillUpload:
         zip_buf.seek(0)
         resp2 = client.post(
             "/backfill/upload",
-            params={"token": test_user_token},
+            headers=auth_headers,
             files={"file": ("data.zip", zip_buf, "application/zip")},
         )
         assert resp2.json()["total_listens_accepted"] == 0
@@ -191,7 +191,7 @@ class TestBackfillUpload:
 
 class TestBackfillReleaseDate:
     def test_rejects_listen_before_release_date(
-        self, client, seeded_db, test_user_token
+        self, client, seeded_db, auth_headers
     ):
         from datetime import date
 
@@ -201,19 +201,18 @@ class TestBackfillReleaseDate:
         album.release_date = date(2024, 6, 1)
         seeded_db.commit()
 
-        # Listen before release date should be rejected
         listens = [_make_listen_json("track_1", "Paranoid Android", "2024-01-01T10:00:00Z")]
         zip_buf = _make_zip({"Streaming_History_Audio_0.json": listens})
         resp = client.post(
             "/backfill/upload",
-            params={"token": test_user_token},
+            headers=auth_headers,
             files={"file": ("data.zip", zip_buf, "application/zip")},
         )
         data = resp.json()
         assert data["rejection_reasons"].get("before_release_date", 0) == 1
 
     def test_accepts_listen_after_release_date(
-        self, client, seeded_db, test_user_token
+        self, client, seeded_db, auth_headers
     ):
         from datetime import date
 
@@ -227,7 +226,7 @@ class TestBackfillReleaseDate:
         zip_buf = _make_zip({"Streaming_History_Audio_0.json": listens})
         resp = client.post(
             "/backfill/upload",
-            params={"token": test_user_token},
+            headers=auth_headers,
             files={"file": ("data.zip", zip_buf, "application/zip")},
         )
         data = resp.json()
@@ -235,8 +234,8 @@ class TestBackfillReleaseDate:
 
 
 class TestBackfillStatus:
-    def test_status(self, client, seeded_db, test_user_token):
-        resp = client.get("/backfill/status", params={"token": test_user_token})
+    def test_status(self, client, seeded_db, auth_headers):
+        resp = client.get("/backfill/status", headers=auth_headers)
         assert resp.status_code == 200
         data = resp.json()
         assert data["total_listens"] == 6

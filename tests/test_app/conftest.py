@@ -78,6 +78,11 @@ def test_user_token(test_user) -> str:
 
 
 @pytest.fixture()
+def auth_headers(test_user_token) -> dict:
+    return {"Authorization": f"Bearer {test_user_token}"}
+
+
+@pytest.fixture()
 def seeded_db(db, test_user):
     """Seed the DB with albums, tracks, artists, genres, and listens."""
     albums = [

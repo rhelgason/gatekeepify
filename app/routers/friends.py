@@ -8,7 +8,8 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import FriendInvite, Friendship, User
-from app.routers.auth import get_current_user_from_token
+from app.models import User as UserModel
+from app.routers.auth import get_current_user
 from app.schemas import FriendResponse, InviteAcceptResponse, InviteResponse
 
 router = APIRouter(prefix="/friends", tags=["friends"])
@@ -23,10 +24,9 @@ def get_friend_ids(db: Session, user_id: str) -> List[str]:
 
 @router.get("", response_model=List[FriendResponse])
 def list_friends(
-    token: str = Query(...),
+    user: UserModel = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    user = get_current_user_from_token(token, db)
     stmt = (
         select(Friendship.user_id_2, User.user_name, Friendship.created_at)
         .join(User, Friendship.user_id_2 == User.user_id)
@@ -46,10 +46,9 @@ def list_friends(
 
 @router.post("/invite", response_model=InviteResponse)
 def create_invite(
-    token: str = Query(...),
+    user: UserModel = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    user = get_current_user_from_token(token, db)
     code = secrets.token_urlsafe(16)
     invite = FriendInvite(
         from_user_id=user.user_id,
@@ -64,10 +63,9 @@ def create_invite(
 @router.post("/accept/{invite_code}", response_model=InviteAcceptResponse)
 def accept_invite(
     invite_code: str,
-    token: str = Query(...),
+    user: UserModel = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    user = get_current_user_from_token(token, db)
 
     invite = (
         db.query(FriendInvite)

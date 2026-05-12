@@ -17,7 +17,8 @@ from app.models import (
     TrackArtist,
     User,
 )
-from app.routers.auth import get_current_user_from_token
+from app.models import User as UserModel
+from app.routers.auth import get_current_user
 from app.routers.friends import get_friend_ids
 from app.schemas import (
     ChallengeResponse,
@@ -85,10 +86,9 @@ def _build_gatekeep_entries(
 @router.get("/artist/{artist_id}", response_model=GatekeepArtistResponse)
 def gatekeep_artist(
     artist_id: str,
-    token: str = Query(...),
+    user: UserModel = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    user = get_current_user_from_token(token, db)
 
     artist = db.query(Artist).filter(Artist.artist_id == artist_id).first()
     if not artist:
@@ -131,10 +131,9 @@ def gatekeep_artist(
 @router.get("/track/{track_id}", response_model=GatekeepTrackResponse)
 def gatekeep_track(
     track_id: str,
-    token: str = Query(...),
+    user: UserModel = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    user = get_current_user_from_token(token, db)
 
     track = db.query(Track).filter(Track.track_id == track_id).first()
     if not track:
@@ -174,10 +173,9 @@ def gatekeep_track(
 
 @router.get("/leaderboard", response_model=LeaderboardResponse)
 def leaderboard(
-    token: str = Query(...),
+    user: UserModel = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    user = get_current_user_from_token(token, db)
     friend_ids = get_friend_ids(db, user.user_id)
     group_ids = [user.user_id] + friend_ids
 
@@ -248,10 +246,9 @@ def leaderboard(
 @router.post("/challenge", response_model=ChallengeResponse)
 def create_challenge(
     artist_id: str = Query(...),
-    token: str = Query(...),
+    user: UserModel = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    user = get_current_user_from_token(token, db)
 
     artist = db.query(Artist).filter(Artist.artist_id == artist_id).first()
     if not artist:

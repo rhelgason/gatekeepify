@@ -10,7 +10,8 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import Album, Listen, ListenSource, Track, User
-from app.routers.auth import get_current_user_from_token
+from app.models import User as UserModel
+from app.routers.auth import get_current_user
 from app.schemas import BackfillStatusResponse, BackfillUploadResponse
 
 router = APIRouter(prefix="/backfill", tags=["backfill"])
@@ -198,10 +199,9 @@ def _get_api_listen_range(
 @router.post("/upload", response_model=BackfillUploadResponse)
 def upload_data_export(
     file: UploadFile,
-    token: str = Query(...),
+    user: UserModel = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    user = get_current_user_from_token(token, db)
 
     if not file.filename or not file.filename.endswith(".zip"):
         raise HTTPException(
@@ -256,10 +256,9 @@ def upload_data_export(
 
 @router.get("/status", response_model=BackfillStatusResponse)
 def backfill_status(
-    token: str = Query(...),
+    user: UserModel = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    user = get_current_user_from_token(token, db)
 
     missing_meta = db.execute(
         select(func.count(func.distinct(Listen.track_id)))

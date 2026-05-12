@@ -16,7 +16,8 @@ from app.models import (
     TrackArtist,
     User,
 )
-from app.routers.auth import get_current_user_from_token
+from app.models import User as UserModel
+from app.routers.auth import get_current_user
 from app.schemas import (
     TimePeriod,
     TopArtistEntry,
@@ -209,47 +210,44 @@ def _get_total_listens(
 
 @router.get("/top-tracks", response_model=List[TopTrackEntry])
 def top_tracks(
-    token: str = Query(...),
+    user: UserModel = Depends(get_current_user),
     period: TimePeriod = TimePeriod.all,
     limit: int = DEFAULT_LIMIT,
     db: Session = Depends(get_db),
 ):
-    user = get_current_user_from_token(token, db)
     since = _period_to_since(period)
     return _get_top_tracks(db, user.user_id, since, limit)
 
 
 @router.get("/top-artists", response_model=List[TopArtistEntry])
 def top_artists(
-    token: str = Query(...),
+    user: UserModel = Depends(get_current_user),
     period: TimePeriod = TimePeriod.all,
     limit: int = DEFAULT_LIMIT,
     db: Session = Depends(get_db),
 ):
-    user = get_current_user_from_token(token, db)
     since = _period_to_since(period)
     return _get_top_artists(db, user.user_id, since, limit)
 
 
 @router.get("/top-genres", response_model=List[TopGenreEntry])
 def top_genres(
-    token: str = Query(...),
+    user: UserModel = Depends(get_current_user),
     period: TimePeriod = TimePeriod.all,
     limit: int = DEFAULT_LIMIT,
     db: Session = Depends(get_db),
 ):
-    user = get_current_user_from_token(token, db)
     since = _period_to_since(period)
     return _get_top_genres(db, user.user_id, since, limit)
 
 
 @router.get("/wrapped", response_model=WrappedResponse)
 def wrapped(
-    token: str = Query(...),
+    user: UserModel = Depends(get_current_user),
     year: Optional[int] = None,
     db: Session = Depends(get_db),
 ):
-    user = get_current_user_from_token(token, db)
+
     if year:
         since = datetime(year, 1, 1, tzinfo=timezone.utc)
     else:

@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import jwt
 from sqlalchemy.orm import Session
 
@@ -8,9 +9,10 @@ from app.config import settings
 from app.database import get_db
 from app.models import User
 from app.schemas import AuthResponse, AuthUrlResponse, UserResponse
-from app.services.spotify import SpotifyService, encrypt_token, decrypt_token
+from app.services.spotify import SpotifyService, encrypt_token
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+security = HTTPBearer()
 
 
 def create_jwt(user_id: str) -> str:
@@ -24,15 +26,10 @@ def create_jwt(user_id: str) -> str:
 
 
 def get_current_user(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
     db: Session = Depends(get_db),
-    authorization: str = Depends(lambda: None),
 ) -> User:
-    raise HTTPException(status_code=401, detail="Not implemented as standalone")
-
-
-def get_current_user_from_token(
-    token: str, db: Session
-) -> User:
+    token = credentials.credentials
     try:
         payload = jwt.decode(
             token, settings.jwt_secret, algorithms=[settings.jwt_algorithm]
@@ -40,6 +37,8 @@ def get_current_user_from_token(
         user_id = payload.get("sub")
         if not user_id:
             raise HTTPException(status_code=401, detail="Invalid token")
+    except HTTPException:
+        raise
     except Exception:
         raise HTTPException(status_code=401, detail="Invalid token")
     user = db.query(User).filter(User.user_id == user_id).first()
@@ -98,8 +97,7 @@ def callback(code: str = Query(...), db: Session = Depends(get_db)):
 
 
 @router.get("/me", response_model=UserResponse)
-def get_me(token: str = Query(...), db: Session = Depends(get_db)):
-    user = get_current_user_from_token(token, db)
+def get_me(user: User = Depends(get_current_user)):
     return UserResponse(
         user_id=user.user_id,
         user_name=user.user_name,
