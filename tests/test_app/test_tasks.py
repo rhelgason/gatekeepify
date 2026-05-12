@@ -2,6 +2,7 @@ from datetime import datetime
 from unittest.mock import MagicMock, patch
 
 import pytest
+from spotipy.oauth2 import SpotifyOauthError
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
@@ -313,6 +314,123 @@ class TestBackfillTrackMetadataTask:
         backfill_track_metadata()
 
         mock_service.get_tracks.assert_not_called()
+
+        db.close()
+        Base.metadata.drop_all(bind=engine)
+
+
+class TestTokenRevocation:
+    def test_poll_deactivates_user_on_oauth_error(self, db):
+        user = User(
+            user_id="usr_revoked",
+            user_name="Revoked",
+            spotify_refresh_token="bad_token",
+        )
+        db.add(user)
+        db.commit()
+
+        mock_service = MagicMock()
+        mock_service.refresh_access_token.side_effect = SpotifyOauthError(
+            "invalid_grant: Refresh token revoked"
+        )
+
+        from app.tasks import _poll_single_user
+
+        with pytest.raises(SpotifyOauthError):
+            _poll_single_user(db, mock_service, user)
+
+    @patch("app.tasks.SessionLocal")
+    @patch("app.tasks.SpotifyService")
+    def test_poll_clears_token_and_continues(self, MockSpotifyService, MockSessionLocal):
+        Session, engine = _make_test_db()
+        db = Session()
+
+        db.add(User(user_id="u_bad", user_name="Bad Token", spotify_refresh_token="revoked"))
+        db.add(User(user_id="u_good", user_name="Good Token", spotify_refresh_token="valid"))
+        db.commit()
+
+        MockSessionLocal.return_value = db
+        mock_service = MagicMock()
+        MockSpotifyService.return_value = mock_service
+
+        call_count = [0]
+
+        def refresh_side_effect(token):
+            call_count[0] += 1
+            if call_count[0] == 1:
+                raise SpotifyOauthError("invalid_grant")
+            return {"access_token": "acc", "refresh_token": "valid"}
+
+        mock_service.refresh_access_token.side_effect = refresh_side_effect
+        mock_service.get_recent_listens.return_value = [
+            _spotify_listen_item("t1", "2024-06-15T10:00:00.000000Z"),
+        ]
+
+        poll_recent_listens()
+
+        bad_user = db.query(User).filter(User.user_id == "u_bad").first()
+        assert bad_user.spotify_refresh_token is None
+
+        good_user = db.query(User).filter(User.user_id == "u_good").first()
+        assert good_user.spotify_refresh_token == "valid"
+
+        assert db.query(Listen).count() == 1
+
+        jobs = db.query(JobRun).all()
+        statuses = {j.user_id: j.status for j in jobs}
+        assert statuses["u_bad"] == "token_revoked"
+        assert statuses["u_good"] == "success"
+
+        db.close()
+        Base.metadata.drop_all(bind=engine)
+
+    @patch("app.tasks.SessionLocal")
+    @patch("app.tasks.SpotifyService")
+    def test_backfill_falls_through_to_next_user(self, MockSpotifyService, MockSessionLocal):
+        Session, engine = _make_test_db()
+        db = Session()
+
+        db.add(User(user_id="u_bad", user_name="Bad", spotify_refresh_token="revoked"))
+        db.add(User(user_id="u_good", user_name="Good", spotify_refresh_token="valid"))
+        db.add(Track(track_id="trk_x", track_name=None))
+        db.add(Listen(ts=datetime(2024, 1, 1), user_id="u_good", track_id="trk_x", source="export"))
+        db.commit()
+
+        MockSessionLocal.return_value = db
+        mock_service = MagicMock()
+        MockSpotifyService.return_value = mock_service
+
+        call_count = [0]
+
+        def refresh_side_effect(token):
+            call_count[0] += 1
+            if call_count[0] == 1:
+                raise SpotifyOauthError("invalid_grant")
+            return {"access_token": "good_acc", "refresh_token": "valid"}
+
+        mock_service.refresh_access_token.side_effect = refresh_side_effect
+        mock_service.get_tracks.return_value = [
+            {
+                "track": {
+                    "id": "trk_x",
+                    "name": "Filled In",
+                    "album": {"id": "a1", "name": "Album", "release_date": "2023-01-01"},
+                    "artists": [{"id": "ar1", "name": "Artist", "genres": []}],
+                    "duration_ms": 200000,
+                    "is_local": False,
+                }
+            }
+        ]
+
+        backfill_track_metadata()
+
+        bad_user = db.query(User).filter(User.user_id == "u_bad").first()
+        assert bad_user.spotify_refresh_token is None
+
+        track = db.query(Track).filter(Track.track_id == "trk_x").first()
+        assert track.track_name == "Filled In"
+
+        mock_service.get_tracks.assert_called_once_with("good_acc", ["trk_x"])
 
         db.close()
         Base.metadata.drop_all(bind=engine)
