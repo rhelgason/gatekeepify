@@ -9,6 +9,8 @@ from sqlalchemy.exc import OperationalError, SQLAlchemyError
 from spotipy.exceptions import SpotifyException
 from spotipy.oauth2 import SpotifyOauthError
 
+from sqlalchemy import text
+
 from app.database import Base, SessionLocal, engine
 from app.routers import auth, backfill, friends, gatekeep, search, stats
 from app.services.audit import log_action
@@ -131,4 +133,16 @@ async def request_logging_middleware(request: Request, call_next):
 
 @app.get("/health")
 def health():
-    return {"status": "ok"}
+    checks = {"database": "ok"}
+    try:
+        db = SessionLocal()
+        db.execute(text("SELECT 1"))
+        db.close()
+    except Exception as e:
+        checks["database"] = f"error: {e}"
+        logger.error(f"Health check database failure: {e}")
+        return JSONResponse(
+            status_code=503,
+            content={"status": "degraded", "checks": checks},
+        )
+    return {"status": "ok", "checks": checks}
