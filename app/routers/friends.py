@@ -22,16 +22,24 @@ def get_friend_ids(db: Session, user_id: str) -> List[str]:
     return [row[0] for row in rows]
 
 
+MAX_LIMIT = 100
+
+
 @router.get("", response_model=List[FriendResponse])
 def list_friends(
     user: UserModel = Depends(get_current_user),
+    limit: int = 50,
+    offset: int = 0,
     db: Session = Depends(get_db),
 ):
+    clamped = max(1, min(limit, MAX_LIMIT))
     stmt = (
         select(Friendship.user_id_2, User.user_name, Friendship.created_at)
         .join(User, Friendship.user_id_2 == User.user_id)
         .where(Friendship.user_id_1 == user.user_id)
         .order_by(Friendship.created_at.desc())
+        .limit(clamped)
+        .offset(offset)
     )
     rows = db.execute(stmt).all()
     return [

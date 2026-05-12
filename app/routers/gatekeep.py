@@ -174,6 +174,8 @@ def gatekeep_track(
 @router.get("/leaderboard", response_model=LeaderboardResponse)
 def leaderboard(
     user: UserModel = Depends(get_current_user),
+    limit: int = 50,
+    offset: int = 0,
     db: Session = Depends(get_db),
 ):
     friend_ids = get_friend_ids(db, user.user_id)
@@ -219,6 +221,8 @@ def leaderboard(
         )
         .group_by(artist_user_first.c.user_id)
         .order_by(func.count().desc())
+        .limit(max(1, min(limit, 100)))
+        .offset(offset)
     )
     rows = db.execute(crown_stmt).all()
 
@@ -229,7 +233,7 @@ def leaderboard(
 
     entries = [
         LeaderboardEntry(
-            rank=i + 1,
+            rank=offset + i + 1,
             user_id=row.user_id,
             user_name=user_names.get(row.user_id),
             crown_count=row.crown_count,

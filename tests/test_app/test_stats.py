@@ -29,6 +29,27 @@ class TestTopTracks:
         data = resp.json()
         assert isinstance(data, list)
 
+    def test_top_tracks_with_offset(self, client, seeded_db, auth_headers):
+        resp = client.get(
+            "/stats/top-tracks",
+            params={"period": "all", "limit": 1, "offset": 1},
+            headers=auth_headers,
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert len(data) == 1
+        assert data[0]["rank"] == 2
+        assert data[0]["track_name"] != "Paranoid Android"
+
+    def test_top_tracks_limit_clamped(self, client, seeded_db, auth_headers):
+        resp = client.get(
+            "/stats/top-tracks",
+            params={"period": "all", "limit": 9999},
+            headers=auth_headers,
+        )
+        assert resp.status_code == 200
+        assert len(resp.json()) <= 100
+
     def test_top_tracks_no_auth(self, client, seeded_db):
         resp = client.get("/stats/top-tracks", params={"period": "all"})
         assert resp.status_code in (401, 403)

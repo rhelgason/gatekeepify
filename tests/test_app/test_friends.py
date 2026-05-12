@@ -146,6 +146,28 @@ class TestListFriends:
         friend_ids = {f["user_id"] for f in data}
         assert friend_ids == {"user_2", "user_3"}
 
+    def test_list_friends_with_pagination(self, client, seeded_db, auth_headers):
+        for i in range(5):
+            seeded_db.add(User(user_id=f"friend_{i}", user_name=f"Friend {i}"))
+            seeded_db.add(Friendship(
+                user_id_1="test_user_1",
+                user_id_2=f"friend_{i}",
+                created_at=datetime(2024, 1, i + 1, tzinfo=timezone.utc),
+            ))
+        seeded_db.commit()
+
+        resp = client.get("/friends", params={"limit": 2, "offset": 0}, headers=auth_headers)
+        assert resp.status_code == 200
+        assert len(resp.json()) == 2
+
+        resp = client.get("/friends", params={"limit": 2, "offset": 2}, headers=auth_headers)
+        assert resp.status_code == 200
+        assert len(resp.json()) == 2
+
+        resp = client.get("/friends", params={"limit": 2, "offset": 4}, headers=auth_headers)
+        assert resp.status_code == 200
+        assert len(resp.json()) == 1
+
     def test_list_friends_empty(self, client, seeded_db, auth_headers):
         resp = client.get("/friends", headers=auth_headers)
         assert resp.status_code == 200

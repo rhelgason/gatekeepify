@@ -29,7 +29,12 @@ from app.schemas import (
 router = APIRouter(prefix="/stats", tags=["stats"])
 
 DEFAULT_LIMIT = 10
+MAX_LIMIT = 100
 WRAPPED_LIMIT = 5
+
+
+def _clamp_limit(limit: int) -> int:
+    return max(1, min(limit, MAX_LIMIT))
 
 
 def _period_to_since(period: TimePeriod) -> Optional[datetime]:
@@ -50,7 +55,7 @@ def _ms_to_minutes(ms: Optional[int]) -> int:
 
 
 def _get_top_tracks(
-    db: Session, user_id: str, since: Optional[datetime], limit: int
+    db: Session, user_id: str, since: Optional[datetime], limit: int, offset: int = 0
 ) -> List[TopTrackEntry]:
     stmt = (
         select(
@@ -72,13 +77,14 @@ def _get_top_tracks(
         )
         .order_by(func.count().desc())
         .limit(limit)
+        .offset(offset)
     )
     if since:
         stmt = stmt.where(Listen.ts >= since)
     rows = db.execute(stmt).all()
     return [
         TopTrackEntry(
-            rank=i + 1,
+            rank=offset + i + 1,
             track_id=row.track_id,
             track_name=row.track_name,
             album_name=row.album_name,
@@ -92,7 +98,7 @@ def _get_top_tracks(
 
 
 def _get_top_artists(
-    db: Session, user_id: str, since: Optional[datetime], limit: int
+    db: Session, user_id: str, since: Optional[datetime], limit: int, offset: int = 0
 ) -> List[TopArtistEntry]:
     stmt = (
         select(
@@ -109,6 +115,7 @@ def _get_top_artists(
         .group_by(Artist.artist_id, Artist.artist_name)
         .order_by(func.count().desc())
         .limit(limit)
+        .offset(offset)
     )
     if since:
         stmt = stmt.where(Listen.ts >= since)
@@ -127,7 +134,7 @@ def _get_top_artists(
 
     return [
         TopArtistEntry(
-            rank=i + 1,
+            rank=offset + i + 1,
             artist_id=row.artist_id,
             artist_name=row.artist_name,
             genres=genres_by_artist.get(row.artist_id, []),
@@ -139,10 +146,8 @@ def _get_top_artists(
 
 
 def _get_top_genres(
-    db: Session, user_id: str, since: Optional[datetime], limit: int
+    db: Session, user_id: str, since: Optional[datetime], limit: int, offset: int = 0
 ) -> List[TopGenreEntry]:
-    # Deduplicate: count each (listen, genre) pair once even if multiple
-    # artists on that track share the genre.
     inner = (
         select(
             Listen.ts,
@@ -171,11 +176,12 @@ def _get_top_genres(
         .group_by(sub.c.genre)
         .order_by(func.count().desc())
         .limit(limit)
+        .offset(offset)
     )
     rows = db.execute(stmt).all()
     return [
         TopGenreEntry(
-            rank=i + 1,
+            rank=offset + i + 1,
             genre=row.genre,
             listen_count=row.listen_count,
             total_minutes=_ms_to_minutes(row.total_ms),
@@ -213,10 +219,11 @@ def top_tracks(
     user: UserModel = Depends(get_current_user),
     period: TimePeriod = TimePeriod.all,
     limit: int = DEFAULT_LIMIT,
+    offset: int = 0,
     db: Session = Depends(get_db),
 ):
     since = _period_to_since(period)
-    return _get_top_tracks(db, user.user_id, since, limit)
+    return _get_top_tracks(db, user.user_id, since, _clamp_limit(limit), offset)
 
 
 @router.get("/top-artists", response_model=List[TopArtistEntry])
@@ -224,10 +231,11 @@ def top_artists(
     user: UserModel = Depends(get_current_user),
     period: TimePeriod = TimePeriod.all,
     limit: int = DEFAULT_LIMIT,
+    offset: int = 0,
     db: Session = Depends(get_db),
 ):
     since = _period_to_since(period)
-    return _get_top_artists(db, user.user_id, since, limit)
+    return _get_top_artists(db, user.user_id, since, _clamp_limit(limit), offset)
 
 
 @router.get("/top-genres", response_model=List[TopGenreEntry])
@@ -235,10 +243,11 @@ def top_genres(
     user: UserModel = Depends(get_current_user),
     period: TimePeriod = TimePeriod.all,
     limit: int = DEFAULT_LIMIT,
+    offset: int = 0,
     db: Session = Depends(get_db),
 ):
     since = _period_to_since(period)
-    return _get_top_genres(db, user.user_id, since, limit)
+    return _get_top_genres(db, user.user_id, since, _clamp_limit(limit), offset)
 
 
 @router.get("/wrapped", response_model=WrappedResponse)
