@@ -172,6 +172,8 @@ def accept_invite(
     )
 
     sender = db.query(User).filter(User.user_id == invite.from_user_id).first()
+    if not sender:
+        raise HTTPException(status_code=500, detail="Invite sender no longer exists")
     return InviteAcceptResponse(
         friend=FriendResponse(
             user_id=sender.user_id,

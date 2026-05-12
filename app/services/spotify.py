@@ -93,12 +93,15 @@ class SpotifyService:
                     all_artist_ids.add(artist["id"])
         if not all_artist_ids:
             return
-        artists_result = client.artists(list(all_artist_ids))
-        if not artists_result or not artists_result.get("artists"):
-            return
-        genre_map = {
-            a["id"]: a.get("genres", []) for a in artists_result["artists"] if a
-        }
+        genre_map: Dict[str, list] = {}
+        artist_id_list = list(all_artist_ids)
+        for i in range(0, len(artist_id_list), MAX_TRACKS_REQUEST):
+            batch = artist_id_list[i : i + MAX_TRACKS_REQUEST]
+            artists_result = client.artists(batch)
+            if artists_result and artists_result.get("artists"):
+                for a in artists_result["artists"]:
+                    if a:
+                        genre_map[a["id"]] = a.get("genres", [])
         for item in track_items:
             track = item.get("track", {})
             for artist in track.get("artists", []):

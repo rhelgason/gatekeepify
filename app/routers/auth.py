@@ -60,15 +60,17 @@ def callback(code: str = Query(...), db: Session = Depends(get_db)):
 
     try:
         token_info = service.exchange_code(code)
+        access_token = token_info["access_token"]
+        refresh_token = token_info.get("refresh_token", "")
+        spotify_user = service.get_current_user(access_token)
+        user_id = spotify_user["id"]
+    except KeyError as e:
+        log_action(db, "auth.callback", status="error", details={"error": f"Missing field: {e}"})
+        raise HTTPException(status_code=502, detail="Unexpected response from Spotify")
     except Exception as e:
         log_action(db, "auth.callback", status="error", details={"error": str(e)})
         raise HTTPException(status_code=400, detail="Failed to exchange auth code")
 
-    access_token = token_info["access_token"]
-    refresh_token = token_info.get("refresh_token", "")
-
-    spotify_user = service.get_current_user(access_token)
-    user_id = spotify_user["id"]
     display_name = spotify_user.get("display_name", "")
     email = spotify_user.get("email")
 

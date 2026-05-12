@@ -34,7 +34,7 @@ router = APIRouter(prefix="/gatekeep", tags=["gatekeep"])
 
 
 def _ms_to_minutes(ms: Optional[int]) -> int:
-    if not ms or ms < 0:
+    if ms is None or ms < 0:
         return 0
     return math.floor(ms / 1000 / 60)
 
@@ -165,9 +165,10 @@ def gatekeep_track(
             func.sum(
                 case((Listen.source == ListenSource.api.value, 1), else_=0)
             ).label("verified_listens"),
-            func.sum(track.duration_ms or 0).label("total_ms"),
+            (func.count() * func.coalesce(Track.duration_ms, 0)).label("total_ms"),
         )
         .select_from(Listen)
+        .join(Track, Listen.track_id == Track.track_id)
         .join(User, Listen.user_id == User.user_id)
         .where(Listen.track_id == track_id)
         .where(Listen.user_id.in_(group_ids))
@@ -249,7 +250,7 @@ def leaderboard(
         .group_by(artist_user_first.c.user_id)
         .order_by(func.count().desc())
         .limit(max(1, min(limit, 100)))
-        .offset(offset)
+        .offset(max(0, offset))
     )
     rows = db.execute(crown_stmt).all()
 

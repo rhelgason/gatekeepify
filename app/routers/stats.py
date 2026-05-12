@@ -38,6 +38,10 @@ def _clamp_limit(limit: int) -> int:
     return max(1, min(limit, MAX_LIMIT))
 
 
+def _clamp_offset(offset: int) -> int:
+    return max(0, offset)
+
+
 def _period_to_since(period: TimePeriod) -> Optional[datetime]:
     now = datetime.now(timezone.utc)
     if period == TimePeriod.today:
@@ -50,7 +54,7 @@ def _period_to_since(period: TimePeriod) -> Optional[datetime]:
 
 
 def _ms_to_minutes(ms: Optional[int]) -> int:
-    if not ms or ms < 0:
+    if ms is None or ms < 0:
         return 0
     return math.floor(ms / 1000 / 60)
 
@@ -224,7 +228,7 @@ def top_tracks(
     db: Session = Depends(get_db),
 ):
     since = _period_to_since(period)
-    results = _get_top_tracks(db, user.user_id, since, _clamp_limit(limit), offset)
+    results = _get_top_tracks(db, user.user_id, since, _clamp_limit(limit), _clamp_offset(offset))
     log_action(db, "stats.top_tracks_viewed", user_id=user.user_id,
                details={"period": period.value, "limit": limit, "offset": offset, "results": len(results)})
     return results
@@ -239,7 +243,7 @@ def top_artists(
     db: Session = Depends(get_db),
 ):
     since = _period_to_since(period)
-    results = _get_top_artists(db, user.user_id, since, _clamp_limit(limit), offset)
+    results = _get_top_artists(db, user.user_id, since, _clamp_limit(limit), _clamp_offset(offset))
     log_action(db, "stats.top_artists_viewed", user_id=user.user_id,
                details={"period": period.value, "limit": limit, "offset": offset, "results": len(results)})
     return results
@@ -254,7 +258,7 @@ def top_genres(
     db: Session = Depends(get_db),
 ):
     since = _period_to_since(period)
-    results = _get_top_genres(db, user.user_id, since, _clamp_limit(limit), offset)
+    results = _get_top_genres(db, user.user_id, since, _clamp_limit(limit), _clamp_offset(offset))
     log_action(db, "stats.top_genres_viewed", user_id=user.user_id,
                details={"period": period.value, "limit": limit, "offset": offset, "results": len(results)})
     return results
@@ -267,10 +271,14 @@ def wrapped(
     db: Session = Depends(get_db),
 ):
 
+    current_year = datetime.now(timezone.utc).year
     if year:
+        if year < 2000 or year > current_year + 1:
+            from fastapi import HTTPException
+            raise HTTPException(status_code=400, detail=f"Year must be between 2000 and {current_year + 1}")
         since = datetime(year, 1, 1, tzinfo=timezone.utc)
     else:
-        year = datetime.now(timezone.utc).year
+        year = current_year
         since = datetime(year, 1, 1, tzinfo=timezone.utc)
 
     top_tracks = _get_top_tracks(db, user.user_id, since, WRAPPED_LIMIT)

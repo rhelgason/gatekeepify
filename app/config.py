@@ -19,3 +19,18 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+
+
+def validate_settings():
+    import sys
+
+    if settings.jwt_secret == "dev-secret-change-in-production":
+        print(
+            "WARNING: Using default JWT secret. Set JWT_SECRET env var before deploying.",
+            file=sys.stderr,
+        )
+    if not settings.encryption_key:
+        print(
+            "WARNING: ENCRYPTION_KEY not set. Spotify refresh tokens will be stored unencrypted.",
+            file=sys.stderr,
+        )

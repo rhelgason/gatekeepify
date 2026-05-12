@@ -24,6 +24,10 @@ router = APIRouter(prefix="/search", tags=["search"])
 MAX_RESULTS = 20
 
 
+def _escape_like(q: str) -> str:
+    return q.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+
 @router.get("/artists", response_model=List[ArtistSearchResult])
 def search_artists(
     q: str = Query(..., min_length=1),
@@ -32,7 +36,7 @@ def search_artists(
     db: Session = Depends(get_db),
 ):
     clamped = max(1, min(limit, MAX_RESULTS))
-    pattern = f"%{q}%"
+    pattern = f"%{_escape_like(q)}%"
 
     stmt = (
         select(
@@ -89,7 +93,7 @@ def search_tracks(
     db: Session = Depends(get_db),
 ):
     clamped = max(1, min(limit, MAX_RESULTS))
-    pattern = f"%{q}%"
+    pattern = f"%{_escape_like(q)}%"
 
     stmt = (
         select(

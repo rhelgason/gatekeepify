@@ -22,6 +22,7 @@ FILE_PREFIX = "Streaming_History_Audio"
 FILE_SUFFIX = ".json"
 MIN_PLAY_TIME_MS = 30000
 TRACK_URI_PREFIX = "spotify:track:"
+MAX_UPLOAD_BYTES = 100 * 1024 * 1024  # 100 MB
 
 EXPECTED_EXPORT_FIELDS = {
     "ts",
@@ -49,7 +50,9 @@ EXTRA_EXPORT_FIELDS = {
 
 
 def _extract_json_from_zip(upload: UploadFile) -> list[dict]:
-    content = upload.file.read()
+    content = upload.file.read(MAX_UPLOAD_BYTES + 1)
+    if len(content) > MAX_UPLOAD_BYTES:
+        raise HTTPException(status_code=400, detail="File too large (max 100 MB)")
     all_listens = []
     try:
         zf = zipfile.ZipFile(io.BytesIO(content))

@@ -11,6 +11,7 @@ from spotipy.oauth2 import SpotifyOauthError
 
 from sqlalchemy import text
 
+from app.config import validate_settings
 from app.database import Base, SessionLocal, engine
 from app.routers import auth, backfill, friends, gatekeep, search, stats
 from app.services.audit import log_action
@@ -22,6 +23,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger("gatekeepify.http")
 
+validate_settings()
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
@@ -64,16 +66,6 @@ async def http_exception_handler(request: Request, exc: HTTPException):
 @app.exception_handler(OperationalError)
 async def database_exception_handler(request: Request, exc: OperationalError):
     logger.error(f"Database error on {request.method} {request.url.path}: {exc}")
-    try:
-        db = SessionLocal()
-        log_action(
-            db, "system.database_error",
-            status="error",
-            details={"path": request.url.path, "error": str(exc)},
-        )
-        db.close()
-    except Exception:
-        pass
     return _error_response(503, "database_error", "Database is temporarily unavailable")
 
 
@@ -95,6 +87,7 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
         f"Unhandled exception on {request.method} {request.url.path}: {exc}\n"
         f"{traceback.format_exc()}"
     )
+    db = None
     try:
         db = SessionLocal()
         log_action(
@@ -107,9 +100,11 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
                 "error": str(exc),
             },
         )
-        db.close()
     except Exception:
         pass
+    finally:
+        if db:
+            db.close()
     return _error_response(500, "internal_error", "Internal server error")
 
 
@@ -134,10 +129,9 @@ async def request_logging_middleware(request: Request, call_next):
 @app.get("/health")
 def health():
     checks = {"database": "ok"}
+    db = SessionLocal()
     try:
-        db = SessionLocal()
         db.execute(text("SELECT 1"))
-        db.close()
     except Exception as e:
         checks["database"] = f"error: {e}"
         logger.error(f"Health check database failure: {e}")
@@ -145,4 +139,6 @@ def health():
             status_code=503,
             content={"status": "degraded", "checks": checks},
         )
+    finally:
+        db.close()
     return {"status": "ok", "checks": checks}
