@@ -1,0 +1,14 @@
+env/
+db/
+.git/
+.github/
+.cache
+src/.cache
+src/host_constants.py
+tests/
+*.pyc
+__pycache__/
+.env
+.DS_Store
+.idea/
+.vscode/

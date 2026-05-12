@@ -84,56 +84,63 @@ Copy `.env.example` to `.env`. Required values:
 - `REDIS_URL` -- `redis://localhost:6379/0` for local, Upstash URL for production
 - `DATABASE_URL` -- `sqlite:///db/gatekeepify.db` for local, Neon URL for production
 
-## What To Do Next
+## Deployment (Railway -- all browser, no local tooling)
 
-### Must do on personal machine (blocked by work computer Santa policy):
+### CI/CD
+- `.github/workflows/ci.yml` runs all 144 tests + verifies server startup on every push/PR to `main`
+- Railway auto-deploys from `main` branch after connecting the GitHub repo
 
-1. **Install Redis locally** -- `brew install redis && brew services start redis` OR `docker run -d --name redis -p 6379:6379 redis:alpine`. Then test the full Celery stack:
-   ```bash
-   # Terminal 1: server
-   uvicorn app.main:app --reload
-   # Terminal 2: worker
-   celery -A app.celery_app worker --loglevel=info
-   # Terminal 3: beat
-   celery -A app.celery_app beat --loglevel=info
+### Deployment config files
+- `railway.toml` -- tells Railway to use Dockerfile, sets health check on `/health`
+- `Dockerfile` -- Python 3.10, installs deps + supervisor, runs all 3 processes
+- `supervisord.conf` -- manages uvicorn (web), celery worker, celery beat in one container
+- `.dockerignore` -- excludes env/, tests/, db/, .git/, credentials from the image
+
+### Setup checklist (ordered)
+
+1. **Push repo to GitHub** (from work machine, just `git push`)
+
+2. **Sign up for Railway** (railway.app) -- connect your GitHub account
+
+3. **Create a PostgreSQL database in Railway** -- click "New" > "Database" > "PostgreSQL". Copy the `DATABASE_URL` from the connection panel.
+
+4. **Create a Redis database in Railway** -- click "New" > "Database" > "Redis". Copy the `REDIS_URL`.
+
+5. **Create the app service in Railway** -- click "New" > "GitHub Repo" > select `gatekeepify`. Railway detects the Dockerfile automatically.
+
+6. **Set environment variables** in Railway's service settings (Variables tab):
+   ```
+   DATABASE_URL=<from step 3>
+   REDIS_URL=<from step 4>
+   SPOTIFY_CLIENT_ID=e1ee69e65fb241a29c6a46e856a5e64e
+   SPOTIFY_CLIENT_SECRET=<your secret>
+   SPOTIFY_REDIRECT_URI=https://<your-railway-domain>/auth/callback
+   JWT_SECRET=<generate: python -c "import secrets; print(secrets.token_hex(32))">
+   ENCRYPTION_KEY=<generate: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())">
    ```
 
-2. **Test the SQLite migration script against real data** -- `scripts/migrate_sqlite.py` exists but has never been run against the actual `db/database.db`. Run it after setting up PostgreSQL:
-   ```bash
-   DATABASE_URL="postgres://..." python -m scripts.migrate_sqlite
-   ```
-   Watch for: timestamp format variations, orphaned track records, any encoding issues in artist/track names.
+7. **Get your Railway domain** -- in service settings > "Networking" > "Generate Domain". It'll be something like `gatekeepify-production.up.railway.app`.
 
-3. **Rotate Spotify credentials** -- `src/host_constants.py` has the client ID and secret in plaintext. After confirming the new app works with env vars, go to the Spotify Developer Dashboard and rotate the secret. Also delete `src/.cache` and `.cache` which contain live OAuth tokens.
+8. **Update SPOTIFY_REDIRECT_URI** -- go back to Variables and set it to `https://<your-railway-domain>/auth/callback`.
 
-### Deployment setup (all free tier):
+9. **Update Spotify Developer Dashboard** -- go to developer.spotify.com/dashboard, select your app, click "Edit Settings", add `https://<your-railway-domain>/auth/callback` to the Redirect URIs list.
 
-4. **Neon** (free PostgreSQL) -- sign up at neon.tech, create a database, get `DATABASE_URL`
+10. **Deploy** -- Railway auto-deploys when you push to `main`. Or click "Deploy" in the dashboard.
 
-5. **Upstash** (free Redis) -- sign up at upstash.com, create a Redis instance, get `REDIS_URL`
+11. **Verify** -- visit `https://<your-railway-domain>/health`. Should return `{"status": "ok", "checks": {"database": "ok"}}`.
 
-6. **Fly.io** (free compute) -- install `flyctl`, then:
-   ```bash
-   fly launch
-   fly secrets set DATABASE_URL="postgres://..." REDIS_URL="redis://..." \
-     SPOTIFY_CLIENT_ID="..." SPOTIFY_CLIENT_SECRET="..." \
-     JWT_SECRET="$(openssl rand -hex 32)" \
-     SPOTIFY_REDIRECT_URI="https://gatekeepify.fly.dev/auth/callback"
-   fly deploy
-   ```
+12. **Test OAuth** -- visit `https://<your-railway-domain>/auth/login`, click the Spotify auth URL, authorize, confirm you get a JWT back.
 
-7. **Spotify Developer Dashboard** -- add `https://gatekeepify.fly.dev/auth/callback` as a redirect URI
+13. **Migrate legacy data** (optional) -- if you want your existing SQLite listening history in production, run the migration script locally with the production DATABASE_URL:
+    ```bash
+    DATABASE_URL="<railway postgres url>" python -m scripts.migrate_sqlite
+    ```
 
-### Next code work:
+14. **Rotate Spotify credentials** -- after confirming production works, go to the Spotify Developer Dashboard and regenerate the client secret. Update the Railway env var. Delete `src/host_constants.py`, `src/.cache`, and `.cache` from the repo.
 
-8. **Frontend (Phase 4)** -- Next.js web app. Key pages:
-   - `/` -- Landing page, "Prove you listened first," Sign in with Spotify CTA
-   - `/dashboard` -- Personal stats (top artists, tracks, genres, minutes), time period selector
-   - `/upload` -- Drag-and-drop Spotify data export ZIP, progress bar
-   - `/friends` -- Friend list, pending invites, shareable invite link
-   - `/gatekeep/[artistId]` -- The product page: side-by-side first-listen comparison with verified/self-reported badges
-   - `/leaderboard` -- Who discovered the most artists first among friends
-   The backend API is fully ready for all of these pages.
+### Post-deployment: next code work
+
+- **Frontend (Phase 4)** -- Next.js web app. The backend API is fully ready. Key pages: landing, dashboard, upload, friends, `/gatekeep/[artistId]` (the product page), leaderboard.
 
 ## Implementation Phases
 
