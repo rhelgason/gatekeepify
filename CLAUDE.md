@@ -21,24 +21,25 @@ The app is mid-migration from a local CLI tool to a web service. Both exist in t
 - **Database** -- SQLite for local dev, PostgreSQL for production (SQLAlchemy abstracts both)
 
 ### Key Files
-- `app/main.py` -- FastAPI entry point
-- `app/models.py` -- All ORM models (8 data tables + job_runs)
+- `app/main.py` -- FastAPI entry point, middleware, exception handlers
+- `app/models.py` -- All ORM models (8 data tables + 2 social + audit_log + job_runs)
 - `app/schemas.py` -- Pydantic request/response models
 - `app/config.py` -- Settings from environment variables
 - `app/database.py` -- SQLAlchemy engine/session
-- `app/routers/auth.py` -- Spotify OAuth + JWT
-- `app/routers/stats.py` -- Top tracks/artists/genres/wrapped (SQL aggregation)
+- `app/routers/auth.py` -- Spotify OAuth + JWT + `get_current_user` dependency
+- `app/routers/stats.py` -- Top tracks/artists/genres/wrapped (SQL aggregation, paginated)
 - `app/routers/backfill.py` -- ZIP upload with 5-layer fraud validation
-- `app/services/spotify.py` -- Multi-user Spotify API client + token encryption
-- `app/services/ingestion.py` -- Data upsert logic for all tables
-- `app/services/audit.py` -- `log_action()` writes to `audit_log` table + stdout
-- `app/routers/friends.py` -- Friend invites, acceptance, listing
+- `app/routers/friends.py` -- Friend invites (atomic claim), acceptance, listing
 - `app/routers/gatekeep.py` -- Artist/track comparison, leaderboard, challenge cards
+- `app/routers/search.py` -- Search artists/tracks by name (case-insensitive, ranked by listen count)
+- `app/services/spotify.py` -- Multi-user Spotify API client + token encryption
+- `app/services/ingestion.py` -- Data upsert logic + retroactive release-date validation
+- `app/services/audit.py` -- `log_action()` writes to `audit_log` table + stdout
 - `app/celery_app.py` -- Celery config + beat schedule
-- `app/tasks.py` -- Periodic tasks: poll_recent_listens, backfill_track_metadata
+- `app/tasks.py` -- Periodic tasks with token revocation handling
 
 ### Database Schema
-8 data tables + 2 social tables + 1 job tracking table:
+8 data tables + 2 social tables + 2 operational tables:
 - `dim_all_albums` (album_id PK, album_name, **release_date**)
 - `dim_all_tracks` (track_id PK, track_name, album_id FK, duration_ms, is_local)
 - `dim_all_artists` (artist_id PK, artist_name)
@@ -51,22 +52,21 @@ The app is mid-migration from a local CLI tool to a web service. Both exist in t
 - `audit_log` (id PK, ts, user_id FK, **action** indexed, entity_type, entity_id, details JSON, status) -- indexes on (user_id, ts) and (action, ts)
 - `job_runs` (id PK, job_name, user_id, started_at, completed_at, status, record_count)
 
-Bold columns are new additions from the architecture overhaul.
-
-## Development Setup
-
-### Run tests (no external services needed)
+### Test Suite
+144 tests, no external services needed:
 ```bash
 source env/bin/activate
-python -m pytest tests/test_app/ -v    # New app tests (68 tests)
-python -m pytest tests/ -v             # All tests including legacy (99 tests)
+python -m pytest tests/test_app/ -v
 ```
+
+## Development Setup
 
 ### Run the FastAPI server locally
 ```bash
 source env/bin/activate
 uvicorn app.main:app --reload
 # Swagger UI at http://localhost:8000/docs
+# Health check at http://localhost:8000/health (verifies DB connectivity)
 ```
 
 ### Run Celery worker + beat (requires Redis)
@@ -84,30 +84,56 @@ Copy `.env.example` to `.env`. Required values:
 - `REDIS_URL` -- `redis://localhost:6379/0` for local, Upstash URL for production
 - `DATABASE_URL` -- `sqlite:///db/gatekeepify.db` for local, Neon URL for production
 
-## External Services To Set Up
+## What To Do Next
 
-### NOT YET SET UP -- needed before deployment:
+### Must do on personal machine (blocked by work computer Santa policy):
 
-1. **Redis (local)** -- `brew install redis && brew services start redis` OR `docker run -d --name redis -p 6379:6379 redis:alpine`. Blocked on work computer by Santa security policy; do this on personal machine.
-
-2. **Neon** (free PostgreSQL) -- sign up at neon.tech, create a database, get `DATABASE_URL`
-
-3. **Upstash** (free Redis) -- sign up at upstash.com, create a Redis instance, get `REDIS_URL`
-
-4. **Fly.io** (free compute) -- install `flyctl`, run `fly launch`, set secrets:
+1. **Install Redis locally** -- `brew install redis && brew services start redis` OR `docker run -d --name redis -p 6379:6379 redis:alpine`. Then test the full Celery stack:
+   ```bash
+   # Terminal 1: server
+   uvicorn app.main:app --reload
+   # Terminal 2: worker
+   celery -A app.celery_app worker --loglevel=info
+   # Terminal 3: beat
+   celery -A app.celery_app beat --loglevel=info
    ```
+
+2. **Test the SQLite migration script against real data** -- `scripts/migrate_sqlite.py` exists but has never been run against the actual `db/database.db`. Run it after setting up PostgreSQL:
+   ```bash
+   DATABASE_URL="postgres://..." python -m scripts.migrate_sqlite
+   ```
+   Watch for: timestamp format variations, orphaned track records, any encoding issues in artist/track names.
+
+3. **Rotate Spotify credentials** -- `src/host_constants.py` has the client ID and secret in plaintext. After confirming the new app works with env vars, go to the Spotify Developer Dashboard and rotate the secret. Also delete `src/.cache` and `.cache` which contain live OAuth tokens.
+
+### Deployment setup (all free tier):
+
+4. **Neon** (free PostgreSQL) -- sign up at neon.tech, create a database, get `DATABASE_URL`
+
+5. **Upstash** (free Redis) -- sign up at upstash.com, create a Redis instance, get `REDIS_URL`
+
+6. **Fly.io** (free compute) -- install `flyctl`, then:
+   ```bash
+   fly launch
    fly secrets set DATABASE_URL="postgres://..." REDIS_URL="redis://..." \
      SPOTIFY_CLIENT_ID="..." SPOTIFY_CLIENT_SECRET="..." \
      JWT_SECRET="$(openssl rand -hex 32)" \
      SPOTIFY_REDIRECT_URI="https://gatekeepify.fly.dev/auth/callback"
+   fly deploy
    ```
 
-5. **Spotify Developer Dashboard** -- update the app's redirect URI to match production URL (`https://gatekeepify.fly.dev/auth/callback`)
+7. **Spotify Developer Dashboard** -- add `https://gatekeepify.fly.dev/auth/callback` as a redirect URI
 
-6. **Run the SQLite migration** -- after PostgreSQL is set up:
-   ```bash
-   DATABASE_URL="postgres://..." python -m scripts.migrate_sqlite
-   ```
+### Next code work:
+
+8. **Frontend (Phase 4)** -- Next.js web app. Key pages:
+   - `/` -- Landing page, "Prove you listened first," Sign in with Spotify CTA
+   - `/dashboard` -- Personal stats (top artists, tracks, genres, minutes), time period selector
+   - `/upload` -- Drag-and-drop Spotify data export ZIP, progress bar
+   - `/friends` -- Friend list, pending invites, shareable invite link
+   - `/gatekeep/[artistId]` -- The product page: side-by-side first-listen comparison with verified/self-reported badges
+   - `/leaderboard` -- Who discovered the most artists first among friends
+   The backend API is fully ready for all of these pages.
 
 ## Implementation Phases
 
@@ -118,34 +144,43 @@ SQLAlchemy models, Alembic migrations, FastAPI with Spotify OAuth, stats endpoin
 Celery + Redis tasks, ingestion service, per-user token management, Dockerfile + supervisord + fly.toml for deployment.
 
 ### Phase 3: Social + Gatekeeping Core ✅ COMPLETE
-New models: `Friendship` (bidirectional, both directions stored), `FriendInvite` (with `invite_code`, tracks acceptance). Alembic migration `002_social_tables.py`.
+Friendships (bidirectional), friend invites (atomic claim), gatekeep artist/track comparison, leaderboard (CTE-based crown counting), challenge card generation.
 
-New routers:
-- `app/routers/friends.py` -- `POST /friends/invite`, `POST /friends/accept/{code}`, `GET /friends`
-- `app/routers/gatekeep.py` -- `GET /gatekeep/artist/{id}`, `GET /gatekeep/track/{id}`, `GET /gatekeep/leaderboard`, `POST /gatekeep/challenge`
-
-The gatekeeping query joins listens → track_to_artist → tracks → users, grouped by user, ordered by `MIN(ts)` ASC. Each entry includes `first_listen_source` (api vs export) and `verified_listens` count (uses `CASE WHEN source='api' THEN 1 ELSE 0 END` for SQLite compatibility). The leaderboard uses CTEs to count how many artists each user discovered first among their friend group, only counting artists with 2+ listeners.
-
-The `get_friend_ids()` helper in `friends.py` is reused by the gatekeep router to scope all queries to the user's friend group. Friendships are stored bidirectionally (two rows per friendship) so querying is a simple `WHERE user_id_1 = ?`.
+### Backend Hardening ✅ COMPLETE
+1. ✅ Auth tokens moved from query params to `Authorization: Bearer` headers
+2. ✅ Spotify token revocation handling (deactivates user, falls through to next)
+3. ✅ Deferred release-date validation (retroactively removes invalid export listens after metadata backfill)
+4. ✅ Concurrent invite acceptance race condition (atomic UPDATE)
+5. ✅ Pagination on all list endpoints (limit clamped to 100, offset support)
+6. ✅ Search endpoints for artists and tracks by name
+7. ✅ Structured error responses (consistent `{"error": type, "detail": message}` shape for all error codes)
+8. ✅ OAuth callback test coverage (6 tests with mocked Spotify)
+9. ✅ Health check verifies database connectivity (returns 503 if DB is down)
+10. ✅ Structured audit logging across all routers (`audit_log` table + stdout middleware)
 
 ### Phase 4: Frontend ❌ NOT STARTED
-Next.js web app. Key pages: landing (`/`), dashboard, upload, friends, `/gatekeep/[artistId]` (the product page), leaderboard. The gatekeep page needs trust indicators (verified checkmark vs self-reported marker).
 
 ## Critical Design Decisions
 
 ### Data integrity is a first-class concern
 Users have incentive to fabricate listening history. Five validation layers:
-1. **Release date check** -- reject listens before a track's release date (stored on `dim_all_albums.release_date`)
+1. **Release date check** -- reject listens before a track's release date (stored on `dim_all_albums.release_date`). Also runs retroactively after metadata backfill fills in release dates.
 2. **Source tagging** -- every listen marked `api` (unforgeable) or `export` (user-submitted) via `dim_all_listens.source`
 3. **API cross-referencing** -- detect contradictions between uploaded data and API-polled data
 4. **Export format validation** -- real Spotify exports have metadata fields (`reason_start`, `platform`, `shuffle`, etc.) that are hard to fake; stored in `export_metadata`
 5. **Statistical anomaly detection** -- future work, flag suspicious patterns
+
+### Auth uses Bearer tokens, not query params
+All authenticated endpoints use `Authorization: Bearer <JWT>` headers via FastAPI's `HTTPBearer` dependency. The `get_current_user` dependency in `auth.py` is reused by every router.
 
 ### Preemptive friend onboarding is not feasible
 Spotify's API does not expose any user's listening data without their OAuth consent. No workaround exists. Instead, build social pressure: challenge cards ("I listened to X before you -- prove me wrong") with invite links.
 
 ### Analytics are SQL, not Python
 The legacy `stat_viewer.py` loaded all listens into memory and used `Counter`. The new stats endpoints use SQL `GROUP BY` queries that scale to millions of rows.
+
+### All errors return consistent JSON
+Every error response has the shape `{"error": "<type>", "detail": "<message>"}`. Types: `validation_error` (422), `http_error` (4xx), `database_error` (503), `spotify_auth_error` / `spotify_api_error` (502), `internal_error` (500). Unhandled exceptions are logged to `audit_log` with full context.
 
 ## Spotify API Constraints
 - `GET /v1/me/player/recently-played` -- max 50 tracks, no way around this
@@ -159,11 +194,33 @@ The legacy `stat_viewer.py` loaded all listens into memory and used `Counter`. T
 - Spotify's `played_at` format (`%Y-%m-%dT%H:%M:%S.%fZ`) differs from the data export format (`%Y-%m-%dT%H:%M:%SZ`) -- both are handled
 - Tracks can exist in `dim_all_listens` with no corresponding `dim_all_tracks` row (from backfill imports). The `backfill_track_metadata` task finds these via LEFT JOIN + IS NULL
 - When two tracks share the same artist, SQLAlchemy needs a `db.flush()` between merges to avoid duplicate INSERT errors (fixed in `_upsert_track_and_relations`)
-- All user-facing actions are logged to the `audit_log` table via `log_action()`. Actions follow `module.verb` naming: `auth.callback`, `backfill.upload`, `friends.invite_created`, `friends.invite_accepted`, `gatekeep.artist_viewed`, `gatekeep.challenge_created`, `stats.top_tracks_viewed`, etc. Failures use status `"error"` or `"denied"` with details explaining why.
-- HTTP request logging (method, path, status, duration) goes to stdout via FastAPI middleware -- not to the database
 - The gatekeep queries use `SUM(CASE WHEN ... THEN 1 ELSE 0 END)` instead of `COUNT(*) FILTER (WHERE ...)` because SQLite doesn't support FILTER
 - Friendships are stored bidirectionally (two rows). If you add a friendship A↔B, insert both (A,B) and (B,A) rows. This makes querying simple but requires keeping both in sync
 - The leaderboard only counts "contested" artists (those with 2+ listeners in the friend group). An artist only you've listened to doesn't earn a crown
+- Invite acceptance uses an atomic `UPDATE ... WHERE accepted_by_user_id IS NULL` to prevent race conditions
+- If a user's Spotify refresh token is revoked, the Celery worker clears their token and skips them in future polls. The user must re-authenticate via `/auth/login`.
 - The `redis` package is in requirements.txt from the legacy app but was never used; `celery[redis]` now provides the actual Redis dependency
-- `src/host_constants.py` contains real Spotify API credentials in plaintext -- these should be rotated after migrating to env vars in production
+- `src/host_constants.py` contains real Spotify API credentials in plaintext -- rotate after migrating to env vars
 - The `.cache` files (spotipy OAuth token cache) in both root and `src/` contain live tokens and should not be committed
+
+## Audit Log Actions Reference
+All logged to `audit_log` table. Query with `SELECT * FROM audit_log WHERE user_id = ? ORDER BY ts DESC`.
+
+| Action | When | Details |
+|--------|------|---------|
+| `auth.callback` | OAuth completes | `is_new_user`, `display_name` |
+| `backfill.upload` | Data export processed | `total_processed`, `total_accepted`, `total_rejected`, `rejection_reasons` |
+| `friends.invite_created` | Invite generated | entity_type=`invite`, entity_id=code |
+| `friends.invite_accepted` | Invite accepted or rejected | `friend_id` on success; `reason` on denial |
+| `gatekeep.artist_viewed` | Artist comparison | `artist_name`, `num_participants`, `winner` |
+| `gatekeep.track_viewed` | Track comparison | `track_name`, `num_participants`, `winner` |
+| `gatekeep.leaderboard_viewed` | Leaderboard accessed | `total_artists_contested`, `num_entries` |
+| `gatekeep.challenge_created` | Challenge generated | `artist_name`, `total_listens`, `invite_code` |
+| `stats.top_tracks_viewed` | Stats page | `period`, `limit`, `offset`, `results` |
+| `stats.top_artists_viewed` | Stats page | `period`, `limit`, `offset`, `results` |
+| `stats.top_genres_viewed` | Stats page | `period`, `limit`, `offset`, `results` |
+| `stats.wrapped_viewed` | Wrapped summary | `year`, `total_minutes` |
+| `search.artists` | Artist search | `query`, `results` |
+| `search.tracks` | Track search | `query`, `results` |
+| `system.database_error` | DB connectivity failure | `path`, `error` |
+| `system.unhandled_error` | Unexpected exception | `path`, `method`, `error_type`, `error` |
