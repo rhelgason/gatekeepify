@@ -118,6 +118,33 @@ class Listen(Base):
     )
 
 
+class Friendship(Base):
+    __tablename__ = "friendships"
+
+    user_id_1: Mapped[str] = mapped_column(
+        String(255), ForeignKey("dim_all_users.user_id"), primary_key=True
+    )
+    user_id_2: Mapped[str] = mapped_column(
+        String(255), ForeignKey("dim_all_users.user_id"), primary_key=True
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime)
+
+
+class FriendInvite(Base):
+    __tablename__ = "friend_invites"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    from_user_id: Mapped[str] = mapped_column(
+        String(255), ForeignKey("dim_all_users.user_id")
+    )
+    invite_code: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime)
+    accepted_by_user_id: Mapped[Optional[str]] = mapped_column(
+        String(255), ForeignKey("dim_all_users.user_id"), nullable=True
+    )
+    accepted_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+
+
 class JobRun(Base):
     __tablename__ = "job_runs"
 

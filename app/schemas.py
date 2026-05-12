@@ -107,3 +107,67 @@ class BackfillStatusResponse(BaseModel):
     tracks_missing_metadata: int
     total_listens: int
     total_tracks: int
+
+
+# --- Social / Friends ---
+
+
+class FriendResponse(BaseModel):
+    user_id: str
+    user_name: Optional[str] = None
+    friends_since: datetime
+
+
+class InviteResponse(BaseModel):
+    invite_code: str
+
+
+class InviteAcceptResponse(BaseModel):
+    friend: FriendResponse
+
+
+# --- Gatekeeping ---
+
+
+class GatekeepEntry(BaseModel):
+    user_id: str
+    user_name: Optional[str] = None
+    first_listen: datetime
+    first_listen_source: str
+    total_listens: int
+    verified_listens: int
+    total_minutes: int
+    is_winner: bool
+
+
+class GatekeepArtistResponse(BaseModel):
+    artist_id: str
+    artist_name: Optional[str] = None
+    entries: List[GatekeepEntry]
+
+
+class GatekeepTrackResponse(BaseModel):
+    track_id: str
+    track_name: Optional[str] = None
+    entries: List[GatekeepEntry]
+
+
+class LeaderboardEntry(BaseModel):
+    rank: int
+    user_id: str
+    user_name: Optional[str] = None
+    crown_count: int
+
+
+class LeaderboardResponse(BaseModel):
+    entries: List[LeaderboardEntry]
+    total_artists_contested: int
+
+
+class ChallengeResponse(BaseModel):
+    challenge_text: str
+    invite_code: str
+    artist_id: str
+    artist_name: Optional[str] = None
+    your_first_listen: datetime
+    your_total_listens: int

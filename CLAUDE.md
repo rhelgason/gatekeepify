@@ -31,11 +31,13 @@ The app is mid-migration from a local CLI tool to a web service. Both exist in t
 - `app/routers/backfill.py` -- ZIP upload with 5-layer fraud validation
 - `app/services/spotify.py` -- Multi-user Spotify API client + token encryption
 - `app/services/ingestion.py` -- Data upsert logic for all tables
+- `app/routers/friends.py` -- Friend invites, acceptance, listing
+- `app/routers/gatekeep.py` -- Artist/track comparison, leaderboard, challenge cards
 - `app/celery_app.py` -- Celery config + beat schedule
 - `app/tasks.py` -- Periodic tasks: poll_recent_listens, backfill_track_metadata
 
 ### Database Schema
-8 data tables + 1 job tracking table:
+8 data tables + 2 social tables + 1 job tracking table:
 - `dim_all_albums` (album_id PK, album_name, **release_date**)
 - `dim_all_tracks` (track_id PK, track_name, album_id FK, duration_ms, is_local)
 - `dim_all_artists` (artist_id PK, artist_name)
@@ -43,6 +45,8 @@ The app is mid-migration from a local CLI tool to a web service. Both exist in t
 - `artist_to_genre` (composite PK, M:N junction)
 - `dim_all_users` (user_id PK, user_name, email, **spotify_refresh_token**, created_at, last_poll_at)
 - `dim_all_listens` (composite PK: ts+user_id+track_id, **source**, **export_metadata**)
+- `friendships` (composite PK: user_id_1+user_id_2, created_at) -- both directions stored
+- `friend_invites` (id PK, from_user_id, invite_code UNIQUE, created_at, accepted_by_user_id, accepted_at)
 - `job_runs` (id PK, job_name, user_id, started_at, completed_at, status, record_count)
 
 Bold columns are new additions from the architecture overhaul.
@@ -111,16 +115,16 @@ SQLAlchemy models, Alembic migrations, FastAPI with Spotify OAuth, stats endpoin
 ### Phase 2: Background Jobs + Multi-User ✅ COMPLETE
 Celery + Redis tasks, ingestion service, per-user token management, Dockerfile + supervisord + fly.toml for deployment.
 
-### Phase 3: Social + Gatekeeping Core ❌ NOT STARTED
-This is the actual product differentiator. Key work:
-- `friendships` table (bidirectional) + `friend_invites` table (with invite codes)
-- Friend invite/accept API endpoints
-- **`GET /gatekeep/artist/{artist_id}`** -- the core feature: compare first-listen dates among friends, crown the earliest listener, show verified vs self-reported badges
-- **`GET /gatekeep/track/{track_id}`** -- same for tracks
-- **`GET /gatekeep/leaderboard`** -- who has the most "first listener" crowns
-- **`POST /gatekeep/challenge`** -- generate shareable "prove me wrong" cards with embedded invite links
+### Phase 3: Social + Gatekeeping Core ✅ COMPLETE
+New models: `Friendship` (bidirectional, both directions stored), `FriendInvite` (with `invite_code`, tracks acceptance). Alembic migration `002_social_tables.py`.
 
-The core gatekeeping query includes a trust hierarchy: `first_listen_source` tells the UI whether to show a verified badge (API-sourced) or "self-reported" (export-sourced).
+New routers:
+- `app/routers/friends.py` -- `POST /friends/invite`, `POST /friends/accept/{code}`, `GET /friends`
+- `app/routers/gatekeep.py` -- `GET /gatekeep/artist/{id}`, `GET /gatekeep/track/{id}`, `GET /gatekeep/leaderboard`, `POST /gatekeep/challenge`
+
+The gatekeeping query joins listens → track_to_artist → tracks → users, grouped by user, ordered by `MIN(ts)` ASC. Each entry includes `first_listen_source` (api vs export) and `verified_listens` count (uses `CASE WHEN source='api' THEN 1 ELSE 0 END` for SQLite compatibility). The leaderboard uses CTEs to count how many artists each user discovered first among their friend group, only counting artists with 2+ listeners.
+
+The `get_friend_ids()` helper in `friends.py` is reused by the gatekeep router to scope all queries to the user's friend group. Friendships are stored bidirectionally (two rows per friendship) so querying is a simple `WHERE user_id_1 = ?`.
 
 ### Phase 4: Frontend ❌ NOT STARTED
 Next.js web app. Key pages: landing (`/`), dashboard, upload, friends, `/gatekeep/[artistId]` (the product page), leaderboard. The gatekeep page needs trust indicators (verified checkmark vs self-reported marker).
@@ -153,6 +157,9 @@ The legacy `stat_viewer.py` loaded all listens into memory and used `Counter`. T
 - Spotify's `played_at` format (`%Y-%m-%dT%H:%M:%S.%fZ`) differs from the data export format (`%Y-%m-%dT%H:%M:%SZ`) -- both are handled
 - Tracks can exist in `dim_all_listens` with no corresponding `dim_all_tracks` row (from backfill imports). The `backfill_track_metadata` task finds these via LEFT JOIN + IS NULL
 - When two tracks share the same artist, SQLAlchemy needs a `db.flush()` between merges to avoid duplicate INSERT errors (fixed in `_upsert_track_and_relations`)
+- The gatekeep queries use `SUM(CASE WHEN ... THEN 1 ELSE 0 END)` instead of `COUNT(*) FILTER (WHERE ...)` because SQLite doesn't support FILTER
+- Friendships are stored bidirectionally (two rows). If you add a friendship A↔B, insert both (A,B) and (B,A) rows. This makes querying simple but requires keeping both in sync
+- The leaderboard only counts "contested" artists (those with 2+ listeners in the friend group). An artist only you've listened to doesn't earn a crown
 - The `redis` package is in requirements.txt from the legacy app but was never used; `celery[redis]` now provides the actual Redis dependency
 - `src/host_constants.py` contains real Spotify API credentials in plaintext -- these should be rotated after migrating to env vars in production
 - The `.cache` files (spotipy OAuth token cache) in both root and `src/` contain live tokens and should not be committed

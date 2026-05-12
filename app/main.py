@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 
 from app.database import Base, engine
-from app.routers import auth, backfill, stats
+from app.routers import auth, backfill, friends, gatekeep, stats
 
 Base.metadata.create_all(bind=engine)
 
@@ -14,6 +14,8 @@ app = FastAPI(
 app.include_router(auth.router)
 app.include_router(stats.router)
 app.include_router(backfill.router)
+app.include_router(friends.router)
+app.include_router(gatekeep.router)
 
 
 @app.get("/health")
