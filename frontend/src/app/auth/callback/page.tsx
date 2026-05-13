@@ -12,7 +12,13 @@ function CallbackHandler() {
     const token = searchParams.get("token");
     if (token) {
       setToken(token);
-      router.replace("/dashboard");
+      const pendingInvite = localStorage.getItem("pending_invite");
+      if (pendingInvite) {
+        localStorage.removeItem("pending_invite");
+        router.replace(`/invite/${pendingInvite}`);
+      } else {
+        router.replace("/dashboard");
+      }
     } else {
       router.replace("/");
     }

@@ -182,27 +182,29 @@ export default function Friends() {
         )}
       </section>
 
-      {/* Invite Code */}
+      {/* Invite Link */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-10">
         <div className="card p-6">
-          <h2 className="font-bold text-lg mb-4">Share Invite Code</h2>
+          <h2 className="font-bold text-lg mb-4">Invite a Friend</h2>
           <p className="text-gray-500 text-sm mb-3">
-            For friends not yet on Gatekeepify
+            Share a link -- they click it, sign in, and you&apos;re friends instantly
           </p>
           <button onClick={handleCreateInvite} className="btn-primary w-full">
-            Generate Code
+            Generate Invite Link
           </button>
           {inviteCode && (
-            <div className="mt-4 flex items-center gap-2 bg-white/5 rounded-xl p-3">
-              <code className="font-mono text-[var(--green)] text-sm flex-1 truncate">
-                {inviteCode}
-              </code>
-              <button
-                onClick={() => navigator.clipboard.writeText(inviteCode)}
-                className="btn-secondary text-xs py-1.5 px-4"
-              >
-                Copy
-              </button>
+            <div className="mt-4">
+              <div className="flex items-center gap-2 bg-white/5 rounded-xl p-3">
+                <code className="font-mono text-[var(--green)] text-xs flex-1 truncate">
+                  {typeof window !== "undefined" ? `${window.location.origin}/invite/${inviteCode}` : inviteCode}
+                </code>
+                <button
+                  onClick={() => navigator.clipboard.writeText(`${window.location.origin}/invite/${inviteCode}`)}
+                  className="btn-secondary text-xs py-1.5 px-4"
+                >
+                  Copy
+                </button>
+              </div>
             </div>
           )}
         </div>
