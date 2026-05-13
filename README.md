@@ -1,21 +1,96 @@
-# gatekeepify
-Better gatekeep music from your friends by proving quantitatively how early and often you started listening to an artist.
+# Gatekeepify
 
-## Usage
-1. Clone the repo
-2. Set up the cron jobs (see below).
-3. Download your Spotify data
-4. Upsert the Spotify data
+**Prove you listened first.**
 
-## Backfill your Data
-To get better functionality, you can backfill your data. This will allow you to see more information across your all time listening history. To do this, you will need to:
-1. Download your data from Spotify. Within a few days of your request, they will send you a zip file with your data.
-2. Unzip the file to your machine.
-3. Run the app and select the "Backfill my Data" option. The program will read each JSON file and upsert it to the database.
+Gatekeepify tracks your Spotify listening history and lets you competitively compare with friends. Settle the debate with timestamps, not opinions.
 
-## Cron Jobs
-There is one cron job that you will want to set up in order to keep your data active, but it encompasses two separate jobs:
-1. Fetch recent listens: this job keeps a constantly updated list of your Spotify listening data. We can only fetch the 50 most recent listens (each of at least 30 seconds), so this job should run about every 20 minutes.
-2. If we ever do a one-time backfill of all Spotify listening history for a user, we will almost certainly have some gaps in track data. We solve this problem with an occasional job for backfilling additional track data (album, artists, duration). We still want to avoid Spotify API rate-limiting, so we run this job about every 1 minute.
+## What It Does
 
-We can set this up with just one crontab entry. Example crontab entry: `* * * * * cd <gatekeepify path> && python3 src/cron.py`
+- **Track listening history** automatically via Spotify API polling every 15 minutes
+- **Upload your full history** from Spotify's data export for years of data
+- **Compare with friends** -- see who discovered an artist first, with verified vs. self-reported badges
+- **12 competitive awards** -- Crown, Archaeologist, Patient Zero, The Obsessive, Night Owl, Genre Snob, and more
+- **Head-to-head matchups** -- compare all metrics against any friend
+- **Discover new music** -- see what friends are listening to, find artists you're late on, track rising artists
+- **Predicted Spotify Wrapped** -- your year-in-review, available any time with historical data
+- **Artist deep-dives** -- listening timeline charts, Last.fm global stats, gatekeep comparison, challenge cards
+- **Data integrity** -- 5-layer fraud detection including release date validation, anomaly detection, and trust scores
+
+## Tech Stack
+
+**Backend:** Python, FastAPI, SQLAlchemy, PostgreSQL, Celery + Redis, spotipy
+
+**Frontend:** Next.js 14, TypeScript, Tailwind CSS
+
+**Deployment:** Railway (backend + PostgreSQL + Redis), Vercel (frontend)
+
+**CI:** GitHub Actions runs 199 tests on every push
+
+## Architecture
+
+```
+Frontend (Vercel)          Backend (Railway)
+Next.js + Tailwind    -->  FastAPI + SQLAlchemy
+                           |
+                     PostgreSQL (Railway)
+                           |
+                     Celery Worker + Beat
+                           |
+                     Redis (Railway)
+                           |
+                     Spotify API + Last.fm API
+```
+
+Three processes run in a single Railway container via supervisord:
+- **Web server** (uvicorn) -- serves the API
+- **Celery Worker** -- executes background tasks
+- **Celery Beat** -- schedules periodic polling and award computation
+
+## Features
+
+### For Users
+- Sign in with Spotify, start tracking immediately
+- Upload Spotify data export for full history
+- Dashboard with top tracks, artists, genres by time period
+- Dedicated artist pages with cover art, listening timeline, and gatekeep comparison
+- Wrapped predictions for any year
+- Trophy case with 12 award categories
+- Head-to-head comparisons with friends
+- Music discovery feed (friends' finds, trending, "you're late on...")
+- Invite friends via shareable links
+
+### For Data Integrity
+- Listen source tagging (API-verified vs. self-reported export data)
+- Release date validation (reject listens before a track existed)
+- Retroactive validation when track metadata is backfilled
+- Statistical anomaly detection (rapid-fire, bot-like spacing, single-day dumps, backdated clusters)
+- Trust scores per user (0-100)
+
+### For Scale
+- Batched polling with priority ordering (least recently polled first)
+- Redis distributed lock prevents overlapping poll cycles
+- Inter-user delay respects Spotify rate limits
+- Designed for 10k+ users
+
+## Development
+
+```bash
+# Install dependencies
+source env/bin/activate
+pip install -r requirements-server.txt
+
+# Run tests (no external services needed)
+python -m pytest tests/test_app/ -v
+
+# Run the server locally
+uvicorn app.main:app --reload
+# Swagger UI at http://localhost:8000/docs
+
+# Run Celery (requires Redis)
+celery -A app.celery_app worker --loglevel=info
+celery -A app.celery_app beat --loglevel=info
+```
+
+## License
+
+MIT
