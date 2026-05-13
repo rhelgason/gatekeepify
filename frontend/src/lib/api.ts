@@ -92,6 +92,13 @@ export const api = {
 
   searchTracks: (q: string) => request<any[]>(`/search/tracks?q=${encodeURIComponent(q)}`),
 
+  getArtistDetail: (artistId: string) => request<any>(`/search/artist/${artistId}`),
+
+  getTrackDetail: (trackId: string) => request<any>(`/search/track/${trackId}`),
+
+  getTimeline: (artistId: string, mode: string = "personal") =>
+    request<any>(`/stats/timeline?artist_id=${artistId}&mode=${mode}`),
+
   gatekeepArtist: (artistId: string) => request<any>(`/gatekeep/artist/${artistId}`),
 
   gatekeepTrack: (trackId: string) => request<any>(`/gatekeep/track/${trackId}`),

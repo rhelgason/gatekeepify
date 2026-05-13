@@ -49,21 +49,30 @@ export default function Upload() {
   }
 
   return (
-    <div>
-      <h1 className="text-2xl font-bold mb-2">Upload Listening History</h1>
-      <p className="text-gray-500 mb-6">
-        Upload your Spotify data export to backfill your full listening
-        history. Without this, we can only track listens from when you signed
-        up.
+    <div className="animate-fade-in">
+      <h1 className="text-3xl font-black mb-2">Upload History</h1>
+      <p className="text-gray-500 mb-8 max-w-xl">
+        Upload your Spotify data export to unlock your full listening history.
+        Without this, we can only track your last 50 listens.
       </p>
 
-      <div className="bg-gray-900 rounded-lg p-4 mb-6">
-        <h2 className="font-semibold mb-2">How to get your data</h2>
-        <ol className="text-gray-400 text-sm space-y-1 list-decimal list-inside">
-          <li>Go to your Spotify Account &gt; Privacy Settings</li>
+      <div className="card p-6 mb-8">
+        <h2 className="font-bold text-lg mb-3">How to get your data</h2>
+        <ol className="text-gray-400 text-sm space-y-2 list-decimal list-inside">
+          <li>
+            Go to{" "}
+            <a
+              href="https://www.spotify.com/account/privacy/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-[var(--green)] hover:underline"
+            >
+              Spotify Account &gt; Privacy Settings
+            </a>
+          </li>
           <li>Request &ldquo;Extended streaming history&rdquo;</li>
           <li>Spotify sends you a ZIP file within a few days</li>
-          <li>Upload that ZIP file here</li>
+          <li>Upload that ZIP file below</li>
         </ol>
       </div>
 
@@ -75,10 +84,10 @@ export default function Upload() {
         onDragLeave={() => setDragging(false)}
         onDrop={handleDrop}
         onClick={() => fileInput.current?.click()}
-        className={`border-2 border-dashed rounded-lg p-12 text-center cursor-pointer transition ${
+        className={`card cursor-pointer p-16 text-center transition-all duration-200 ${
           dragging
-            ? "border-green-500 bg-green-500/5"
-            : "border-gray-700 hover:border-gray-600"
+            ? "border-[var(--green)] bg-[var(--green-dim)] scale-[1.01]"
+            : "hover:border-white/10 hover:bg-[#1a1a1a]"
         }`}
       >
         <input
@@ -89,48 +98,46 @@ export default function Upload() {
           onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])}
         />
         {uploading ? (
-          <p className="text-gray-400">Uploading and processing...</p>
+          <div>
+            <div className="text-3xl mb-3 animate-pulse">📦</div>
+            <p className="text-gray-400">Uploading and processing...</p>
+          </div>
         ) : (
           <div>
-            <p className="text-gray-300 mb-1">
+            <div className="text-3xl mb-3">📁</div>
+            <p className="text-gray-300 font-medium mb-1">
               Drop your ZIP file here, or click to browse
             </p>
-            <p className="text-gray-600 text-sm">
-              Accepts Spotify data export ZIP files (max 100 MB)
-            </p>
+            <p className="text-gray-600 text-sm">Max 100 MB</p>
           </div>
         )}
       </div>
 
-      {error && (
-        <p className="text-red-400 mt-3">{error}</p>
-      )}
+      {error && <p className="text-red-400 mt-4">{error}</p>}
 
       {result && (
-        <div className="mt-6 bg-gray-900 rounded-lg p-4">
-          <h2 className="font-semibold mb-3 text-green-400">Upload Complete</h2>
+        <div className="card mt-6 p-6 animate-slide-up">
+          <h2 className="font-bold text-[var(--green)] mb-4 text-lg">Upload Complete</h2>
           <div className="grid grid-cols-3 gap-4 text-center">
             <div>
-              <div className="text-2xl font-bold">
-                {result.total_listens_processed}
-              </div>
+              <div className="stat-number">{result.total_listens_processed.toLocaleString()}</div>
               <div className="text-gray-500 text-sm">Processed</div>
             </div>
             <div>
-              <div className="text-2xl font-bold text-green-400">
-                {result.total_listens_accepted}
+              <div className="stat-number text-[var(--green)]">
+                {result.total_listens_accepted.toLocaleString()}
               </div>
               <div className="text-gray-500 text-sm">Accepted</div>
             </div>
             <div>
-              <div className="text-2xl font-bold text-red-400">
-                {result.total_listens_rejected}
+              <div className="stat-number text-red-400">
+                {result.total_listens_rejected.toLocaleString()}
               </div>
               <div className="text-gray-500 text-sm">Rejected</div>
             </div>
           </div>
           {Object.keys(result.rejection_reasons || {}).length > 0 && (
-            <div className="mt-3 text-sm text-gray-500">
+            <div className="mt-4 text-xs text-gray-600 bg-white/5 rounded-xl p-3">
               Rejections:{" "}
               {Object.entries(result.rejection_reasons)
                 .map(([k, v]) => `${k}: ${v}`)
@@ -141,15 +148,23 @@ export default function Upload() {
       )}
 
       {status && (
-        <div className="mt-6 bg-gray-900 rounded-lg p-4">
-          <h2 className="font-semibold mb-2">Current Status</h2>
-          <div className="text-sm text-gray-400 space-y-1">
-            <p>Total listens: {status.total_listens.toLocaleString()}</p>
-            <p>Unique tracks: {status.total_tracks.toLocaleString()}</p>
-            <p>
-              Tracks awaiting metadata:{" "}
-              {status.tracks_missing_metadata.toLocaleString()}
-            </p>
+        <div className="card mt-6 p-6">
+          <h2 className="text-sm font-bold uppercase tracking-widest text-gray-500 mb-3">
+            Your Data
+          </h2>
+          <div className="grid grid-cols-3 gap-4 text-center">
+            <div>
+              <div className="text-2xl font-black">{status.total_listens.toLocaleString()}</div>
+              <div className="text-gray-600 text-sm">Total Listens</div>
+            </div>
+            <div>
+              <div className="text-2xl font-black">{status.total_tracks.toLocaleString()}</div>
+              <div className="text-gray-600 text-sm">Unique Tracks</div>
+            </div>
+            <div>
+              <div className="text-2xl font-black">{status.tracks_missing_metadata.toLocaleString()}</div>
+              <div className="text-gray-600 text-sm">Awaiting Metadata</div>
+            </div>
           </div>
         </div>
       )}

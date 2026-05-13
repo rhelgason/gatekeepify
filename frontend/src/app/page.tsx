@@ -27,26 +27,34 @@ export default function Landing() {
   }
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-[80vh] text-center">
-      <h1 className="text-5xl font-bold mb-4">
-        Prove you listened <span className="text-green-400">first</span>.
-      </h1>
-      <p className="text-gray-400 text-lg mb-8 max-w-md">
-        Track your Spotify history, compare with friends, and settle the debate
-        once and for all.
-      </p>
+    <div className="flex flex-col items-center justify-center min-h-[85vh] text-center animate-fade-in">
+      <div className="mb-8">
+        <div className="inline-block px-4 py-1.5 rounded-full bg-white/5 border border-white/10 text-sm text-gray-400 mb-8">
+          for music snobs, by music snobs
+        </div>
+        <h1 className="text-6xl md:text-8xl font-black tracking-tight leading-[0.9] mb-6">
+          Prove you
+          <br />
+          listened{" "}
+          <span className="gradient-text">first</span>.
+        </h1>
+        <p className="text-gray-500 text-lg md:text-xl max-w-lg mx-auto leading-relaxed">
+          Track your listening history. Compare with friends.
+          <br />
+          Settle it with timestamps, not opinions.
+        </p>
+      </div>
       <button
         onClick={handleLogin}
         disabled={loading}
-        className="bg-green-500 hover:bg-green-400 text-black font-bold py-3 px-8 rounded-full text-lg transition disabled:opacity-50"
+        className="btn-primary text-lg disabled:opacity-50 disabled:scale-100"
       >
         {loading ? "Connecting..." : "Sign in with Spotify"}
       </button>
-      {error && (
-        <p className="text-red-400 text-sm mt-4">{error}</p>
-      )}
-      <p className="text-gray-600 text-sm mt-6">
-        We only read your listening history. We never post or modify anything.
+      {error && <p className="text-red-400 text-sm mt-4">{error}</p>}
+      <p className="text-gray-700 text-xs mt-8 max-w-sm">
+        We only read your listening history. We never post, modify, or share
+        anything on your behalf.
       </p>
     </div>
   );

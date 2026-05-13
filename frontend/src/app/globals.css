@@ -2,6 +2,47 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --green: #1DB954;
+  --green-light: #1ed760;
+  --green-dim: rgba(29, 185, 84, 0.15);
+  --yellow: #f5a623;
+  --yellow-dim: rgba(245, 166, 35, 0.15);
+}
+
 body {
-  @apply bg-gray-950 text-gray-100;
+  @apply bg-[#0a0a0a] text-gray-100;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+::selection {
+  background: var(--green);
+  color: black;
+}
+
+@layer components {
+  .card {
+    @apply bg-[#161616] rounded-2xl border border-white/5;
+  }
+  .card-hover {
+    @apply card transition-all duration-200 hover:border-white/10 hover:bg-[#1a1a1a] hover:scale-[1.01];
+  }
+  .badge-verified {
+    @apply text-xs px-2.5 py-0.5 rounded-full bg-[var(--green-dim)] text-[var(--green)] font-medium;
+  }
+  .badge-self-reported {
+    @apply text-xs px-2.5 py-0.5 rounded-full bg-[var(--yellow-dim)] text-[var(--yellow)] font-medium;
+  }
+  .btn-primary {
+    @apply bg-[var(--green)] hover:bg-[var(--green-light)] text-black font-bold py-3 px-8 rounded-full transition-all duration-200 hover:scale-105;
+  }
+  .btn-secondary {
+    @apply bg-white/10 hover:bg-white/15 text-white font-medium py-2.5 px-6 rounded-full transition-all duration-200;
+  }
+  .gradient-text {
+    @apply bg-gradient-to-r from-[var(--green)] to-emerald-300 bg-clip-text text-transparent;
+  }
+  .stat-number {
+    @apply text-4xl font-black tracking-tight;
+  }
 }

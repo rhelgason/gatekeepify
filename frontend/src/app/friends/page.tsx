@@ -48,30 +48,31 @@ export default function Friends() {
   }
 
   if (loading) {
-    return <p className="text-gray-400 mt-12 text-center">Loading...</p>;
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="text-gray-500 animate-pulse text-lg">Loading...</div>
+      </div>
+    );
   }
 
   return (
-    <div>
-      <h1 className="text-2xl font-bold mb-6">Friends</h1>
+    <div className="animate-fade-in">
+      <h1 className="text-3xl font-black mb-8">Friends</h1>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-        <div className="bg-gray-900 rounded-lg p-4">
-          <h2 className="font-semibold mb-3">Invite a Friend</h2>
-          <button
-            onClick={handleCreateInvite}
-            className="bg-green-500 hover:bg-green-400 text-black font-semibold px-4 py-2 rounded transition w-full"
-          >
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-10">
+        <div className="card p-6">
+          <h2 className="font-bold text-lg mb-4">Invite a Friend</h2>
+          <button onClick={handleCreateInvite} className="btn-primary w-full">
             Generate Invite Code
           </button>
           {inviteCode && (
-            <div className="mt-3 flex items-center gap-2">
-              <code className="bg-gray-800 px-3 py-2 rounded text-green-400 text-sm flex-1">
+            <div className="mt-4 flex items-center gap-2 bg-white/5 rounded-xl p-3">
+              <code className="font-mono text-[var(--green)] text-sm flex-1 truncate">
                 {inviteCode}
               </code>
               <button
                 onClick={() => navigator.clipboard.writeText(inviteCode)}
-                className="text-xs text-gray-500 hover:text-gray-300 whitespace-nowrap"
+                className="btn-secondary text-xs py-1.5 px-4"
               >
                 Copy
               </button>
@@ -79,8 +80,8 @@ export default function Friends() {
           )}
         </div>
 
-        <div className="bg-gray-900 rounded-lg p-4">
-          <h2 className="font-semibold mb-3">Accept an Invite</h2>
+        <div className="card p-6">
+          <h2 className="font-bold text-lg mb-4">Accept an Invite</h2>
           <div className="flex gap-2">
             <input
               type="text"
@@ -88,39 +89,38 @@ export default function Friends() {
               onChange={(e) => setAcceptCode(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleAcceptInvite()}
               placeholder="Paste invite code..."
-              className="flex-1 bg-gray-800 border border-gray-700 rounded px-3 py-2 text-gray-100 placeholder-gray-500 focus:border-green-500 focus:outline-none text-sm"
+              className="flex-1 bg-white/5 border border-white/10 rounded-full px-5 py-3 text-gray-100 placeholder-gray-600 focus:border-[var(--green)] focus:outline-none text-sm transition-all"
             />
-            <button
-              onClick={handleAcceptInvite}
-              className="bg-green-500 hover:bg-green-400 text-black font-semibold px-4 py-2 rounded transition"
-            >
+            <button onClick={handleAcceptInvite} className="btn-primary">
               Accept
             </button>
           </div>
           {message && (
-            <p className="text-sm mt-2 text-gray-400">{message}</p>
+            <p className="text-sm mt-3 text-gray-400">{message}</p>
           )}
         </div>
       </div>
 
-      <h2 className="font-semibold mb-3">
+      <h2 className="text-sm font-bold uppercase tracking-widest text-gray-500 mb-4">
         Your Friends ({friends.length})
       </h2>
       {friends.length === 0 ? (
-        <p className="text-gray-500">
-          No friends yet. Generate an invite code and share it!
-        </p>
+        <div className="card p-12 text-center">
+          <p className="text-gray-400 text-lg mb-2">No friends yet</p>
+          <p className="text-gray-600 text-sm">
+            Generate an invite code above and share it!
+          </p>
+        </div>
       ) : (
         <div className="space-y-2">
           {friends.map((f) => (
             <div
               key={f.user_id}
-              className="flex justify-between bg-gray-900 rounded px-4 py-3"
+              className="card flex justify-between items-center px-5 py-4"
             >
-              <span>{f.user_name || f.user_id}</span>
-              <span className="text-gray-500 text-sm">
-                Friends since{" "}
-                {new Date(f.friends_since).toLocaleDateString()}
+              <span className="font-medium">{f.user_name || f.user_id}</span>
+              <span className="text-gray-600 text-sm">
+                Since {new Date(f.friends_since).toLocaleDateString()}
               </span>
             </div>
           ))}
