@@ -172,3 +172,79 @@ class TestListFriends:
         resp = client.get("/friends", headers=auth_headers)
         assert resp.status_code == 200
         assert resp.json() == []
+
+
+class TestSearchUsers:
+    def test_search_finds_users(self, client, seeded_db, auth_headers):
+        seeded_db.add(User(user_id="user_2", user_name="Alice Smith"))
+        seeded_db.commit()
+        resp = client.get("/friends/search-users", params={"q": "Alice"}, headers=auth_headers)
+        assert resp.status_code == 200
+        assert len(resp.json()) == 1
+        assert resp.json()[0]["user_name"] == "Alice Smith"
+
+    def test_search_excludes_self(self, client, seeded_db, auth_headers):
+        resp = client.get("/friends/search-users", params={"q": "Test"}, headers=auth_headers)
+        assert resp.status_code == 200
+        user_ids = [u["user_id"] for u in resp.json()]
+        assert "test_user_1" not in user_ids
+
+    def test_search_shows_friend_status(self, client, seeded_db, auth_headers):
+        seeded_db.add(User(user_id="friend_1", user_name="Friend One"))
+        now = datetime.now(timezone.utc)
+        seeded_db.add(Friendship(user_id_1="test_user_1", user_id_2="friend_1", created_at=now))
+        seeded_db.commit()
+        resp = client.get("/friends/search-users", params={"q": "Friend"}, headers=auth_headers)
+        assert resp.json()[0]["is_friend"] is True
+
+
+class TestDirectFriendRequests:
+    def test_send_request(self, client, seeded_db, auth_headers):
+        seeded_db.add(User(user_id="target", user_name="Target"))
+        seeded_db.commit()
+        resp = client.post("/friends/request", params={"to_user_id": "target"}, headers=auth_headers)
+        assert resp.status_code == 200
+        assert resp.json()["status"] == "sent"
+
+    def test_cannot_request_self(self, client, seeded_db, auth_headers):
+        resp = client.post("/friends/request", params={"to_user_id": "test_user_1"}, headers=auth_headers)
+        assert resp.status_code == 400
+
+    def test_cannot_request_existing_friend(self, client, seeded_db, auth_headers):
+        seeded_db.add(User(user_id="existing_friend", user_name="EF"))
+        now = datetime.now(timezone.utc)
+        seeded_db.add(Friendship(user_id_1="test_user_1", user_id_2="existing_friend", created_at=now))
+        seeded_db.add(Friendship(user_id_1="existing_friend", user_id_2="test_user_1", created_at=now))
+        seeded_db.commit()
+        resp = client.post("/friends/request", params={"to_user_id": "existing_friend"}, headers=auth_headers)
+        assert resp.status_code == 400
+
+    def test_view_pending_requests(self, client, seeded_db, auth_headers):
+        seeded_db.add(User(user_id="requester", user_name="Requester", spotify_refresh_token="tok"))
+        seeded_db.commit()
+        # requester sends request to test_user_1
+        client.post("/friends/request", params={"to_user_id": "test_user_1"}, headers=_auth("requester"))
+        resp = client.get("/friends/requests", headers=auth_headers)
+        assert resp.status_code == 200
+        assert len(resp.json()) == 1
+        assert resp.json()[0]["from_user_id"] == "requester"
+
+    def test_accept_request(self, client, seeded_db, auth_headers):
+        seeded_db.add(User(user_id="requester", user_name="Requester"))
+        seeded_db.commit()
+        client.post("/friends/request", params={"to_user_id": "test_user_1"}, headers=_auth("requester"))
+        requests = client.get("/friends/requests", headers=auth_headers).json()
+        req_id = requests[0]["id"]
+        resp = client.post(f"/friends/requests/{req_id}/accept", headers=auth_headers)
+        assert resp.status_code == 200
+        assert resp.json()["status"] == "accepted"
+
+    def test_decline_request(self, client, seeded_db, auth_headers):
+        seeded_db.add(User(user_id="requester", user_name="Requester"))
+        seeded_db.commit()
+        client.post("/friends/request", params={"to_user_id": "test_user_1"}, headers=_auth("requester"))
+        requests = client.get("/friends/requests", headers=auth_headers).json()
+        req_id = requests[0]["id"]
+        resp = client.post(f"/friends/requests/{req_id}/decline", headers=auth_headers)
+        assert resp.status_code == 200
+        assert resp.json()["status"] == "declined"

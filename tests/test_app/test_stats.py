@@ -1,3 +1,6 @@
+from app.models import User
+
+
 class TestTopTracks:
     def test_top_tracks_all_time(self, client, seeded_db, auth_headers):
         resp = client.get(
@@ -115,3 +118,60 @@ class TestWrapped:
         assert resp.status_code == 200
         data = resp.json()
         assert data["year"] is not None
+
+    def test_wrapped_invalid_year(self, client, seeded_db, auth_headers):
+        resp = client.get("/stats/wrapped", params={"year": 1999}, headers=auth_headers)
+        assert resp.status_code == 400
+
+
+class TestTimeline:
+    def test_timeline_personal(self, client, seeded_db, auth_headers):
+        resp = client.get(
+            "/stats/timeline",
+            params={"artist_id": "artist_1", "mode": "personal"},
+            headers=auth_headers,
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "users" in data
+        assert len(data["users"]) >= 1
+
+    def test_timeline_requires_artist_or_track(self, client, seeded_db, auth_headers):
+        resp = client.get("/stats/timeline", headers=auth_headers)
+        assert resp.status_code == 400
+
+    def test_timeline_friends_mode(self, client, seeded_db, auth_headers):
+        resp = client.get(
+            "/stats/timeline",
+            params={"artist_id": "artist_1", "mode": "friends"},
+            headers=auth_headers,
+        )
+        assert resp.status_code == 200
+
+    def test_timeline_global_mode(self, client, seeded_db, auth_headers):
+        resp = client.get(
+            "/stats/timeline",
+            params={"artist_id": "artist_1", "mode": "global"},
+            headers=auth_headers,
+        )
+        assert resp.status_code == 200
+
+
+class TestTargetUserStats:
+    def test_cannot_view_non_friend_stats(self, client, seeded_db, auth_headers):
+        seeded_db.add(User(user_id="stranger", user_name="Stranger"))
+        seeded_db.commit()
+        resp = client.get(
+            "/stats/top-tracks",
+            params={"period": "all", "target_user_id": "stranger"},
+            headers=auth_headers,
+        )
+        assert resp.status_code == 403
+
+    def test_can_view_own_stats_with_target(self, client, seeded_db, auth_headers):
+        resp = client.get(
+            "/stats/top-tracks",
+            params={"period": "all", "target_user_id": "test_user_1"},
+            headers=auth_headers,
+        )
+        assert resp.status_code == 200

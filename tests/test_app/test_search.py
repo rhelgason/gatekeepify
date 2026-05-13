@@ -88,3 +88,46 @@ class TestSearchTracks:
         data = resp.json()
         if len(data) >= 2:
             assert data[0]["your_listen_count"] >= data[1]["your_listen_count"]
+
+
+class TestArtistDetail:
+    def test_get_artist_detail(self, client, seeded_db, auth_headers):
+        resp = client.get("/search/artist/artist_1", headers=auth_headers)
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["artist_id"] == "artist_1"
+        assert data["artist_name"] == "Radiohead"
+        assert data["total_listens"] > 0
+        assert "alternative rock" in data["genres"]
+
+    def test_artist_not_found(self, client, seeded_db, auth_headers):
+        resp = client.get("/search/artist/nonexistent", headers=auth_headers)
+        assert resp.status_code == 404
+
+
+class TestTrackDetail:
+    def test_get_track_detail(self, client, seeded_db, auth_headers):
+        resp = client.get("/search/track/track_1", headers=auth_headers)
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["track_id"] == "track_1"
+        assert data["track_name"] == "Paranoid Android"
+        assert data["total_listens"] > 0
+
+    def test_track_not_found(self, client, seeded_db, auth_headers):
+        resp = client.get("/search/track/nonexistent", headers=auth_headers)
+        assert resp.status_code == 404
+
+
+class TestResolveArtist:
+    def test_resolve_from_db(self, client, seeded_db, auth_headers):
+        resp = client.get("/search/resolve-artist", params={"name": "Radiohead"}, headers=auth_headers)
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["artist_id"] == "artist_1"
+        assert data["resolved"] == "db"
+
+    def test_resolve_case_insensitive(self, client, seeded_db, auth_headers):
+        resp = client.get("/search/resolve-artist", params={"name": "radiohead"}, headers=auth_headers)
+        assert resp.status_code == 200
+        assert resp.json()["resolved"] == "db"
