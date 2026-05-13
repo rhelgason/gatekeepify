@@ -234,6 +234,11 @@ Every error response has the shape `{"error": "<type>", "detail": "<message>"}`.
 - Rate limits: ~100 requests per 30-second window per app
 - Album `release_date` can be `"2020-06-15"`, `"2020-06"`, or `"2020"` -- `parse_release_date()` handles all three
 
+## Future Scaling Concerns
+
+- **Spotify rate limiting in cron jobs** -- `poll_recent_listens` loops through all users sequentially with no throttling. Each user costs 2-3 API calls. At 30+ users, this risks hitting Spotify's ~100 req/30s limit. The `spotipy` backoff_factor handles retries, so it won't crash, but cycles will slow down. Fix when needed: add a `time.sleep(1)` between users in the polling loop, or split users across multiple staggered task invocations.
+- **ZIP upload enrichment** -- immediate metadata enrichment is capped at 500 tracks. If a user uploads a massive history with thousands of unique tracks, the rest are filled in by the backfill cron (50 tracks every 2 minutes). A user with 10,000 unique tracks would take ~6 hours to fully enrich. This is acceptable for now.
+
 ## Edge Cases and Known Issues
 - Spotify's `played_at` format (`%Y-%m-%dT%H:%M:%S.%fZ`) differs from the data export format (`%Y-%m-%dT%H:%M:%SZ`) -- both are handled
 - Tracks can exist in `dim_all_listens` with no corresponding `dim_all_tracks` row (from backfill imports). The `backfill_track_metadata` task finds these via LEFT JOIN + IS NULL
