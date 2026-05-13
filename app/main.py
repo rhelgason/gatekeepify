@@ -15,7 +15,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings, validate_settings
 from app.database import Base, SessionLocal, engine
-from app.routers import auth, awards, backfill, friends, gatekeep, search, stats
+from app.routers import auth, awards, backfill, discover, friends, gatekeep, search, stats
 from app.routers.auth import get_current_user
 from app.services.audit import log_action
 
@@ -67,6 +67,7 @@ app.include_router(friends.router)
 app.include_router(gatekeep.router)
 app.include_router(search.router)
 app.include_router(awards.router)
+app.include_router(discover.router)
 
 
 def _error_response(status_code: int, error: str, detail: str) -> JSONResponse:
