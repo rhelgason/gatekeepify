@@ -151,6 +151,11 @@ export const api = {
 
   getLeaderboard: () => cachedRequest<any>("/gatekeep/leaderboard"),
 
+  getTrophies: () => cachedRequest<any>("/gatekeep/awards/trophies"),
+
+  getHeadToHead: (friendId: string) =>
+    cachedRequest<any>(`/gatekeep/awards/head-to-head?friend_id=${friendId}`),
+
   createChallenge: (artistId: string) =>
     request<any>(`/gatekeep/challenge?artist_id=${artistId}`, { method: "POST" }),
 };

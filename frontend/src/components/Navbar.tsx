@@ -27,7 +27,7 @@ export default function Navbar() {
     { href: "/dashboard", label: "Stats" },
     { href: "/wrapped", label: "Wrapped" },
     { href: "/gatekeep", label: "Gatekeep" },
-    { href: "/leaderboard", label: "Crowns" },
+    { href: "/trophies", label: "Trophies" },
     { href: "/friends", label: "Friends", badge: pendingCount },
     { href: "/upload", label: "Upload" },
   ];
