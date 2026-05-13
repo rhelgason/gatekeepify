@@ -6,6 +6,7 @@ from spotipy.oauth2 import SpotifyOauthError
 from sqlalchemy import func, select
 
 from app.celery_app import celery_app
+from app.config import settings
 from app.database import SessionLocal
 from app.models import Listen, User
 from app.services.ingestion import (
@@ -38,18 +39,50 @@ def _deactivate_user(db, user: User, reason: str) -> None:
     )
 
 
-@celery_app.task(name="app.tasks.poll_recent_listens")
-def poll_recent_listens():
+MAX_USERS_PER_CYCLE = 500
+INTER_USER_DELAY = 1.0
+
+
+@celery_app.task(name="app.tasks.poll_recent_listens", bind=True)
+def poll_recent_listens(self):
+    import time
+
+    lock_key = "lock:poll_recent_listens"
+    lock = None
+    try:
+        from redis import Redis
+        redis = Redis.from_url(settings.redis_url)
+        lock = redis.lock(lock_key, timeout=settings.poll_interval_seconds - 10)
+        if not lock.acquire(blocking=False):
+            logger.warning("poll_recent_listens skipped: previous cycle still running")
+            return
+    except Exception as e:
+        logger.warning(f"Could not acquire Redis lock, running without lock: {e}")
+
     db = SessionLocal()
+    started_at = datetime.now(timezone.utc)
     try:
         service = SpotifyService()
-        users = get_active_users(db)
-        logger.info(f"Polling recent listens for {len(users)} users")
-        for user in users:
+        all_users = get_active_users(db)
+        total_users = len(all_users)
+
+        all_users.sort(key=lambda u: u.last_poll_at or datetime.min)
+        batch = all_users[:MAX_USERS_PER_CYCLE]
+
+        logger.info(
+            f"Polling recent listens: {len(batch)}/{total_users} users "
+            f"(oldest poll: {batch[0].last_poll_at if batch else 'N/A'})"
+        )
+
+        polled = 0
+        errors = 0
+        for user in batch:
             try:
                 _poll_single_user(db, service, user)
+                polled += 1
             except Exception as e:
                 db.rollback()
+                errors += 1
                 if _is_token_revoked(e):
                     _deactivate_user(db, user, f"token revoked ({e})")
                     log_job_run(
@@ -70,8 +103,30 @@ def poll_recent_listens():
                         datetime.now(timezone.utc),
                         "error",
                     )
+
+            if INTER_USER_DELAY > 0 and len(batch) > 10:
+                time.sleep(INTER_USER_DELAY)
+
+        pending = total_users - len(batch)
+        logger.info(
+            f"Poll cycle complete: {polled} polled, {errors} errors, "
+            f"{pending} pending for next cycle"
+        )
+        log_job_run(
+            db, "poll_recent_listens", None, started_at,
+            datetime.now(timezone.utc), "success", polled,
+        )
+    except Exception as e:
+        logger.error(f"Poll cycle failed: {e}")
+        log_job_run(db, "poll_recent_listens", None, started_at,
+                    datetime.now(timezone.utc), "error")
     finally:
         db.close()
+        if lock:
+            try:
+                lock.release()
+            except Exception:
+                pass
 
 
 def _poll_single_user(
