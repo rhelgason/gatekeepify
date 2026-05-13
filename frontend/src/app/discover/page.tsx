@@ -12,6 +12,9 @@ export default function Discover() {
   const [lateOn, setLateOn] = useState<any[]>([]);
   const [rising, setRising] = useState<any[]>([]);
   const [feed, setFeed] = useState<any[]>([]);
+  const [feedDays, setFeedDays] = useState(7);
+  const [feedLoading, setFeedLoading] = useState(false);
+  const [feedHasMore, setFeedHasMore] = useState(true);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -97,6 +100,23 @@ export default function Discover() {
                   </Link>
                 ))}
               </div>
+              {feedHasMore && (
+                <button
+                  onClick={async () => {
+                    setFeedLoading(true);
+                    const newDays = feedDays + 14;
+                    const more = await api.getActivityFeed(50, newDays).catch(() => []);
+                    setFeed(more);
+                    setFeedDays(newDays);
+                    setFeedHasMore(more.length > feed.length);
+                    setFeedLoading(false);
+                  }}
+                  disabled={feedLoading}
+                  className="btn-secondary w-full mt-4 text-sm"
+                >
+                  {feedLoading ? "Loading..." : "Load more"}
+                </button>
+              )}
             </section>
           )}
 

@@ -10,9 +10,9 @@ from app.models import Artist, Listen, ListenSource, Track, TrackArtist
 
 
 def generate_activity_feed(
-    db: Session, user_ids: List[str], limit: int = 20
+    db: Session, user_ids: List[str], limit: int = 20, days: int = 7
 ) -> List[dict]:
-    since = datetime.now(timezone.utc) - timedelta(days=7)
+    since = datetime.now(timezone.utc) - timedelta(days=days)
     events = []
 
     for uid in user_ids:

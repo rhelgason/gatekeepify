@@ -250,13 +250,15 @@ def rising_artists(
 
 @router.get("/feed")
 def activity_feed(
+    limit: int = 20,
+    days: int = 7,
     user: UserModel = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     friend_ids = get_friend_ids(db, user.user_id)
     group_ids = [user.user_id] + friend_ids
 
-    events = generate_activity_feed(db, group_ids)
+    events = generate_activity_feed(db, group_ids, limit=min(limit, 100), days=days)
 
     log_action(db, "discover.feed_viewed", user_id=user.user_id,
                details={"events": len(events)})
