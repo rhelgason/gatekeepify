@@ -10,8 +10,9 @@ function GatekeepContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const preselected = searchParams.get("artist");
+  const prefillQuery = searchParams.get("q");
 
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useState(prefillQuery || "");
   const [results, setResults] = useState<any[]>([]);
   const [searching, setSearching] = useState(false);
 
@@ -22,6 +23,13 @@ function GatekeepContent() {
   useEffect(() => {
     if (preselected) router.replace(`/artist/${preselected}`);
   }, [preselected, router]);
+
+  useEffect(() => {
+    if (prefillQuery) {
+      setSearching(true);
+      api.searchArtists(prefillQuery).then(setResults).finally(() => setSearching(false));
+    }
+  }, [prefillQuery]);
 
   async function handleSearch() {
     if (!query.trim()) return;

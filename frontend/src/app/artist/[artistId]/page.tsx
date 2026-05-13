@@ -15,6 +15,7 @@ export default function ArtistPage() {
   const [comparison, setComparison] = useState<any>(null);
   const [timeline, setTimeline] = useState<any>(null);
   const [lastfmData, setLastfmData] = useState<any>(null);
+  const [lastfmLoading, setLastfmLoading] = useState(false);
   const [timelineMode, setTimelineMode] = useState<"personal" | "friends" | "global">("personal");
   const [challenge, setChallenge] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -32,7 +33,8 @@ export default function ArtistPage() {
       if (timelineMode === "global") {
         api.getTimeline(artistId, "global").then(setTimeline).catch(() => {});
         if (detail?.artist_name) {
-          api.getLastfmTimeline(detail.artist_name).then(setLastfmData).catch(() => {});
+          setLastfmLoading(true);
+          api.getLastfmTimeline(detail.artist_name).then(setLastfmData).catch(() => {}).finally(() => setLastfmLoading(false));
         }
       } else {
         api.getTimeline(artistId, timelineMode).then(setTimeline).catch(() => {});
@@ -263,7 +265,12 @@ export default function ArtistPage() {
                     <p className="text-gray-600 text-sm">The chart will populate as users listen over time.</p>
                   </div>
                 )}
-                {d && (
+                {lastfmLoading && (
+                  <div className="card p-8 text-center">
+                    <div className="text-gray-500 animate-pulse">Loading global stats...</div>
+                  </div>
+                )}
+                {!lastfmLoading && d && (
                   <>
                     <div className="card p-6">
                       <div className="flex justify-center gap-10 mb-2">
@@ -306,7 +313,10 @@ export default function ArtistPage() {
                         <h3 className="text-xs font-bold uppercase tracking-widest text-gray-500 mb-3">Similar Artists</h3>
                         <div className="flex gap-2 flex-wrap">
                           {d.similar_artists.map((name: string) => (
-                            <span key={name} className="text-sm bg-white/5 px-4 py-1.5 rounded-full text-gray-300">{name}</span>
+                            <Link key={name} href={`/gatekeep?q=${encodeURIComponent(name)}`}
+                              className="text-sm bg-white/5 px-4 py-1.5 rounded-full text-gray-300 hover:bg-white/10 hover:text-white transition-all">
+                              {name}
+                            </Link>
                           ))}
                         </div>
                       </div>
