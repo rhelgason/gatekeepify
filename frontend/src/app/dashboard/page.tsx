@@ -114,7 +114,7 @@ export default function Dashboard() {
             {artists.slice(0, 5).map((a) => (
               <Link
                 key={a.artist_id}
-                href={`/gatekeep?artist=${a.artist_id}`}
+                href={`/artist/${a.artist_id}`}
                 className="card-hover group p-4 flex flex-col items-center text-center"
               >
                 {a.image_url ? (
@@ -142,7 +142,7 @@ export default function Dashboard() {
               {artists.slice(5).map((a) => (
                 <Link
                   key={a.artist_id}
-                  href={`/gatekeep?artist=${a.artist_id}`}
+                  href={`/artist/${a.artist_id}`}
                   className="card-hover flex items-center gap-3 px-4 py-3"
                 >
                   {a.image_url ? (

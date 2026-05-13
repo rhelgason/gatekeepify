@@ -1,0 +1,292 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { useRouter, useParams } from "next/navigation";
+import { isLoggedIn } from "@/lib/auth";
+import { api } from "@/lib/api";
+import Link from "next/link";
+
+export default function ArtistPage() {
+  const router = useRouter();
+  const params = useParams();
+  const artistId = params.artistId as string;
+
+  const [detail, setDetail] = useState<any>(null);
+  const [comparison, setComparison] = useState<any>(null);
+  const [timeline, setTimeline] = useState<any>(null);
+  const [timelineMode, setTimelineMode] = useState<"personal" | "friends">("personal");
+  const [challenge, setChallenge] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!isLoggedIn()) {
+      router.replace("/");
+      return;
+    }
+    loadArtist();
+  }, [artistId, router]);
+
+  useEffect(() => {
+    if (artistId && !loading) {
+      api.getTimeline(artistId, timelineMode).then(setTimeline).catch(() => {});
+    }
+  }, [artistId, timelineMode, loading]);
+
+  async function loadArtist() {
+    setLoading(true);
+    try {
+      const [d, c, t] = await Promise.all([
+        api.getArtistDetail(artistId).catch(() => null),
+        api.gatekeepArtist(artistId).catch(() => null),
+        api.getTimeline(artistId, timelineMode).catch(() => null),
+      ]);
+      setDetail(d);
+      setComparison(c);
+      setTimeline(t);
+    } catch {}
+    setLoading(false);
+  }
+
+  async function handleChallenge() {
+    const data = await api.createChallenge(artistId);
+    setChallenge(data);
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="text-gray-500 animate-pulse text-lg">Loading artist...</div>
+      </div>
+    );
+  }
+
+  const name = detail?.artist_name || comparison?.artist_name || "Unknown Artist";
+  const imageUrl = detail?.image_url;
+  const genres = detail?.genres || [];
+  const maxListens = timeline?.users?.[0]?.months
+    ? Math.max(...timeline.users.flatMap((u: any) => u.months.map((m: any) => m.listen_count)), 1)
+    : 1;
+
+  const barColors = [
+    "bg-[var(--green)]",
+    "bg-emerald-400",
+    "bg-teal-400",
+    "bg-cyan-400",
+    "bg-sky-400",
+  ];
+
+  return (
+    <div className="animate-fade-in">
+      <Link href="/dashboard" className="text-xs text-gray-600 hover:text-gray-400 transition-colors">
+        &larr; back to stats
+      </Link>
+
+      {/* Hero */}
+      <div className="mt-4 flex flex-col md:flex-row items-center md:items-end gap-8 mb-10">
+        {imageUrl ? (
+          <img
+            src={imageUrl}
+            alt={name}
+            className="w-48 h-48 rounded-3xl object-cover ring-2 ring-white/10 shadow-2xl shadow-black/50"
+          />
+        ) : (
+          <div className="w-48 h-48 rounded-3xl bg-white/5 flex items-center justify-center text-6xl text-gray-600 ring-2 ring-white/10">
+            {name[0]}
+          </div>
+        )}
+        <div className="text-center md:text-left">
+          <h1 className="text-5xl md:text-6xl font-black tracking-tight mb-3">{name}</h1>
+          {genres.length > 0 && (
+            <div className="flex gap-2 flex-wrap justify-center md:justify-start mb-4">
+              {genres.slice(0, 5).map((g: string) => (
+                <span key={g} className="text-xs bg-white/5 border border-white/10 px-3 py-1.5 rounded-full text-gray-400">
+                  {g}
+                </span>
+              ))}
+            </div>
+          )}
+          {detail && (
+            <div className="flex gap-6 justify-center md:justify-start">
+              <div>
+                <div className="stat-number text-3xl">{detail.total_listens.toLocaleString()}</div>
+                <div className="text-gray-600 text-xs uppercase tracking-wider">listens</div>
+              </div>
+              <div>
+                <div className="stat-number text-3xl">{detail.total_minutes.toLocaleString()}</div>
+                <div className="text-gray-600 text-xs uppercase tracking-wider">minutes</div>
+              </div>
+              {detail.first_listen && (
+                <div>
+                  <div className="stat-number text-3xl">
+                    {new Date(detail.first_listen).toLocaleDateString("en-US", { month: "short", year: "numeric" })}
+                  </div>
+                  <div className="text-gray-600 text-xs uppercase tracking-wider">first listen</div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Timeline */}
+      {timeline?.users?.length > 0 && (
+        <section className="mb-10">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-sm font-bold uppercase tracking-widest text-gray-500">
+              Listening Timeline
+            </h2>
+            <div className="flex gap-1 bg-white/5 rounded-full p-1">
+              <button
+                onClick={() => setTimelineMode("personal")}
+                className={`px-4 py-1.5 rounded-full text-xs transition-all ${
+                  timelineMode === "personal"
+                    ? "bg-[var(--green)] text-black font-bold"
+                    : "text-gray-500 hover:text-white"
+                }`}
+              >
+                Your Listens
+              </button>
+              <button
+                onClick={() => setTimelineMode("friends")}
+                className={`px-4 py-1.5 rounded-full text-xs transition-all ${
+                  timelineMode === "friends"
+                    ? "bg-[var(--green)] text-black font-bold"
+                    : "text-gray-500 hover:text-white"
+                }`}
+              >
+                Friends
+              </button>
+            </div>
+          </div>
+          <div className="card p-6">
+            {timeline.users.map((user: any, userIdx: number) => (
+              <div key={user.user_id} className="mb-4 last:mb-0">
+                {timeline.users.length > 1 && (
+                  <div className="text-xs text-gray-500 mb-2 font-medium">
+                    {user.user_name || user.user_id}
+                  </div>
+                )}
+                <div className="flex items-end gap-[2px] h-24">
+                  {user.months.map((m: any) => {
+                    const height = Math.max((m.listen_count / maxListens) * 100, 4);
+                    return (
+                      <div
+                        key={m.month}
+                        className="group relative flex-1 flex flex-col justify-end"
+                      >
+                        <div
+                          className={`${barColors[userIdx % barColors.length]} rounded-t opacity-80 hover:opacity-100 transition-all duration-150 min-w-[3px]`}
+                          style={{ height: `${height}%` }}
+                        />
+                        <div className="absolute -top-8 left-1/2 -translate-x-1/2 hidden group-hover:block bg-gray-800 text-white text-[10px] px-2 py-1 rounded whitespace-nowrap z-10">
+                          {m.month}: {m.listen_count} listens
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+                {user.months.length > 0 && (
+                  <div className="flex justify-between text-[10px] text-gray-600 mt-1">
+                    <span>{user.months[0]?.month}</span>
+                    <span>{user.months[user.months.length - 1]?.month}</span>
+                  </div>
+                )}
+              </div>
+            ))}
+            {timeline.users.length > 1 && (
+              <div className="flex gap-4 mt-3 pt-3 border-t border-white/5">
+                {timeline.users.map((user: any, i: number) => (
+                  <div key={user.user_id} className="flex items-center gap-2 text-xs text-gray-500">
+                    <div className={`w-2.5 h-2.5 rounded-full ${barColors[i % barColors.length]}`} />
+                    {user.user_name || user.user_id}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </section>
+      )}
+
+      {/* Gatekeep Comparison */}
+      {comparison?.entries?.length > 0 && (
+        <section className="mb-10">
+          <h2 className="text-sm font-bold uppercase tracking-widest text-gray-500 mb-4">
+            Who Listened First?
+          </h2>
+          <div className="space-y-3">
+            {comparison.entries.map((entry: any, i: number) => (
+              <div
+                key={entry.user_id}
+                className={`card p-5 animate-slide-up ${
+                  entry.is_winner
+                    ? "ring-1 ring-[var(--green)]/30 bg-[var(--green-dim)]"
+                    : ""
+                }`}
+                style={{ animationDelay: `${i * 0.1}s` }}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    {entry.is_winner && <span className="text-3xl">👑</span>}
+                    <div>
+                      <span className="font-bold text-lg">
+                        {entry.user_name || entry.user_id}
+                      </span>
+                      <span
+                        className={`ml-3 ${
+                          entry.first_listen_source === "api"
+                            ? "badge-verified"
+                            : "badge-self-reported"
+                        }`}
+                      >
+                        {entry.first_listen_source === "api" ? "verified" : "self-reported"}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="font-bold text-lg">
+                      {entry.total_listens}{" "}
+                      <span className="text-gray-500 font-normal text-sm">listens</span>
+                    </div>
+                    <div className="text-xs text-gray-500">
+                      First: {new Date(entry.first_listen).toLocaleDateString("en-US", { month: "short", year: "numeric" })}
+                      {entry.verified_listens > 0 && entry.verified_listens < entry.total_listens && (
+                        <> &middot; {entry.verified_listens} verified</>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Challenge */}
+      <section>
+        <button onClick={handleChallenge} className="btn-primary">
+          Challenge a Friend
+        </button>
+
+        {challenge && (
+          <div className="mt-4 card p-6 animate-slide-up border-[var(--green)]/20">
+            <p className="text-xl font-bold italic mb-4 leading-relaxed">
+              &ldquo;{challenge.challenge_text}&rdquo;
+            </p>
+            <div className="flex items-center gap-3 bg-white/5 rounded-xl p-3">
+              <span className="text-gray-500 text-sm">Invite code:</span>
+              <code className="font-mono text-[var(--green)] text-sm flex-1">
+                {challenge.invite_code}
+              </code>
+              <button
+                onClick={() => navigator.clipboard.writeText(challenge.invite_code)}
+                className="btn-secondary text-xs py-1.5 px-4"
+              >
+                Copy
+              </button>
+            </div>
+          </div>
+        )}
+      </section>
+    </div>
+  );
+}

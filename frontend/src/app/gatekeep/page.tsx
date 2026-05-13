@@ -4,6 +4,7 @@ import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { isLoggedIn } from "@/lib/auth";
 import { api } from "@/lib/api";
+import Link from "next/link";
 
 function GatekeepContent() {
   const router = useRouter();
@@ -86,9 +87,9 @@ function GatekeepContent() {
       {results.length > 0 && !comparison && (
         <div className="space-y-2 mb-6 animate-slide-up">
           {results.map((a) => (
-            <button
+            <Link
               key={a.artist_id}
-              onClick={() => loadArtist(a.artist_id)}
+              href={`/artist/${a.artist_id}`}
               className="card-hover w-full text-left flex items-center gap-4 px-4 py-3"
             >
               {a.image_url ? (
@@ -109,7 +110,7 @@ function GatekeepContent() {
                   {a.your_listen_count} listens
                 </span>
               )}
-            </button>
+            </Link>
           ))}
         </div>
       )}
