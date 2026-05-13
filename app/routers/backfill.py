@@ -362,6 +362,9 @@ def backfill_status(
         .where(Listen.user_id == user.user_id, Listen.source == ListenSource.export.value)
     ).scalar() or 0
 
+    log_action(db, "backfill.status_viewed", user_id=user.user_id,
+               details={"missing_metadata": missing_meta, "has_export": has_export > 0})
+
     return BackfillStatusResponse(
         tracks_missing_metadata=missing_meta,
         total_listens=total_listens,

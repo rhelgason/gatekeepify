@@ -147,9 +147,6 @@ def search_tracks(
         details={"query": q, "results": len(rows)},
     )
 
-    log_action(db, "search.tracks", user_id=user.user_id,
-               details={"query": q, "results": len(rows)})
-
     return [
         TrackSearchResult(
             track_id=row.track_id,
@@ -258,6 +255,9 @@ def resolve_artist(
         func.lower(Artist.artist_name) == name.lower()
     ).first()
     if existing:
+        log_action(db, "search.artist_resolved", user_id=user.user_id,
+                   entity_type="artist", entity_id=existing.artist_id,
+                   details={"name": name, "resolved": "db"})
         return {"artist_id": existing.artist_id, "artist_name": existing.artist_name, "resolved": "db"}
 
     user_obj = db.query(User).filter(User.user_id == user.user_id).first()

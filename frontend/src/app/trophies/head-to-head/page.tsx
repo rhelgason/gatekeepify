@@ -4,6 +4,7 @@ import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { isLoggedIn } from "@/lib/auth";
 import { api } from "@/lib/api";
+import { trackEvent } from "@/lib/track";
 
 const AWARD_EMOJI: Record<string, string> = {
   crown: "👑", archaeologist: "🦴", trendsetter: "🔥", patient_zero: "🦠",
@@ -29,7 +30,10 @@ function HeadToHeadContent() {
       router.replace("/trophies");
       return;
     }
-    api.getHeadToHead(friendId).then(setData).catch(() => {}).finally(() => setLoading(false));
+    api.getHeadToHead(friendId).then((d) => {
+      setData(d);
+      trackEvent("head_to_head_viewed", { friend_id: friendId });
+    }).catch(() => {}).finally(() => setLoading(false));
   }, [friendId, router]);
 
   if (loading) {

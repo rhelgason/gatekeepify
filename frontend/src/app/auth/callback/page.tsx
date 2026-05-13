@@ -3,6 +3,7 @@
 import { Suspense, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { setToken } from "@/lib/auth";
+import { trackEvent } from "@/lib/track";
 
 function CallbackHandler() {
   const router = useRouter();
@@ -12,6 +13,7 @@ function CallbackHandler() {
     const token = searchParams.get("token");
     if (token) {
       setToken(token);
+      trackEvent("login_completed");
       const pendingInvite = localStorage.getItem("pending_invite");
       if (pendingInvite) {
         localStorage.removeItem("pending_invite");

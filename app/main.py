@@ -175,23 +175,26 @@ def health():
 
 
 @app.post("/admin/trigger-poll")
-def trigger_poll(user: "User" = Depends(get_current_user)):
+def trigger_poll(user: "User" = Depends(get_current_user), db: "Session" = Depends(get_db)):
     from app.tasks import poll_recent_listens
     poll_recent_listens.delay()
+    log_action(db, "admin.trigger_poll", user_id=user.user_id)
     return {"status": "triggered", "task": "poll_recent_listens"}
 
 
 @app.post("/admin/trigger-backfill")
-def trigger_backfill(user: "User" = Depends(get_current_user)):
+def trigger_backfill(user: "User" = Depends(get_current_user), db: "Session" = Depends(get_db)):
     from app.tasks import backfill_track_metadata
     backfill_track_metadata.delay()
+    log_action(db, "admin.trigger_backfill", user_id=user.user_id)
     return {"status": "triggered", "task": "backfill_track_metadata"}
 
 
 @app.post("/admin/trigger-awards")
-def trigger_awards(user: "User" = Depends(get_current_user)):
+def trigger_awards(user: "User" = Depends(get_current_user), db: "Session" = Depends(get_db)):
     from app.tasks import compute_award_snapshots
     compute_award_snapshots.delay()
+    log_action(db, "admin.trigger_awards", user_id=user.user_id)
     return {"status": "triggered", "task": "compute_award_snapshots"}
 
 
@@ -222,6 +225,8 @@ def trust_score(
 ):
     from app.services.anomaly import analyze_user_export
     uid = target_user_id or user.user_id
+    log_action(db, "admin.trust_score", user_id=user.user_id,
+               details={"target_user_id": uid})
     return analyze_user_export(db, uid)
 
 

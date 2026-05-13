@@ -29,6 +29,7 @@ from app.services.awards import (
     compute_time_traveler,
     get_friend_group_hash,
 )
+from app.services.compatibility import compute_quick_score
 
 
 def _auth(user_id):
@@ -200,6 +201,33 @@ class TestComputeHypebeast:
         results = compute_hypebeast(award_db, ["alice", "bob", "charlie"])
         # All data is from 2017-2023, so no recent 30-day activity
         assert isinstance(results, list)
+
+
+class TestComputeTimeTraveler:
+    def test_returns_ranked_results(self, award_db):
+        results = compute_time_traveler(award_db, ["alice", "bob", "charlie"])
+        assert isinstance(results, list)
+        if len(results) > 1:
+            assert results[0]["rank"] <= results[1]["rank"]
+
+    def test_empty_for_no_data(self, db):
+        u = User(user_id="empty_tt", user_name="Empty", created_at=datetime(2024, 1, 1, tzinfo=timezone.utc))
+        db.add(u)
+        db.commit()
+        results = compute_time_traveler(db, ["empty_tt"])
+        assert isinstance(results, list)
+
+
+class TestCompatibilityEndpoint:
+    def test_compatibility_returns_score(self, client, award_db):
+        resp = client.get("/friends/compatibility/bob", headers=_auth("alice"))
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "score" in data
+
+    def test_compatibility_not_friends(self, client, award_db):
+        resp = client.get("/friends/compatibility/bob", headers=_auth("charlie"))
+        assert resp.status_code in (403, 404)
 
 
 class TestTrophiesEndpoint:

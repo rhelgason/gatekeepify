@@ -30,6 +30,8 @@ The product is intentionally performative and annoying. That's the point.
 - `app/services/awards.py` -- 12 award computation functions
 - `app/services/anomaly.py` -- Statistical anomaly detection (trust scores)
 - `app/services/lastfm.py` -- Last.fm API integration
+- `app/services/activity.py` -- Activity feed event detection (7 event types) with deterministic quip selection
+- `app/services/compatibility.py` -- Jaccard similarity for taste compatibility, shared by friends + discover
 - `app/services/audit.py` -- `log_action()` writes to audit_log table + stdout
 - `app/celery_app.py` -- Celery config + beat schedule (3 periodic tasks)
 - `app/tasks.py` -- Batched polling, metadata backfill, award snapshots
@@ -54,7 +56,7 @@ The product is intentionally performative and annoying. That's the point.
 - `job_runs` (id PK, job_name, user_id, started_at, completed_at, status, record_count)
 
 ### Test Suite
-199 tests, no external services needed:
+232 tests, no external services needed:
 ```bash
 source env/bin/activate
 python -m pytest tests/test_app/ -v
@@ -91,7 +93,7 @@ Copy `.env.example` to `.env`:
 
 **Railway** (backend): auto-deploys from `main`. Dockerfile + supervisord runs web + worker + beat.
 **Vercel** (frontend): auto-deploys from `main`. Root directory set to `frontend`.
-**CI**: GitHub Actions runs 199 tests on every push to `main`.
+**CI**: GitHub Actions runs 232 tests on every push to `main`.
 
 ### Celery Beat Schedule
 - `poll_recent_listens` -- every 15 min, batches up to 500 users per cycle
@@ -127,19 +129,23 @@ Complex awards cached in `award_snapshots` via Celery task every 6 hours.
 
 ## Frontend Pages
 
+Navbar: 5 tabs (Home, Feed, Gatekeep, Trophies, Friends) + user menu dropdown (Upload Data, Sign Out).
+
 - `/` -- Landing page with Spotify sign-in
-- `/dashboard` -- Top tracks/artists/genres with period selector
-- `/wrapped` -- Predicted Wrapped with year selector
-- `/discover` -- Friends' fresh finds, you're late on, rising artists
+- `/dashboard` -- Home: Recent stats (period selector) + Wrapped (year selector) as a togglable view mode. Supports `?view=wrapped` query param.
+- `/feed` -- Combined Feed + Discover: two-column layout on desktop (Discover recommendations left, Activity stream right), stacked on mobile
 - `/gatekeep` -- Search artists (DB + Spotify fallthrough)
 - `/artist/[id]` -- Artist detail: hero, SVG line chart timeline (personal/friends/global), Last.fm stats, gatekeep comparison, challenge
-- `/trophies` -- Trophy case with 12 awards, mini-leaderboards, head-to-head CTA
+- `/trophies` -- Trophy case: awards grouped by tier (Discovery, Devotion, Taste, Dynamic), expandable inline leaderboards, head-to-head CTA
 - `/trophies/head-to-head?friend=X` -- Side-by-side comparison with visual bars
 - `/friends` -- User search, direct requests, invite link generation, pending requests
 - `/profile/[userId]` -- View a friend's stats
-- `/upload` -- Drag-and-drop ZIP upload with progress
+- `/upload` -- Drag-and-drop ZIP upload with progress (accessible via user menu, not a nav tab)
 - `/invite/[code]` -- Auto-accept invite (stores code through OAuth redirect via localStorage)
 - `/auth/callback` -- OAuth callback, checks for pending invite
+- `/wrapped` -- Redirects to `/dashboard?view=wrapped`
+- `/discover` -- Redirects to `/feed`
+- `/leaderboard` -- Redirects to `/trophies`
 
 ## Spotify API Constraints
 - `GET /v1/me/player/recently-played` -- max 50 tracks
@@ -168,9 +174,48 @@ Complex awards cached in `award_snapshots` via Celery task every 6 hours.
 - OAuth `state` parameter carries frontend origin for preview deployment support
 
 ## Logging
-- Every backend endpoint writes to `audit_log` table
-- Frontend `PageTracker` component logs every page view
-- `trackEvent()` utility logs button clicks, searches, uploads, period changes, etc.
-- All frontend events prefixed with `frontend.` in the audit log
-- HTTP request middleware logs method, path, status, duration to stdout
+
+**IMPORTANT: Every new endpoint and every new user-facing button/action MUST have logging.**
+
+### Backend: `log_action()`
+- Every backend endpoint calls `log_action(db, "action_name", user_id=..., details={...})`
+- Action names follow the pattern `{router}.{action}` (e.g., `stats.top_tracks_viewed`, `friends.invite_created`)
+- Admin endpoints use `admin.` prefix (e.g., `admin.trigger_poll`)
+- Frontend events are prefixed with `frontend.` (e.g., `frontend.page_view`)
+- When adding a new endpoint, add `log_action()` before the return statement
 - Query all activity: `SELECT * FROM audit_log WHERE user_id = ? ORDER BY ts DESC`
+
+### Frontend: `trackEvent()`
+- `PageTracker` component in `layout.tsx` logs every page view automatically
+- `trackEvent(name, details?)` from `@/lib/track` logs button clicks, searches, uploads, etc.
+- When adding a new interactive element (button, toggle, link with semantic meaning), add a `trackEvent()` call
+- Events fire-and-forget to `POST /track-event` which writes to `audit_log`
+
+### What to log
+- All user-initiated actions (clicks, searches, form submissions)
+- All state changes (period selector, year selector, view mode toggle)
+- Upload lifecycle events (started, completed, failed)
+- Social actions (friend requests, invites, accept/decline)
+- Navigation to semantically meaningful pages (head-to-head with friend_id)
+
+## Testing
+
+**IMPORTANT: Every new endpoint and every new service function MUST have test coverage.**
+
+### Running Tests
+```bash
+python -m pytest tests/test_app/ -v
+```
+
+### Test Structure
+- `tests/test_app/conftest.py` -- Shared fixtures: in-memory SQLite DB, test client, seeded data
+- One test file per router (e.g., `test_stats.py`, `test_friends.py`, `test_gatekeep.py`)
+- Service tests: `test_activity.py`, `test_compatibility.py`, `test_awards.py`, `test_anomaly.py`, `test_ingestion.py`
+- Admin/utility tests: `test_admin.py`, `test_errors.py`
+
+### When adding new code
+- New endpoint: add tests in the corresponding `test_{router}.py` file
+- New service function: add tests in `test_{service}.py`
+- New activity feed event type: add a test in `test_activity.py`
+- New award: add a compute function test in `test_awards.py`
+- Always run the full test suite before committing

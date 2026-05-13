@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { isLoggedIn } from "@/lib/auth";
 import { api } from "@/lib/api";
+import { trackEvent } from "@/lib/track";
 
 const HIDDEN_ON = ["/upload", "/auth", "/invite"];
 
@@ -45,6 +46,7 @@ export default function BackfillBanner() {
       <div className="flex gap-2 justify-end">
         <button
           onClick={() => {
+            trackEvent("backfill_banner_dismissed");
             setDismissed(true);
             sessionStorage.setItem("backfill_dismissed", "1");
           }}
@@ -52,7 +54,7 @@ export default function BackfillBanner() {
         >
           Later
         </button>
-        <Link href="/upload" className="btn-primary text-xs py-2 px-4">
+        <Link href="/upload" onClick={() => trackEvent("backfill_banner_upload_clicked")} className="btn-primary text-xs py-2 px-4">
           Upload
         </Link>
       </div>

@@ -179,6 +179,8 @@ def _detect_milestones(db: Session, user_id: str) -> List[dict]:
                 if last_listen:
                     week_ago = datetime.now(timezone.utc) - timedelta(days=7)
                     ts = last_listen if isinstance(last_listen, datetime) else datetime.fromisoformat(str(last_listen))
+                    if ts.tzinfo is None:
+                        ts = ts.replace(tzinfo=timezone.utc)
                     if ts < week_ago:
                         break
 
@@ -276,6 +278,8 @@ def _detect_crown_steals(db: Session, group_ids: List[str], since: datetime) -> 
     artist_entries: dict = defaultdict(list)
     for row in rows:
         ts = row.first_listen if isinstance(row.first_listen, datetime) else datetime.fromisoformat(str(row.first_listen))
+        if ts.tzinfo is None:
+            ts = ts.replace(tzinfo=timezone.utc)
         artist_entries[row.artist_id].append({
             "user_id": row.user_id,
             "ts": ts,

@@ -150,7 +150,8 @@ def callback(code: str = Query(...), state: str = Query(None), db: Session = Dep
 
 
 @router.get("/me", response_model=UserResponse)
-def get_me(user: User = Depends(get_current_user)):
+def get_me(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    log_action(db, "auth.me", user_id=user.user_id)
     return UserResponse(
         user_id=user.user_id,
         user_name=user.user_name,

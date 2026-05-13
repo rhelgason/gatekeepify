@@ -114,3 +114,19 @@ class TestRising:
     def test_requires_auth(self, client, discover_db):
         resp = client.get("/discover/rising")
         assert resp.status_code in (401, 403)
+
+
+class TestActivityFeed:
+    def test_returns_list(self, client, discover_db):
+        resp = client.get("/discover/feed", headers=_auth("alice"))
+        assert resp.status_code == 200
+        assert isinstance(resp.json(), list)
+
+    def test_respects_limit(self, client, discover_db):
+        resp = client.get("/discover/feed", params={"limit": 2}, headers=_auth("alice"))
+        assert resp.status_code == 200
+        assert len(resp.json()) <= 2
+
+    def test_requires_auth(self, client, discover_db):
+        resp = client.get("/discover/feed")
+        assert resp.status_code in (401, 403)
