@@ -49,7 +49,7 @@ export default function Profile() {
   }, [userId]);
 
   const periods: { value: Period; label: string }[] = [
-    { value: "today", label: "Today" },
+    { value: "today", label: "Today (UTC)" },
     { value: "month", label: "30 Days" },
     { value: "year", label: "Year" },
     { value: "all", label: "All Time" },
