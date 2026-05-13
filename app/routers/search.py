@@ -14,10 +14,16 @@ from app.models import (
     TrackArtist,
     User,
 )
+import logging
+
 from app.models import User as UserModel
 from app.routers.auth import get_current_user
 from app.schemas import ArtistDetailResponse, ArtistSearchResult, TrackDetailResponse, TrackSearchResult
 from app.services.audit import log_action
+from app.services.ingestion import _get_best_image
+from app.services.spotify import SpotifyService, decrypt_token
+
+logger = logging.getLogger("gatekeepify.search")
 
 router = APIRouter(prefix="/search", tags=["search"])
 
@@ -229,3 +235,64 @@ def get_track_detail(
         total_minutes=math.floor((row.total_listens or 0) * (track.duration_ms or 0) / 1000 / 60),
         first_listen=row.first_listen,
     )
+
+
+@router.get("/resolve-artist")
+def resolve_artist(
+    name: str = Query(..., min_length=1),
+    user: UserModel = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    from fastapi import HTTPException
+
+    existing = db.query(Artist).filter(
+        func.lower(Artist.artist_name) == name.lower()
+    ).first()
+    if existing:
+        return {"artist_id": existing.artist_id, "artist_name": existing.artist_name, "resolved": "db"}
+
+    user_obj = db.query(User).filter(User.user_id == user.user_id).first()
+    if not user_obj or not user_obj.spotify_refresh_token:
+        raise HTTPException(status_code=404, detail="Artist not found")
+
+    try:
+        service = SpotifyService()
+        refresh_token = decrypt_token(user_obj.spotify_refresh_token)
+        token_info = service.refresh_access_token(refresh_token)
+        client = service.get_client(token_info["access_token"])
+
+        results = client.search(q=f'artist:"{name}"', type="artist", limit=5)
+        artists = results.get("artists", {}).get("items", [])
+
+        match = None
+        for a in artists:
+            if a.get("name", "").lower() == name.lower():
+                match = a
+                break
+        if not match and artists:
+            match = artists[0]
+
+        if not match:
+            raise HTTPException(status_code=404, detail="Artist not found on Spotify")
+
+        db.merge(Artist(
+            artist_id=match["id"],
+            artist_name=match.get("name"),
+            image_url=_get_best_image(match.get("images", [])),
+        ))
+        for genre in match.get("genres", []):
+            if genre:
+                db.merge(ArtistGenre(artist_id=match["id"], genre=genre))
+        db.commit()
+
+        log_action(db, "search.artist_resolved", user_id=user.user_id,
+                   entity_type="artist", entity_id=match["id"],
+                   details={"name": name, "spotify_name": match.get("name")})
+
+        return {"artist_id": match["id"], "artist_name": match.get("name"), "resolved": "spotify"}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.warning(f"Failed to resolve artist '{name}': {e}")
+        raise HTTPException(status_code=404, detail="Could not resolve artist")

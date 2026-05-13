@@ -94,6 +94,11 @@ export const api = {
 
   getArtistDetail: (artistId: string) => request<any>(`/search/artist/${artistId}`),
 
+  resolveArtist: (name: string) =>
+    request<{ artist_id: string; artist_name: string; resolved: string }>(
+      `/search/resolve-artist?name=${encodeURIComponent(name)}`
+    ),
+
   getTrackDetail: (trackId: string) => request<any>(`/search/track/${trackId}`),
 
   getTimeline: (artistId: string, mode: string = "personal") =>

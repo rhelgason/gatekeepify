@@ -312,11 +312,19 @@ export default function ArtistPage() {
                       <div className="card p-5">
                         <h3 className="text-xs font-bold uppercase tracking-widest text-gray-500 mb-3">Similar Artists</h3>
                         <div className="flex gap-2 flex-wrap">
-                          {d.similar_artists.map((name: string) => (
-                            <Link key={name} href={`/gatekeep?q=${encodeURIComponent(name)}`}
+                          {d.similar_artists.map((artistName: string) => (
+                            <button key={artistName}
+                              onClick={async () => {
+                                try {
+                                  const resolved = await api.resolveArtist(artistName);
+                                  router.push(`/artist/${resolved.artist_id}`);
+                                } catch {
+                                  router.push(`/gatekeep?q=${encodeURIComponent(artistName)}`);
+                                }
+                              }}
                               className="text-sm bg-white/5 px-4 py-1.5 rounded-full text-gray-300 hover:bg-white/10 hover:text-white transition-all">
-                              {name}
-                            </Link>
+                              {artistName}
+                            </button>
                           ))}
                         </div>
                       </div>
