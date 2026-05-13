@@ -61,7 +61,7 @@ def _ms_to_minutes(ms: Optional[int]) -> int:
 
 
 def _get_top_tracks(
-    db: Session, user_id: str, since: Optional[datetime], limit: int, offset: int = 0
+    db: Session, user_id: str, since: Optional[datetime], limit: int, offset: int = 0, until: Optional[datetime] = None
 ) -> List[TopTrackEntry]:
     stmt = (
         select(
@@ -89,6 +89,8 @@ def _get_top_tracks(
     )
     if since:
         stmt = stmt.where(Listen.ts >= since)
+    if until:
+        stmt = stmt.where(Listen.ts < until)
     rows = db.execute(stmt).all()
     return [
         TopTrackEntry(
@@ -107,7 +109,7 @@ def _get_top_tracks(
 
 
 def _get_top_artists(
-    db: Session, user_id: str, since: Optional[datetime], limit: int, offset: int = 0
+    db: Session, user_id: str, since: Optional[datetime], limit: int, offset: int = 0, until: Optional[datetime] = None
 ) -> List[TopArtistEntry]:
     stmt = (
         select(
@@ -129,6 +131,8 @@ def _get_top_artists(
     )
     if since:
         stmt = stmt.where(Listen.ts >= since)
+    if until:
+        stmt = stmt.where(Listen.ts < until)
     rows = db.execute(stmt).all()
 
     artist_ids = [row.artist_id for row in rows]
@@ -157,7 +161,7 @@ def _get_top_artists(
 
 
 def _get_top_genres(
-    db: Session, user_id: str, since: Optional[datetime], limit: int, offset: int = 0
+    db: Session, user_id: str, since: Optional[datetime], limit: int, offset: int = 0, until: Optional[datetime] = None
 ) -> List[TopGenreEntry]:
     inner = (
         select(
@@ -176,6 +180,8 @@ def _get_top_genres(
     )
     if since:
         inner = inner.where(Listen.ts >= since)
+    if until:
+        inner = inner.where(Listen.ts < until)
     sub = inner.subquery()
 
     stmt = (
@@ -202,7 +208,7 @@ def _get_top_genres(
 
 
 def _get_total_minutes(
-    db: Session, user_id: str, since: Optional[datetime]
+    db: Session, user_id: str, since: Optional[datetime], until: Optional[datetime] = None
 ) -> int:
     stmt = (
         select(func.sum(Track.duration_ms))
@@ -212,6 +218,8 @@ def _get_total_minutes(
     )
     if since:
         stmt = stmt.where(Listen.ts >= since)
+    if until:
+        stmt = stmt.where(Listen.ts < until)
     result = db.execute(stmt).scalar()
     return _ms_to_minutes(result)
 
@@ -287,10 +295,12 @@ def wrapped(
         year = current_year
         since = datetime(year, 1, 1, tzinfo=timezone.utc)
 
-    top_tracks = _get_top_tracks(db, user.user_id, since, WRAPPED_LIMIT)
-    top_artists = _get_top_artists(db, user.user_id, since, WRAPPED_LIMIT)
-    top_genres = _get_top_genres(db, user.user_id, since, 1)
-    total_minutes = _get_total_minutes(db, user.user_id, since)
+    until = datetime(year + 1, 1, 1, tzinfo=timezone.utc) if year < current_year else None
+
+    top_tracks = _get_top_tracks(db, user.user_id, since, WRAPPED_LIMIT, until=until)
+    top_artists = _get_top_artists(db, user.user_id, since, WRAPPED_LIMIT, until=until)
+    top_genres = _get_top_genres(db, user.user_id, since, 1, until=until)
+    total_minutes = _get_total_minutes(db, user.user_id, since, until=until)
 
     log_action(db, "stats.wrapped_viewed", user_id=user.user_id,
                details={"year": year, "total_minutes": total_minutes})
