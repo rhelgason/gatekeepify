@@ -15,7 +15,10 @@ def get_artist_weekly_listeners(
     artist_name: str,
 ) -> Optional[list[dict]]:
     if not settings.lastfm_api_key:
+        logger.warning("LASTFM_API_KEY is not set")
         return None
+
+    logger.info(f"Fetching Last.fm data for '{artist_name}' with key '{settings.lastfm_api_key[:4]}...'")
 
     try:
         charts_resp = requests.get(
@@ -28,8 +31,11 @@ def get_artist_weekly_listeners(
             },
             timeout=10,
         )
+        logger.info(f"Last.fm chart list response: {charts_resp.status_code}")
         charts_resp.raise_for_status()
-        charts = charts_resp.json().get("weeklychartlist", {}).get("chart", [])
+        chart_json = charts_resp.json()
+        charts = chart_json.get("weeklychartlist", {}).get("chart", [])
+        logger.info(f"Last.fm returned {len(charts)} chart periods")
 
         if not charts:
             return None
@@ -99,5 +105,5 @@ def get_artist_weekly_listeners(
         ]
 
     except Exception as e:
-        logger.warning(f"Last.fm API error for '{artist_name}': {e}")
+        logger.error(f"Last.fm API error for '{artist_name}': {type(e).__name__}: {e}")
         return None
