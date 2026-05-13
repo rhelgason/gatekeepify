@@ -88,6 +88,20 @@ export const api = {
   acceptInvite: (code: string) =>
     request<any>(`/friends/accept/${code}`, { method: "POST" }),
 
+  searchUsers: (q: string) =>
+    request<any[]>(`/friends/search-users?q=${encodeURIComponent(q)}`),
+
+  sendFriendRequest: (toUserId: string) =>
+    request<any>(`/friends/request?to_user_id=${encodeURIComponent(toUserId)}`, { method: "POST" }),
+
+  getPendingRequests: () => request<any[]>("/friends/requests"),
+
+  acceptFriendRequest: (requestId: number) =>
+    request<any>(`/friends/requests/${requestId}/accept`, { method: "POST" }),
+
+  declineFriendRequest: (requestId: number) =>
+    request<any>(`/friends/requests/${requestId}/decline`, { method: "POST" }),
+
   searchArtists: (q: string) => request<any[]>(`/search/artists?q=${encodeURIComponent(q)}`),
 
   searchTracks: (q: string) => request<any[]>(`/search/tracks?q=${encodeURIComponent(q)}`),

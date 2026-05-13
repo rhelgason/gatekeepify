@@ -10,6 +10,8 @@ from app.database import get_db
 from app.models import FriendInvite, Friendship, User
 from app.models import User as UserModel
 from app.routers.auth import get_current_user
+from sqlalchemy import func
+
 from app.schemas import FriendResponse, InviteAcceptResponse, InviteResponse
 from app.services.audit import log_action
 
@@ -181,3 +183,163 @@ def accept_invite(
             friends_since=now,
         )
     )
+
+
+@router.get("/search-users")
+def search_users(
+    q: str = Query(..., min_length=1),
+    user: UserModel = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    existing_friend_ids = set(get_friend_ids(db, user.user_id))
+    pattern = f"%{q}%"
+
+    users = db.execute(
+        select(User.user_id, User.user_name)
+        .where(
+            User.user_name.ilike(pattern),
+            User.user_id != user.user_id,
+        )
+        .limit(10)
+    ).all()
+
+    return [
+        {
+            "user_id": u.user_id,
+            "user_name": u.user_name,
+            "is_friend": u.user_id in existing_friend_ids,
+        }
+        for u in users
+    ]
+
+
+@router.post("/request")
+def send_friend_request(
+    to_user_id: str = Query(...),
+    user: UserModel = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    if to_user_id == user.user_id:
+        raise HTTPException(status_code=400, detail="Cannot send request to yourself")
+
+    target = db.query(User).filter(User.user_id == to_user_id).first()
+    if not target:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    existing = db.execute(
+        select(Friendship).where(
+            Friendship.user_id_1 == user.user_id,
+            Friendship.user_id_2 == to_user_id,
+        )
+    ).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="Already friends")
+
+    pending = db.execute(
+        select(FriendInvite).where(
+            FriendInvite.from_user_id == user.user_id,
+            FriendInvite.to_user_id == to_user_id,
+            FriendInvite.accepted_by_user_id.is_(None),
+        )
+    ).first()
+    if pending:
+        raise HTTPException(status_code=400, detail="Request already sent")
+
+    code = secrets.token_urlsafe(16)
+    db.add(FriendInvite(
+        from_user_id=user.user_id,
+        to_user_id=to_user_id,
+        invite_code=code,
+        created_at=datetime.now(timezone.utc),
+    ))
+    db.commit()
+
+    log_action(db, "friends.request_sent", user_id=user.user_id,
+               entity_type="user", entity_id=to_user_id)
+
+    return {"status": "sent", "to_user_id": to_user_id}
+
+
+@router.get("/requests")
+def get_pending_requests(
+    user: UserModel = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    incoming = db.execute(
+        select(FriendInvite.id, FriendInvite.from_user_id, User.user_name, FriendInvite.created_at)
+        .join(User, FriendInvite.from_user_id == User.user_id)
+        .where(
+            FriendInvite.to_user_id == user.user_id,
+            FriendInvite.accepted_by_user_id.is_(None),
+        )
+        .order_by(FriendInvite.created_at.desc())
+    ).all()
+
+    return [
+        {
+            "id": r.id,
+            "from_user_id": r.from_user_id,
+            "from_user_name": r.user_name,
+            "created_at": r.created_at,
+        }
+        for r in incoming
+    ]
+
+
+@router.post("/requests/{request_id}/accept")
+def accept_friend_request(
+    request_id: int,
+    user: UserModel = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    invite = db.query(FriendInvite).filter(
+        FriendInvite.id == request_id,
+        FriendInvite.to_user_id == user.user_id,
+        FriendInvite.accepted_by_user_id.is_(None),
+    ).first()
+    if not invite:
+        raise HTTPException(status_code=404, detail="Request not found")
+
+    existing = db.execute(
+        select(Friendship).where(
+            Friendship.user_id_1 == user.user_id,
+            Friendship.user_id_2 == invite.from_user_id,
+        )
+    ).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="Already friends")
+
+    now = datetime.now(timezone.utc)
+    invite.accepted_by_user_id = user.user_id
+    invite.accepted_at = now
+    db.add(Friendship(user_id_1=user.user_id, user_id_2=invite.from_user_id, created_at=now))
+    db.add(Friendship(user_id_1=invite.from_user_id, user_id_2=user.user_id, created_at=now))
+    db.commit()
+
+    log_action(db, "friends.request_accepted", user_id=user.user_id,
+               entity_type="user", entity_id=invite.from_user_id)
+
+    return {"status": "accepted", "friend_id": invite.from_user_id}
+
+
+@router.post("/requests/{request_id}/decline")
+def decline_friend_request(
+    request_id: int,
+    user: UserModel = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    invite = db.query(FriendInvite).filter(
+        FriendInvite.id == request_id,
+        FriendInvite.to_user_id == user.user_id,
+        FriendInvite.accepted_by_user_id.is_(None),
+    ).first()
+    if not invite:
+        raise HTTPException(status_code=404, detail="Request not found")
+
+    db.delete(invite)
+    db.commit()
+
+    log_action(db, "friends.request_declined", user_id=user.user_id,
+               entity_type="user", entity_id=invite.from_user_id)
+
+    return {"status": "declined"}

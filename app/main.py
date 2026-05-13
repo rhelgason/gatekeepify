@@ -42,6 +42,7 @@ try:
     _add_column_if_missing(engine, "dim_all_albums", "image_url", "VARCHAR(512)")
     _add_column_if_missing(engine, "dim_all_tracks", "image_url", "VARCHAR(512)")
     _add_column_if_missing(engine, "dim_all_artists", "image_url", "VARCHAR(512)")
+    _add_column_if_missing(engine, "friend_invites", "to_user_id", "VARCHAR(255)")
 except Exception as e:
     logger.warning(f"Column migration skipped: {e}")
 

@@ -140,6 +140,9 @@ class FriendInvite(Base):
     from_user_id: Mapped[str] = mapped_column(
         String(255), ForeignKey("dim_all_users.user_id")
     )
+    to_user_id: Mapped[Optional[str]] = mapped_column(
+        String(255), ForeignKey("dim_all_users.user_id"), nullable=True
+    )
     invite_code: Mapped[str] = mapped_column(String(64), unique=True, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime)
     accepted_by_user_id: Mapped[Optional[str]] = mapped_column(
