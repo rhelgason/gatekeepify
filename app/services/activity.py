@@ -1,4 +1,5 @@
-import random
+import hashlib
+import json
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from typing import List, Optional
@@ -6,7 +7,7 @@ from typing import List, Optional
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.models import Artist, Listen, ListenSource, Track, TrackArtist
+from app.models import Artist, AuditLog, Listen, ListenSource, Track, TrackArtist
 
 
 def generate_activity_feed(
@@ -15,14 +16,39 @@ def generate_activity_feed(
     since = datetime.now(timezone.utc) - timedelta(days=days)
     events = []
 
+    upload_user_ids = set()
     for uid in user_ids:
+        upload_events = _detect_uploads(db, uid, since)
+        if upload_events:
+            upload_user_ids.add(uid)
+        events.extend(upload_events)
         events.extend(_detect_binges(db, uid, since))
         events.extend(_detect_new_obsessions(db, uid, since))
         events.extend(_detect_milestones(db, uid))
         events.extend(_detect_late_to_party(db, uid, user_ids, since))
         events.extend(_detect_broken_streaks(db, uid))
 
-    events.extend(_detect_crown_steals(db, user_ids, since))
+    crown_events = _detect_crown_steals(db, user_ids, since)
+    for uid in upload_user_ids:
+        user_crowns = [e for e in crown_events if e["user_id"] == uid]
+        if len(user_crowns) > 3:
+            kept = user_crowns[:3]
+            rest_count = len(user_crowns) - 3
+            user_name = kept[0]["user_name"]
+            kept.append({
+                "type": "crown_stolen",
+                "ts": user_crowns[3]["ts"],
+                "user_id": uid,
+                "user_name": user_name,
+                "artist_id": None,
+                "artist_name": None,
+                "message": f"...and {rest_count} more crowns stolen by {user_name}'s data upload.",
+                "stat": f"+{rest_count} more",
+                "emoji": "👑",
+            })
+            crown_events = [e for e in crown_events if e["user_id"] != uid] + kept
+
+    events.extend(crown_events)
 
     events.sort(key=lambda e: e["ts"], reverse=True)
     return events[:limit]
@@ -347,6 +373,45 @@ def _detect_broken_streaks(db: Session, user_id: str) -> List[dict]:
     return []
 
 
+def _detect_uploads(db: Session, user_id: str, since: datetime) -> List[dict]:
+    rows = db.execute(
+        select(AuditLog.ts, AuditLog.details)
+        .where(
+            AuditLog.user_id == user_id,
+            AuditLog.action == "backfill.upload",
+            AuditLog.ts >= since,
+            AuditLog.status == "success",
+        )
+        .order_by(AuditLog.ts.desc())
+    ).all()
+
+    if not rows:
+        return []
+
+    user_name = _get_user_name(db, user_id)
+    events = []
+    for row in rows:
+        details = json.loads(row.details) if row.details else {}
+        accepted = details.get("total_listens_accepted", 0)
+        if accepted == 0:
+            continue
+        ts = row.ts if isinstance(row.ts, datetime) else datetime.fromisoformat(str(row.ts))
+        quip = _upload_quip(user_name, accepted)
+        events.append({
+            "type": "data_uploaded",
+            "ts": ts.isoformat(),
+            "user_id": user_id,
+            "user_name": user_name,
+            "artist_id": None,
+            "artist_name": None,
+            "message": quip,
+            "stat": f"{accepted:,} listens uploaded",
+            "emoji": "📦",
+        })
+
+    return events
+
+
 def _get_user_name(db: Session, user_id: str) -> str:
     from app.models import User
     user = db.query(User).filter(User.user_id == user_id).first()
@@ -354,6 +419,12 @@ def _get_user_name(db: Session, user_id: str) -> str:
 
 
 # --- Quip generators ---
+
+def _pick(quips: list, *seed_parts: str) -> str:
+    seed = hashlib.md5("|".join(str(s) for s in seed_parts).encode()).hexdigest()
+    idx = int(seed, 16) % len(quips)
+    return quips[idx]
+
 
 def _binge_quip(user: str, artist: str, hours: float, minutes: int) -> str:
     quips = [
@@ -366,7 +437,7 @@ def _binge_quip(user: str, artist: str, hours: float, minutes: int) -> str:
         f"Noise complaint filed. {user} has been playing {artist} for {hours} hours.",
         f"{user} apparently thinks {artist} will stop making music if they stop listening. {hours} hours.",
     ]
-    return random.choice(quips)
+    return _pick(quips, "binge", user, artist)
 
 
 def _new_obsession_quip(user: str, artist: str, count: int) -> str:
@@ -379,7 +450,7 @@ def _new_obsession_quip(user: str, artist: str, count: int) -> str:
         f"Day 1 of {user} knowing {artist} exists: {count} plays. This will only get worse.",
         f"{user} stumbled into {artist} and decided to make it their whole week. {count} plays.",
     ]
-    return random.choice(quips)
+    return _pick(quips, "obsession", user, artist)
 
 
 def _milestone_quip(user: str, artist: str, milestone: int) -> str:
@@ -402,7 +473,7 @@ def _milestone_quip(user: str, artist: str, milestone: int) -> str:
             f"Century club: {user} has played {artist} 100 times.",
             f"{user} cracked 100 plays on {artist}. That's... a lot of commitment.",
         ]
-    return random.choice(quips)
+    return _pick(quips, "milestone", user, artist, str(milestone))
 
 
 def _late_quip(user: str, artist: str, friend_count: int) -> str:
@@ -414,7 +485,7 @@ def _late_quip(user: str, artist: str, friend_count: int) -> str:
         f"{user} just found out about {artist}. {friend_count} of their friends: 'we been knew.'",
         f"Fashionably late: {user} finally listened to {artist}. Only about a year behind {friend_count} friends.",
     ]
-    return random.choice(quips)
+    return _pick(quips, "late", user, artist)
 
 
 def _crown_steal_quip(thief: str, victim: str, artist: str) -> str:
@@ -427,7 +498,20 @@ def _crown_steal_quip(thief: str, victim: str, artist: str) -> str:
         f"The {artist} crown just changed hands. {thief} dethroned {victim}. Brutal.",
         f"{victim} held the {artist} crown for a while. {thief} just ended that era.",
     ]
-    return random.choice(quips)
+    return _pick(quips, "crown", thief, victim, artist)
+
+
+def _upload_quip(user: str, accepted: int) -> str:
+    quips = [
+        f"{user} just uploaded {accepted:,} listens. The receipts are in.",
+        f"{user} dropped {accepted:,} listens worth of proof. Crowns are about to change hands.",
+        f"Data dump incoming: {user} just uploaded {accepted:,} listens. Check your crowns.",
+        f"{user} pulled up with {accepted:,} listens of listening history. This changes everything.",
+        f"{user} just submitted {accepted:,} listens to the record. Your move.",
+        f"Breaking: {user} has entered the chat with {accepted:,} listens. Thrones are shaking.",
+        f"{user} uploaded their Spotify data. {accepted:,} listens. The leaderboard will never be the same.",
+    ]
+    return _pick(quips, "upload", user, str(accepted))
 
 
 def _streak_broken_quip(user: str, streak_days: int) -> str:
@@ -440,4 +524,4 @@ def _streak_broken_quip(user: str, streak_days: int) -> str:
         f"After {streak_days} days, {user} finally touched grass. Streak broken.",
         f"{user}'s {streak_days}-day streak just flatlined. The silence is deafening.",
     ]
-    return random.choice(quips)
+    return _pick(quips, "streak", user, str(streak_days))
