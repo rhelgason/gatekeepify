@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { isLoggedIn } from "@/lib/auth";
 import { api } from "@/lib/api";
 
-export default function Gatekeep() {
+function GatekeepContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const preselected = searchParams.get("artist");
@@ -198,5 +198,13 @@ export default function Gatekeep() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function Gatekeep() {
+  return (
+    <Suspense fallback={<p className="text-gray-400 mt-12 text-center">Loading...</p>}>
+      <GatekeepContent />
+    </Suspense>
   );
 }
