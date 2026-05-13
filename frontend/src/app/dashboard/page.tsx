@@ -45,6 +45,52 @@ export default function Dashboard() {
     return <p className="text-gray-400 mt-12 text-center">Loading stats...</p>;
   }
 
+  const isEmpty = tracks.length === 0 && artists.length === 0 && genres.length === 0;
+
+  if (isEmpty) {
+    return (
+      <div className="mt-12 max-w-lg mx-auto text-center">
+        <h1 className="text-2xl font-bold mb-4">Welcome to Gatekeepify</h1>
+        <p className="text-gray-400 mb-6">
+          We&apos;re collecting your listening data now. Your recent Spotify
+          history will appear here within 15 minutes.
+        </p>
+        <div className="bg-gray-900 rounded-lg p-6 text-left space-y-4">
+          <div>
+            <h2 className="font-semibold text-green-400 mb-1">
+              Want your full history?
+            </h2>
+            <p className="text-gray-400 text-sm">
+              Spotify&apos;s API only gives us your last 50 listens. To see
+              years of data, upload your Spotify data export.
+            </p>
+            <Link
+              href="/upload"
+              className="inline-block mt-2 text-sm text-green-400 hover:text-green-300"
+            >
+              Upload your data &rarr;
+            </Link>
+          </div>
+          <div>
+            <h2 className="font-semibold text-green-400 mb-1">
+              Invite your friends
+            </h2>
+            <p className="text-gray-400 text-sm">
+              Gatekeeping is a team sport. Add friends to compare who listened
+              first.
+            </p>
+            <Link
+              href="/friends"
+              className="inline-block mt-2 text-sm text-green-400 hover:text-green-300"
+            >
+              Manage friends &rarr;
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
