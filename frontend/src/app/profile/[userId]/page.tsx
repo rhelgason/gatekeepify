@@ -19,6 +19,7 @@ export default function Profile() {
   const [artists, setArtists] = useState<any[]>([]);
   const [genres, setGenres] = useState<any[]>([]);
   const [userName, setUserName] = useState("");
+  const [compat, setCompat] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -47,6 +48,7 @@ export default function Profile() {
       if (friend) setUserName(friend.user_name || friend.user_id);
       else setUserName(userId);
     });
+    api.getCompatibility(userId).then(setCompat).catch(() => {});
   }, [userId]);
 
   const periods: { value: Period; label: string }[] = [
@@ -72,7 +74,7 @@ export default function Profile() {
         &larr; back
       </button>
 
-      <div className="flex items-center gap-4 mt-4 mb-8">
+      <div className="flex items-center gap-4 mt-4 mb-6">
         <div className="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center text-2xl text-gray-500">
           {userName[0]?.toUpperCase() || "?"}
         </div>
@@ -81,6 +83,47 @@ export default function Profile() {
           <p className="text-gray-500 text-sm">Friend&apos;s listening stats</p>
         </div>
       </div>
+
+      {compat && (
+        <div className="card p-5 mb-8 animate-slide-up">
+          <div className="flex flex-col sm:flex-row items-center gap-6">
+            <div className="text-center flex-shrink-0">
+              <div className={`stat-number text-5xl ${compat.score >= 70 ? "gradient-text" : compat.score >= 40 ? "text-yellow-400" : "text-red-400"}`}>
+                {compat.score}%
+              </div>
+              <div className="text-gray-600 text-xs uppercase tracking-wider mt-1">compatibility</div>
+            </div>
+            <div className="flex-1 w-full">
+              <div className="flex gap-4 mb-3 text-center">
+                <div className="flex-1">
+                  <div className="text-sm font-bold">{compat.artist_overlap}%</div>
+                  <div className="text-[10px] text-gray-600">artist overlap</div>
+                </div>
+                <div className="flex-1">
+                  <div className="text-sm font-bold">{compat.genre_overlap}%</div>
+                  <div className="text-[10px] text-gray-600">genre overlap</div>
+                </div>
+                <div className="flex-1">
+                  <div className="text-sm font-bold">{compat.top5_agreement}%</div>
+                  <div className="text-[10px] text-gray-600">top 5 match</div>
+                </div>
+              </div>
+              {compat.shared_artists?.length > 0 && (
+                <div className="mb-2">
+                  <span className="text-[10px] text-gray-500 uppercase tracking-wider">You both listen to: </span>
+                  <span className="text-xs text-gray-300">{compat.shared_artists.slice(0, 5).join(", ")}</span>
+                </div>
+              )}
+              {compat.disagreement_genres?.length > 0 && (
+                <div>
+                  <span className="text-[10px] text-gray-500 uppercase tracking-wider">You disagree on: </span>
+                  <span className="text-xs text-gray-400">{compat.disagreement_genres.slice(0, 3).join(", ")}</span>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-8">
         <h2 className="text-sm font-bold uppercase tracking-widest text-gray-500">Stats</h2>

@@ -349,3 +349,23 @@ def decline_friend_request(
                entity_type="user", entity_id=invite.from_user_id)
 
     return {"status": "declined"}
+
+
+@router.get("/compatibility/{friend_id}")
+def get_compatibility(
+    friend_id: str,
+    user: UserModel = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    friend_ids = get_friend_ids(db, user.user_id)
+    if friend_id not in friend_ids:
+        raise HTTPException(status_code=403, detail="Not friends with this user")
+
+    from app.services.compatibility import compute_compatibility
+    result = compute_compatibility(db, user.user_id, friend_id)
+
+    log_action(db, "friends.compatibility_viewed", user_id=user.user_id,
+               entity_type="user", entity_id=friend_id,
+               details={"score": result["score"]})
+
+    return result

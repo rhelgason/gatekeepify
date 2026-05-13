@@ -124,6 +124,9 @@ export const api = {
   declineFriendRequest: (requestId: number) =>
     request<any>(`/friends/requests/${requestId}/decline`, { method: "POST" }),
 
+  getCompatibility: (friendId: string) =>
+    cachedRequest<any>(`/friends/compatibility/${friendId}`),
+
   searchArtists: (q: string) => request<any[]>(`/search/artists?q=${encodeURIComponent(q)}`),
 
   searchSpotifyArtists: (q: string) => request<any[]>(`/search/spotify-artists?q=${encodeURIComponent(q)}`),

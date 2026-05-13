@@ -17,6 +17,7 @@ export default function Friends() {
   const [userResults, setUserResults] = useState<any[]>([]);
   const [searching, setSearching] = useState(false);
   const [message, setMessage] = useState("");
+  const [compatScores, setCompatScores] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -35,6 +36,12 @@ export default function Friends() {
     setFriends(f);
     setPendingRequests(r);
     setLoading(false);
+
+    for (const friend of f) {
+      api.getCompatibility(friend.user_id).then(c => {
+        setCompatScores(prev => ({ ...prev, [friend.user_id]: c.score }));
+      }).catch(() => {});
+    }
   }
 
   async function handleCreateInvite() {
@@ -231,11 +238,21 @@ export default function Friends() {
                 <div className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center text-sm text-gray-500">
                   {(f.user_name || f.user_id)[0]?.toUpperCase()}
                 </div>
-                <span className="font-medium">{f.user_name || f.user_id}</span>
+                <div>
+                  <span className="font-medium block">{f.user_name || f.user_id}</span>
+                  <span className="text-gray-600 text-xs">
+                    Since {new Date(f.friends_since).toLocaleDateString()}
+                  </span>
+                </div>
               </div>
-              <span className="text-gray-600 text-sm">
-                Since {new Date(f.friends_since).toLocaleDateString()}
-              </span>
+              {compatScores[f.user_id] !== undefined && (
+                <span className={`text-sm font-bold ${
+                  compatScores[f.user_id] >= 70 ? "text-[var(--green)]" :
+                  compatScores[f.user_id] >= 40 ? "text-yellow-400" : "text-red-400"
+                }`}>
+                  {compatScores[f.user_id]}% match
+                </span>
+              )}
             </Link>
           ))}
         </div>
