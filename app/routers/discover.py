@@ -18,8 +18,28 @@ from app.models import User as UserModel
 from app.routers.auth import get_current_user
 from app.routers.friends import get_friend_ids
 from app.services.audit import log_action
+from app.services.compatibility import compute_quick_score, get_user_artists
 
 router = APIRouter(prefix="/discover", tags=["discover"])
+
+
+def _get_my_artist_ids(db: Session, user_id: str) -> set:
+    return set(
+        r[0] for r in db.execute(
+            select(TrackArtist.artist_id)
+            .select_from(Listen)
+            .join(TrackArtist, Listen.track_id == TrackArtist.track_id)
+            .where(Listen.user_id == user_id)
+            .group_by(TrackArtist.artist_id)
+        ).all()
+    )
+
+
+def _get_friend_compat_scores(db: Session, user_id: str, friend_ids: list) -> dict:
+    scores = {}
+    for fid in friend_ids:
+        scores[fid] = compute_quick_score(db, user_id, fid)
+    return scores
 
 
 @router.get("/friends-fresh-finds")
@@ -33,50 +53,46 @@ def friends_fresh_finds(
         return []
 
     since = datetime.now(timezone.utc) - timedelta(days=days)
+    my_artists = _get_my_artist_ids(db, user.user_id)
+    compat_scores = _get_friend_compat_scores(db, user.user_id, friend_ids)
 
-    my_artists = set(
-        r[0] for r in db.execute(
-            select(TrackArtist.artist_id)
-            .select_from(Listen)
-            .join(TrackArtist, Listen.track_id == TrackArtist.track_id)
-            .where(Listen.user_id == user.user_id)
-            .group_by(TrackArtist.artist_id)
-        ).all()
-    )
-
+    # Get per-friend-per-artist recent listens
     stmt = (
         select(
             TrackArtist.artist_id,
             Artist.artist_name,
             Artist.image_url,
-            func.count(func.distinct(Listen.user_id)).label("friend_count"),
+            Listen.user_id,
             func.count().label("listen_count"),
         )
         .select_from(Listen)
         .join(TrackArtist, Listen.track_id == TrackArtist.track_id)
         .join(Artist, TrackArtist.artist_id == Artist.artist_id)
-        .where(
-            Listen.user_id.in_(friend_ids),
-            Listen.ts >= since,
-        )
-        .group_by(TrackArtist.artist_id, Artist.artist_name, Artist.image_url)
-        .order_by(func.count(func.distinct(Listen.user_id)).desc(), func.count().desc())
-        .limit(20)
+        .where(Listen.user_id.in_(friend_ids), Listen.ts >= since)
+        .group_by(TrackArtist.artist_id, Artist.artist_name, Artist.image_url, Listen.user_id)
     )
     rows = db.execute(stmt).all()
 
-    results = [
-        {
-            "artist_id": r.artist_id,
-            "artist_name": r.artist_name,
-            "image_url": r.image_url,
-            "friend_count": r.friend_count,
-            "listen_count": r.listen_count,
-            "you_listen": r.artist_id in my_artists,
-        }
-        for r in rows
-        if r.artist_id not in my_artists
-    ]
+    # Aggregate per artist, weighting by friend compatibility
+    artist_data: dict = {}
+    for r in rows:
+        if r.artist_id in my_artists:
+            continue
+        if r.artist_id not in artist_data:
+            artist_data[r.artist_id] = {
+                "artist_id": r.artist_id,
+                "artist_name": r.artist_name,
+                "image_url": r.image_url,
+                "friend_count": 0,
+                "listen_count": 0,
+                "relevance_score": 0.0,
+            }
+        d = artist_data[r.artist_id]
+        d["friend_count"] += 1
+        d["listen_count"] += r.listen_count
+        d["relevance_score"] += compat_scores.get(r.user_id, 50) * r.listen_count
+
+    results = sorted(artist_data.values(), key=lambda x: -x["relevance_score"])[:20]
 
     log_action(db, "discover.friends_fresh_finds", user_id=user.user_id,
                details={"days": days, "results": len(results)})
@@ -92,39 +108,51 @@ def youre_late_on(
     if not friend_ids:
         return []
 
-    my_artists = set(
-        r[0] for r in db.execute(
-            select(TrackArtist.artist_id)
-            .select_from(Listen)
-            .join(TrackArtist, Listen.track_id == TrackArtist.track_id)
-            .where(Listen.user_id == user.user_id)
-            .group_by(TrackArtist.artist_id)
-        ).all()
-    )
+    my_artists = _get_my_artist_ids(db, user.user_id)
+    compat_scores = _get_friend_compat_scores(db, user.user_id, friend_ids)
 
+    # Get per-friend-per-artist listens (all time)
     stmt = (
         select(
             TrackArtist.artist_id,
             Artist.artist_name,
             Artist.image_url,
-            func.count(func.distinct(Listen.user_id)).label("friend_count"),
-            func.sum(
-                func.count().over(partition_by=[Listen.user_id, TrackArtist.artist_id])
-            ).label("total_listens") if False else func.count().label("total_listens"),
+            Listen.user_id,
+            func.count().label("listen_count"),
         )
         .select_from(Listen)
         .join(TrackArtist, Listen.track_id == TrackArtist.track_id)
         .join(Artist, TrackArtist.artist_id == Artist.artist_id)
         .where(Listen.user_id.in_(friend_ids))
-        .group_by(TrackArtist.artist_id, Artist.artist_name, Artist.image_url)
-        .having(func.count(func.distinct(Listen.user_id)) >= 2)
-        .order_by(func.count(func.distinct(Listen.user_id)).desc(), func.count().desc())
-        .limit(20)
+        .group_by(TrackArtist.artist_id, Artist.artist_name, Artist.image_url, Listen.user_id)
     )
     rows = db.execute(stmt).all()
 
+    artist_data: dict = {}
+    for r in rows:
+        if r.artist_id in my_artists:
+            continue
+        if r.artist_id not in artist_data:
+            artist_data[r.artist_id] = {
+                "artist_id": r.artist_id,
+                "artist_name": r.artist_name,
+                "image_url": r.image_url,
+                "friend_count": 0,
+                "total_listens": 0,
+                "relevance_score": 0.0,
+            }
+        d = artist_data[r.artist_id]
+        d["friend_count"] += 1
+        d["total_listens"] += r.listen_count
+        d["relevance_score"] += compat_scores.get(r.user_id, 50) * r.listen_count
+
+    # Only include artists that 2+ friends listen to
+    candidates = [d for d in artist_data.values() if d["friend_count"] >= 2]
+    candidates.sort(key=lambda x: -x["relevance_score"])
+    rows_filtered = candidates[:20]
+
     genre_map: dict = {}
-    artist_ids = [r.artist_id for r in rows if r.artist_id not in my_artists]
+    artist_ids = [d["artist_id"] for d in rows_filtered]
     if artist_ids:
         genre_rows = db.execute(
             select(ArtistGenre.artist_id, ArtistGenre.genre)
@@ -135,16 +163,11 @@ def youre_late_on(
 
     results = [
         {
-            "artist_id": r.artist_id,
-            "artist_name": r.artist_name,
-            "image_url": r.image_url,
-            "friend_count": r.friend_count,
-            "total_listens": r.total_listens,
-            "genres": genre_map.get(r.artist_id, [])[:3],
-            "urgency": f"{r.friend_count} of your friends already listen to this artist",
+            **d,
+            "genres": genre_map.get(d["artist_id"], [])[:3],
+            "urgency": f"{d['friend_count']} of your friends already listen to this artist",
         }
-        for r in rows
-        if r.artist_id not in my_artists
+        for d in rows_filtered
     ]
 
     log_action(db, "discover.youre_late_on", user_id=user.user_id,
@@ -203,15 +226,7 @@ def rising_artists(
         for a in db.query(Artist).filter(Artist.artist_id.in_(top_ids)).all()
     }
 
-    my_artists = set(
-        r[0] for r in db.execute(
-            select(TrackArtist.artist_id)
-            .select_from(Listen)
-            .join(TrackArtist, Listen.track_id == TrackArtist.track_id)
-            .where(Listen.user_id == user.user_id)
-            .group_by(TrackArtist.artist_id)
-        ).all()
-    )
+    my_artists = _get_my_artist_ids(db, user.user_id)
 
     results = []
     for artist_id, new_listeners, total_listeners in growth[:15]:

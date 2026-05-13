@@ -5,8 +5,8 @@ from app.models import ArtistGenre, Listen, TrackArtist
 
 
 def compute_compatibility(db: Session, user_id_1: str, user_id_2: str) -> dict:
-    artists_1 = _get_user_artists(db, user_id_1, 50)
-    artists_2 = _get_user_artists(db, user_id_2, 50)
+    artists_1 = get_user_artists(db, user_id_1, 50)
+    artists_2 = get_user_artists(db, user_id_2, 50)
 
     if not artists_1 or not artists_2:
         return {
@@ -28,8 +28,8 @@ def compute_compatibility(db: Session, user_id_1: str, user_id_2: str) -> dict:
     all_artist_ids = artist_ids_1 | artist_ids_2
     artist_jaccard = len(shared_artist_ids) / len(all_artist_ids) * 100 if all_artist_ids else 0
 
-    genres_1 = _get_user_genres(db, user_id_1)
-    genres_2 = _get_user_genres(db, user_id_2)
+    genres_1 = get_user_genres(db, user_id_1)
+    genres_2 = get_user_genres(db, user_id_2)
     shared_genres = genres_1 & genres_2
     all_genres = genres_1 | genres_2
     genre_jaccard = len(shared_genres) / len(all_genres) * 100 if all_genres else 0
@@ -65,7 +65,15 @@ def compute_compatibility(db: Session, user_id_1: str, user_id_2: str) -> dict:
     }
 
 
-def _get_user_artists(db: Session, user_id: str, limit: int) -> list[dict]:
+def compute_quick_score(db: Session, user_id_1: str, user_id_2: str) -> float:
+    a1 = set(a["artist_id"] for a in get_user_artists(db, user_id_1, 50))
+    a2 = set(a["artist_id"] for a in get_user_artists(db, user_id_2, 50))
+    if not a1 or not a2:
+        return 0.0
+    return len(a1 & a2) / len(a1 | a2) * 100
+
+
+def get_user_artists(db: Session, user_id: str, limit: int) -> list[dict]:
     stmt = (
         select(TrackArtist.artist_id, func.count().label("cnt"))
         .select_from(Listen)
@@ -93,7 +101,7 @@ def _get_user_artists(db: Session, user_id: str, limit: int) -> list[dict]:
     ]
 
 
-def _get_user_genres(db: Session, user_id: str) -> set:
+def get_user_genres(db: Session, user_id: str) -> set:
     stmt = (
         select(ArtistGenre.genre)
         .select_from(Listen)
