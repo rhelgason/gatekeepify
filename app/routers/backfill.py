@@ -10,10 +10,16 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import Album, Listen, ListenSource, Track, User
+import logging
+
 from app.models import User as UserModel
 from app.routers.auth import get_current_user
 from app.schemas import BackfillStatusResponse, BackfillUploadResponse
 from app.services.audit import log_action
+from app.services.ingestion import upsert_track_metadata
+from app.services.spotify import SpotifyService, decrypt_token
+
+logger = logging.getLogger("gatekeepify.backfill")
 
 router = APIRouter(prefix="/backfill", tags=["backfill"])
 
@@ -262,6 +268,38 @@ def upload_data_export(
 
     db.commit()
 
+    MAX_IMMEDIATE_ENRICHMENT = 500
+
+    new_track_ids = list({
+        listen.track_id for listen, _ in accepted
+        if db.query(Track).filter(
+            Track.track_id == listen.track_id, Track.album_id.is_(None)
+        ).first()
+    })[:MAX_IMMEDIATE_ENRICHMENT]
+
+    enriched = 0
+    if new_track_ids:
+        try:
+            from spotipy.exceptions import SpotifyException
+
+            user_obj = db.query(User).filter(User.user_id == user.user_id).first()
+            if user_obj and user_obj.spotify_refresh_token:
+                service = SpotifyService()
+                refresh_token = decrypt_token(user_obj.spotify_refresh_token)
+                token_info = service.refresh_access_token(refresh_token)
+                access_token = token_info["access_token"]
+                items = service.get_tracks(access_token, new_track_ids)
+                if items:
+                    enriched = upsert_track_metadata(db, items)
+                    logger.info(f"Enriched {enriched} tracks immediately after upload")
+        except SpotifyException as e:
+            if e.http_status == 429:
+                logger.warning(f"Rate limited during enrichment after {enriched} tracks, cron will finish the rest")
+            else:
+                logger.warning(f"Spotify error during enrichment: {e}")
+        except Exception as e:
+            logger.warning(f"Immediate enrichment failed, will backfill later: {e}")
+
     log_action(
         db, "backfill.upload",
         user_id=user.user_id,
@@ -270,6 +308,7 @@ def upload_data_export(
             "total_accepted": inserted,
             "total_rejected": len(raw_listens) - len(accepted),
             "rejection_reasons": rejection_reasons,
+            "tracks_enriched_immediately": enriched,
         },
     )
 
