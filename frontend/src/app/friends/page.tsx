@@ -12,6 +12,7 @@ export default function Friends() {
   const [friends, setFriends] = useState<any[]>([]);
   const [pendingRequests, setPendingRequests] = useState<any[]>([]);
   const [inviteCode, setInviteCode] = useState("");
+  const [copied, setCopied] = useState(false);
   const [userQuery, setUserQuery] = useState("");
   const [userResults, setUserResults] = useState<any[]>([]);
   const [searching, setSearching] = useState(false);
@@ -191,10 +192,15 @@ export default function Friends() {
                   {typeof window !== "undefined" ? `${window.location.origin}/invite/${inviteCode}` : inviteCode}
                 </code>
                 <button
-                  onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/invite/${inviteCode}`); trackEvent("invite_link_copied"); }}
+                  onClick={() => {
+                    navigator.clipboard.writeText(`${window.location.origin}/invite/${inviteCode}`);
+                    trackEvent("invite_link_copied");
+                    setCopied(true);
+                    setTimeout(() => setCopied(false), 2000);
+                  }}
                   className="btn-secondary text-xs py-1.5 px-4"
                 >
-                  Copy
+                  {copied ? "Copied!" : "Copy"}
                 </button>
               </div>
             </div>

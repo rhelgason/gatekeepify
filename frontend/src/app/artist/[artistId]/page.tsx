@@ -19,6 +19,7 @@ export default function ArtistPage() {
   const [lastfmLoading, setLastfmLoading] = useState(false);
   const [timelineMode, setTimelineMode] = useState<"personal" | "friends" | "global">("personal");
   const [challenge, setChallenge] = useState<any>(null);
+  const [copied, setCopied] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -438,10 +439,15 @@ export default function ArtistPage() {
                 {challenge.invite_code}
               </code>
               <button
-                onClick={() => { navigator.clipboard.writeText(challenge.invite_code); trackEvent("challenge_code_copied", { artist_id: artistId }); }}
+                onClick={() => {
+                  navigator.clipboard.writeText(challenge.invite_code);
+                  trackEvent("challenge_code_copied", { artist_id: artistId });
+                  setCopied(true);
+                  setTimeout(() => setCopied(false), 2000);
+                }}
                 className="btn-secondary text-xs py-1.5 px-4"
               >
-                Copy
+                {copied ? "Copied!" : "Copy"}
               </button>
             </div>
           </div>
