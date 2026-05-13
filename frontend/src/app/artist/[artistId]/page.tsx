@@ -70,17 +70,6 @@ export default function ArtistPage() {
   const name = detail?.artist_name || comparison?.artist_name || "Unknown Artist";
   const imageUrl = detail?.image_url;
   const genres = detail?.genres || [];
-  const maxListens = timeline?.users?.[0]?.months
-    ? Math.max(...timeline.users.flatMap((u: any) => u.months.map((m: any) => m.listen_count)), 1)
-    : 1;
-
-  const barColors = [
-    "bg-[var(--green)]",
-    "bg-emerald-400",
-    "bg-teal-400",
-    "bg-cyan-400",
-    "bg-sky-400",
-  ];
 
   return (
     <div className="animate-fade-in">
@@ -163,6 +152,74 @@ export default function ArtistPage() {
         </div>
 
         {(() => {
+          const lineColors = ["#1DB954", "#34d399", "#2dd4bf", "#22d3ee", "#38bdf8", "#a78bfa"];
+
+          function renderLineChart(datasets: { label: string; months: any[]; color: string }[], footnote?: string) {
+            const allMonths = [...new Set(datasets.flatMap(d => d.months.map((m: any) => m.month)))].sort();
+            const maxVal = Math.max(...datasets.flatMap(d => d.months.map((m: any) => m.listen_count)), 1);
+
+            const W = 600, H = 140, padX = 0, padY = 10;
+            const chartW = W - padX * 2, chartH = H - padY * 2;
+
+            function getX(i: number) {
+              return padX + (allMonths.length === 1 ? chartW / 2 : (i / (allMonths.length - 1)) * chartW);
+            }
+            function getY(val: number) {
+              return padY + chartH - (val / maxVal) * chartH;
+            }
+
+            return (
+              <div className="card p-6">
+                <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-36" preserveAspectRatio="none">
+                  {[0.25, 0.5, 0.75].map(frac => (
+                    <line key={frac} x1={padX} x2={W - padX} y1={getY(maxVal * frac)} y2={getY(maxVal * frac)}
+                      stroke="rgba(255,255,255,0.05)" strokeWidth="1" />
+                  ))}
+                  {datasets.map((ds, di) => {
+                    const points = allMonths.map((month, i) => {
+                      const entry = ds.months.find((m: any) => m.month === month);
+                      return { x: getX(i), y: getY(entry?.listen_count || 0), val: entry?.listen_count || 0, month };
+                    });
+                    const pathD = points.map((p, i) => `${i === 0 ? "M" : "L"} ${p.x} ${p.y}`).join(" ");
+                    const areaD = pathD + ` L ${points[points.length - 1].x} ${H - padY} L ${points[0].x} ${H - padY} Z`;
+                    return (
+                      <g key={di}>
+                        <path d={areaD} fill={ds.color} opacity="0.1" />
+                        <path d={pathD} fill="none" stroke={ds.color} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+                        {points.map((p, i) => (
+                          <g key={i}>
+                            <circle cx={p.x} cy={p.y} r="4" fill={ds.color} opacity="0.9" />
+                            <circle cx={p.x} cy={p.y} r="12" fill="transparent" className="cursor-pointer">
+                              <title>{p.month}: {p.val.toLocaleString()} listens</title>
+                            </circle>
+                          </g>
+                        ))}
+                      </g>
+                    );
+                  })}
+                </svg>
+                {allMonths.length > 0 && (
+                  <div className="flex justify-between text-[10px] text-gray-600 mt-1">
+                    <span>{allMonths[0]}</span>
+                    {allMonths.length > 2 && <span>{allMonths[Math.floor(allMonths.length / 2)]}</span>}
+                    {allMonths.length > 1 && <span>{allMonths[allMonths.length - 1]}</span>}
+                  </div>
+                )}
+                {datasets.length > 1 && (
+                  <div className="flex gap-4 mt-3 pt-3 border-t border-white/5">
+                    {datasets.map((ds, i) => (
+                      <div key={i} className="flex items-center gap-2 text-xs text-gray-500">
+                        <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: ds.color }} />
+                        {ds.label}
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {footnote && <p className="text-center text-gray-600 text-xs mt-3">{footnote}</p>}
+              </div>
+            );
+          }
+
           // Global mode uses Last.fm
           if (timelineMode === "global") {
             if (!lastfmData?.data) {
@@ -189,31 +246,9 @@ export default function ArtistPage() {
                 </div>
               );
             }
-            const months = lastfmData.data.months || [];
-            const maxL = Math.max(...months.map((m: any) => m.listen_count), 1);
-            return (
-              <div className="card p-6">
-                <div className="flex items-end gap-[2px] h-24">
-                  {months.map((m: any) => (
-                    <div key={m.month} className="group relative flex-1 flex flex-col justify-end">
-                      <div
-                        className="bg-purple-400 rounded-t opacity-80 hover:opacity-100 transition-all duration-150 min-w-[3px]"
-                        style={{ height: `${Math.max((m.listen_count / maxL) * 100, 4)}%` }}
-                      />
-                      <div className="absolute -top-8 left-1/2 -translate-x-1/2 hidden group-hover:block bg-gray-800 text-white text-[10px] px-2 py-1 rounded whitespace-nowrap z-10">
-                        {m.month}: {m.listen_count.toLocaleString()} plays
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                {months.length > 0 && (
-                  <div className="flex justify-between text-[10px] text-gray-600 mt-1">
-                    <span>{months[0]?.month}</span>
-                    <span>{months[months.length - 1]?.month}</span>
-                  </div>
-                )}
-                <p className="text-center text-gray-600 text-xs mt-3">Global popularity via Last.fm</p>
-              </div>
+            return renderLineChart(
+              [{ label: "Last.fm Global", months: lastfmData.data.months || [], color: "#a78bfa" }],
+              "Global popularity via Last.fm"
             );
           }
 
@@ -236,80 +271,12 @@ export default function ArtistPage() {
             );
           }
 
-          // Few data points: show stat cards instead of a chart
-          const totalMonths = Math.max(...users.map((u: any) => u.months?.length || 0));
-          if (totalMonths <= 2) {
-            return (
-              <div className="card p-6">
-                {users.map((user: any, i: number) => (
-                  <div key={user.user_id} className="mb-4 last:mb-0">
-                    {users.length > 1 && (
-                      <div className="text-xs text-gray-500 mb-2 font-medium">{user.user_name}</div>
-                    )}
-                    <div className="flex gap-6">
-                      {user.months.map((m: any) => (
-                        <div key={m.month} className="text-center">
-                          <div className={`stat-number text-2xl ${i === 0 ? "gradient-text" : "text-gray-300"}`}>
-                            {m.listen_count}
-                          </div>
-                          <div className="text-gray-600 text-xs">{m.month}</div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-                <p className="text-gray-600 text-xs mt-3">
-                  A full timeline will appear as more months of data are collected.
-                </p>
-              </div>
-            );
-          }
-
-          // Full bar chart
-          return (
-            <div className="card p-6">
-              {users.map((user: any, userIdx: number) => (
-                <div key={user.user_id} className="mb-4 last:mb-0">
-                  {users.length > 1 && (
-                    <div className="text-xs text-gray-500 mb-2 font-medium">
-                      {user.user_name || user.user_id}
-                    </div>
-                  )}
-                  <div className="flex items-end gap-[2px] h-24">
-                    {user.months.map((m: any) => {
-                      const height = Math.max((m.listen_count / maxListens) * 100, 4);
-                      return (
-                        <div key={m.month} className="group relative flex-1 flex flex-col justify-end">
-                          <div
-                            className={`${barColors[userIdx % barColors.length]} rounded-t opacity-80 hover:opacity-100 transition-all duration-150 min-w-[3px]`}
-                            style={{ height: `${height}%` }}
-                          />
-                          <div className="absolute -top-8 left-1/2 -translate-x-1/2 hidden group-hover:block bg-gray-800 text-white text-[10px] px-2 py-1 rounded whitespace-nowrap z-10">
-                            {m.month}: {m.listen_count} listens
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                  {user.months.length > 0 && (
-                    <div className="flex justify-between text-[10px] text-gray-600 mt-1">
-                      <span>{user.months[0]?.month}</span>
-                      <span>{user.months[user.months.length - 1]?.month}</span>
-                    </div>
-                  )}
-                </div>
-              ))}
-              {users.length > 1 && (
-                <div className="flex gap-4 mt-3 pt-3 border-t border-white/5">
-                  {users.map((user: any, i: number) => (
-                    <div key={user.user_id} className="flex items-center gap-2 text-xs text-gray-500">
-                      <div className={`w-2.5 h-2.5 rounded-full ${barColors[i % barColors.length]}`} />
-                      {user.user_name || user.user_id}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+          return renderLineChart(
+            users.filter((u: any) => u.months?.length > 0).map((u: any, i: number) => ({
+              label: u.user_name || u.user_id,
+              months: u.months,
+              color: lineColors[i % lineColors.length],
+            }))
           );
         })()}
       </section>
