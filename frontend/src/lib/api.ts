@@ -99,6 +99,9 @@ export const api = {
   getTimeline: (artistId: string, mode: string = "personal") =>
     request<any>(`/stats/timeline?artist_id=${artistId}&mode=${mode}`),
 
+  getLastfmTimeline: (artistName: string) =>
+    request<any>(`/stats/lastfm-timeline?artist_name=${encodeURIComponent(artistName)}`),
+
   gatekeepArtist: (artistId: string) => request<any>(`/gatekeep/artist/${artistId}`),
 
   gatekeepTrack: (trackId: string) => request<any>(`/gatekeep/track/${trackId}`),

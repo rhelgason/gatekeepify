@@ -392,3 +392,40 @@ def timeline(
     )
 
     return {"users": list(data.values())}
+
+
+@router.get("/lastfm-timeline")
+def lastfm_timeline(
+    artist_name: str = Query(...),
+    user: UserModel = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    from app.services.lastfm import get_artist_weekly_listeners
+
+    result = get_artist_weekly_listeners(artist_name)
+
+    log_action(
+        db, "stats.lastfm_timeline_viewed",
+        user_id=user.user_id,
+        details={"artist_name": artist_name, "has_data": result is not None},
+    )
+
+    if result is None:
+        return {"source": "lastfm", "data": None, "message": "Last.fm data unavailable"}
+
+    if result and result[0].get("source") == "lastfm_summary":
+        return {
+            "source": "lastfm",
+            "type": "summary",
+            "data": result[0],
+        }
+
+    return {
+        "source": "lastfm",
+        "type": "timeline",
+        "data": {
+            "user_id": "_lastfm",
+            "user_name": "Last.fm Global",
+            "months": result,
+        },
+    }

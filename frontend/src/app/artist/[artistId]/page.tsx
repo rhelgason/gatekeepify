@@ -14,7 +14,8 @@ export default function ArtistPage() {
   const [detail, setDetail] = useState<any>(null);
   const [comparison, setComparison] = useState<any>(null);
   const [timeline, setTimeline] = useState<any>(null);
-  const [timelineMode, setTimelineMode] = useState<"personal" | "friends" | "global">("personal");
+  const [lastfmData, setLastfmData] = useState<any>(null);
+  const [timelineMode, setTimelineMode] = useState<"personal" | "friends" | "global" | "lastfm">("personal");
   const [challenge, setChallenge] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
@@ -28,9 +29,15 @@ export default function ArtistPage() {
 
   useEffect(() => {
     if (artistId && !loading) {
-      api.getTimeline(artistId, timelineMode).then(setTimeline).catch(() => {});
+      if (timelineMode === "lastfm") {
+        if (detail?.artist_name) {
+          api.getLastfmTimeline(detail.artist_name).then(setLastfmData).catch(() => {});
+        }
+      } else {
+        api.getTimeline(artistId, timelineMode).then(setTimeline).catch(() => {});
+      }
     }
-  }, [artistId, timelineMode, loading]);
+  }, [artistId, timelineMode, loading, detail?.artist_name]);
 
   async function loadArtist() {
     setLoading(true);
@@ -129,76 +136,152 @@ export default function ArtistPage() {
       </div>
 
       {/* Timeline */}
-      {timeline?.users?.length > 0 && (
-        <section className="mb-10">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-sm font-bold uppercase tracking-widest text-gray-500">
-              Listening Timeline
-            </h2>
-            <div className="flex gap-1 bg-white/5 rounded-full p-1">
-              {(["personal", "friends", "global"] as const).map((m) => (
-                <button
-                  key={m}
-                  onClick={() => setTimelineMode(m)}
-                  className={`px-4 py-1.5 rounded-full text-xs transition-all ${
-                    timelineMode === m
-                      ? "bg-[var(--green)] text-black font-bold"
-                      : "text-gray-500 hover:text-white"
-                  }`}
-                >
-                  {m === "personal" ? "Your Listens" : m === "friends" ? "Friends" : "Global"}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div className="card p-6">
-            {timeline.users.map((user: any, userIdx: number) => (
-              <div key={user.user_id} className="mb-4 last:mb-0">
-                {timeline.users.length > 1 && (
-                  <div className="text-xs text-gray-500 mb-2 font-medium">
-                    {user.user_name || user.user_id}
-                  </div>
-                )}
-                <div className="flex items-end gap-[2px] h-24">
-                  {user.months.map((m: any) => {
-                    const height = Math.max((m.listen_count / maxListens) * 100, 4);
-                    return (
-                      <div
-                        key={m.month}
-                        className="group relative flex-1 flex flex-col justify-end"
-                      >
-                        <div
-                          className={`${barColors[userIdx % barColors.length]} rounded-t opacity-80 hover:opacity-100 transition-all duration-150 min-w-[3px]`}
-                          style={{ height: `${height}%` }}
-                        />
-                        <div className="absolute -top-8 left-1/2 -translate-x-1/2 hidden group-hover:block bg-gray-800 text-white text-[10px] px-2 py-1 rounded whitespace-nowrap z-10">
-                          {m.month}: {m.listen_count} listens
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-                {user.months.length > 0 && (
-                  <div className="flex justify-between text-[10px] text-gray-600 mt-1">
-                    <span>{user.months[0]?.month}</span>
-                    <span>{user.months[user.months.length - 1]?.month}</span>
-                  </div>
-                )}
-              </div>
+      <section className="mb-10">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-sm font-bold uppercase tracking-widest text-gray-500">
+            Listening Timeline
+          </h2>
+          <div className="flex gap-1 bg-white/5 rounded-full p-1">
+            {([
+              { key: "personal", label: "Yours" },
+              { key: "friends", label: "Friends" },
+              { key: "global", label: "Gatekeepify" },
+              { key: "lastfm", label: "Last.fm" },
+            ] as const).map(({ key, label }) => (
+              <button
+                key={key}
+                onClick={() => setTimelineMode(key)}
+                className={`px-3 py-1.5 rounded-full text-xs transition-all ${
+                  timelineMode === key
+                    ? "bg-[var(--green)] text-black font-bold"
+                    : "text-gray-500 hover:text-white"
+                }`}
+              >
+                {label}
+              </button>
             ))}
-            {timeline.users.length > 1 && (
-              <div className="flex gap-4 mt-3 pt-3 border-t border-white/5">
-                {timeline.users.map((user: any, i: number) => (
-                  <div key={user.user_id} className="flex items-center gap-2 text-xs text-gray-500">
-                    <div className={`w-2.5 h-2.5 rounded-full ${barColors[i % barColors.length]}`} />
-                    {user.user_name || user.user_id}
-                  </div>
-                ))}
-              </div>
-            )}
           </div>
-        </section>
-      )}
+        </div>
+
+        {(() => {
+          if (timelineMode === "lastfm") {
+            if (!lastfmData?.data) {
+              return (
+                <div className="card p-8 text-center">
+                  <p className="text-gray-500">Last.fm data unavailable for this artist.</p>
+                  <p className="text-gray-600 text-sm mt-1">Set LASTFM_API_KEY to enable.</p>
+                </div>
+              );
+            }
+            if (lastfmData.type === "summary") {
+              return (
+                <div className="card p-6">
+                  <div className="flex justify-center gap-10">
+                    <div className="text-center">
+                      <div className="stat-number text-2xl">{lastfmData.data.total_listeners?.toLocaleString()}</div>
+                      <div className="text-gray-600 text-xs uppercase tracking-wider">listeners</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="stat-number text-2xl">{lastfmData.data.total_playcount?.toLocaleString()}</div>
+                      <div className="text-gray-600 text-xs uppercase tracking-wider">total plays</div>
+                    </div>
+                  </div>
+                  <p className="text-center text-gray-600 text-xs mt-3">Global stats from Last.fm</p>
+                </div>
+              );
+            }
+            const months = lastfmData.data.months || [];
+            const maxL = Math.max(...months.map((m: any) => m.listen_count), 1);
+            return (
+              <div className="card p-6">
+                <div className="flex items-end gap-[2px] h-24">
+                  {months.map((m: any) => (
+                    <div key={m.month} className="group relative flex-1 flex flex-col justify-end">
+                      <div
+                        className="bg-purple-400 rounded-t opacity-80 hover:opacity-100 transition-all duration-150 min-w-[3px]"
+                        style={{ height: `${Math.max((m.listen_count / maxL) * 100, 4)}%` }}
+                      />
+                      <div className="absolute -top-8 left-1/2 -translate-x-1/2 hidden group-hover:block bg-gray-800 text-white text-[10px] px-2 py-1 rounded whitespace-nowrap z-10">
+                        {m.month}: {m.listen_count.toLocaleString()} plays
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                {months.length > 0 && (
+                  <div className="flex justify-between text-[10px] text-gray-600 mt-1">
+                    <span>{months[0]?.month}</span>
+                    <span>{months[months.length - 1]?.month}</span>
+                  </div>
+                )}
+                <p className="text-center text-gray-600 text-xs mt-3">Global weekly plays from Last.fm</p>
+              </div>
+            );
+          }
+
+          const users = timeline?.users || [];
+          const hasData = users.some((u: any) => u.months?.length > 0);
+          if (!hasData) {
+            return (
+              <div className="card p-8 text-center">
+                <p className="text-gray-500 mb-2">Not enough data to show a timeline yet.</p>
+                <p className="text-gray-600 text-sm">
+                  Keep listening, or{" "}
+                  <Link href="/upload" className="text-[var(--green)] hover:underline">
+                    upload your Spotify data export
+                  </Link>{" "}
+                  for full history.
+                </p>
+              </div>
+            );
+          }
+
+          return (
+            <div className="card p-6">
+              {users.map((user: any, userIdx: number) => (
+                <div key={user.user_id} className="mb-4 last:mb-0">
+                  {users.length > 1 && (
+                    <div className="text-xs text-gray-500 mb-2 font-medium">
+                      {user.user_name || user.user_id}
+                    </div>
+                  )}
+                  <div className="flex items-end gap-[2px] h-24">
+                    {user.months.map((m: any) => {
+                      const height = Math.max((m.listen_count / maxListens) * 100, 4);
+                      return (
+                        <div key={m.month} className="group relative flex-1 flex flex-col justify-end">
+                          <div
+                            className={`${barColors[userIdx % barColors.length]} rounded-t opacity-80 hover:opacity-100 transition-all duration-150 min-w-[3px]`}
+                            style={{ height: `${height}%` }}
+                          />
+                          <div className="absolute -top-8 left-1/2 -translate-x-1/2 hidden group-hover:block bg-gray-800 text-white text-[10px] px-2 py-1 rounded whitespace-nowrap z-10">
+                            {m.month}: {m.listen_count} listens
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  {user.months.length > 0 && (
+                    <div className="flex justify-between text-[10px] text-gray-600 mt-1">
+                      <span>{user.months[0]?.month}</span>
+                      <span>{user.months[user.months.length - 1]?.month}</span>
+                    </div>
+                  )}
+                </div>
+              ))}
+              {users.length > 1 && (
+                <div className="flex gap-4 mt-3 pt-3 border-t border-white/5">
+                  {users.map((user: any, i: number) => (
+                    <div key={user.user_id} className="flex items-center gap-2 text-xs text-gray-500">
+                      <div className={`w-2.5 h-2.5 rounded-full ${barColors[i % barColors.length]}`} />
+                      {user.user_name || user.user_id}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })()}
+      </section>
 
       {/* Gatekeep Comparison */}
       {comparison?.entries?.length > 0 && (
