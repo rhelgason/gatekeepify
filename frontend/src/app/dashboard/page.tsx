@@ -85,14 +85,14 @@ export default function Dashboard() {
 
   return (
     <div className="animate-fade-in">
-      <div className="flex items-center justify-between mb-8">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-8">
         <h1 className="text-3xl font-black">Your Stats</h1>
         <div className="flex gap-1 bg-white/5 rounded-full p-1">
           {periods.map((p) => (
             <button
               key={p.value}
               onClick={() => setPeriod(p.value)}
-              className={`px-4 py-1.5 rounded-full text-sm transition-all duration-200 ${
+              className={`px-3 md:px-4 py-1.5 rounded-full text-xs md:text-sm transition-all duration-200 ${
                 period === p.value
                   ? "bg-[var(--green)] text-black font-bold"
                   : "text-gray-500 hover:text-white"
@@ -110,7 +110,7 @@ export default function Dashboard() {
           <h2 className="text-sm font-bold uppercase tracking-widest text-gray-500 mb-4">
             Top Artists
           </h2>
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+          <div className="grid grid-cols-3 md:grid-cols-5 gap-2 md:gap-3">
             {artists.slice(0, 5).map((a) => (
               <Link
                 key={a.artist_id}
@@ -121,18 +121,18 @@ export default function Dashboard() {
                   <img
                     src={a.image_url}
                     alt={a.artist_name}
-                    className="w-24 h-24 rounded-full object-cover mb-3 ring-2 ring-transparent group-hover:ring-[var(--green)] transition-all duration-200"
+                    className="w-16 h-16 md:w-24 md:h-24 rounded-full object-cover mb-2 md:mb-3 ring-2 ring-transparent group-hover:ring-[var(--green)] transition-all duration-200"
                   />
                 ) : (
-                  <div className="w-24 h-24 rounded-full bg-white/5 mb-3 flex items-center justify-center text-3xl text-gray-600">
+                  <div className="w-16 h-16 md:w-24 md:h-24 rounded-full bg-white/5 mb-2 md:mb-3 flex items-center justify-center text-xl md:text-3xl text-gray-600">
                     {a.artist_name?.[0] || "?"}
                   </div>
                 )}
-                <span className="font-bold text-sm truncate w-full">
+                <span className="font-bold text-xs md:text-sm truncate w-full">
                   {a.artist_name}
                 </span>
-                <span className="text-xs text-gray-500 mt-1">
-                  {a.listen_count} plays &middot; {a.total_minutes} min
+                <span className="text-[10px] md:text-xs text-gray-500 mt-1">
+                  {a.listen_count} plays
                 </span>
               </Link>
             ))}

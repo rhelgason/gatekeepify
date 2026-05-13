@@ -34,7 +34,7 @@ body {
     @apply text-xs px-2.5 py-0.5 rounded-full bg-[var(--yellow-dim)] text-[var(--yellow)] font-medium;
   }
   .btn-primary {
-    @apply bg-[var(--green)] hover:bg-[var(--green-light)] text-black font-bold py-3 px-8 rounded-full transition-all duration-200 hover:scale-105;
+    @apply bg-[var(--green)] hover:bg-[var(--green-light)] text-black font-bold py-3 px-6 md:px-8 rounded-full transition-all duration-200 hover:scale-105 text-sm md:text-base;
   }
   .btn-secondary {
     @apply bg-white/10 hover:bg-white/15 text-white font-medium py-2.5 px-6 rounded-full transition-all duration-200;

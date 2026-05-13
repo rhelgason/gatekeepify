@@ -81,20 +81,20 @@ export default function ArtistPage() {
       </button>
 
       {/* Hero */}
-      <div className="mt-4 flex flex-col md:flex-row items-center md:items-end gap-8 mb-10">
+      <div className="mt-4 flex flex-col md:flex-row items-center md:items-end gap-6 md:gap-8 mb-10">
         {imageUrl ? (
           <img
             src={imageUrl}
             alt={name}
-            className="w-48 h-48 rounded-3xl object-cover ring-2 ring-white/10 shadow-2xl shadow-black/50"
+            className="w-32 h-32 md:w-48 md:h-48 rounded-3xl object-cover ring-2 ring-white/10 shadow-2xl shadow-black/50"
           />
         ) : (
-          <div className="w-48 h-48 rounded-3xl bg-white/5 flex items-center justify-center text-6xl text-gray-600 ring-2 ring-white/10">
+          <div className="w-32 h-32 md:w-48 md:h-48 rounded-3xl bg-white/5 flex items-center justify-center text-4xl md:text-6xl text-gray-600 ring-2 ring-white/10">
             {name[0]}
           </div>
         )}
         <div className="text-center md:text-left">
-          <h1 className="text-5xl md:text-6xl font-black tracking-tight mb-3">{name}</h1>
+          <h1 className="text-3xl md:text-6xl font-black tracking-tight mb-3">{name}</h1>
           {genres.length > 0 && (
             <div className="flex gap-2 flex-wrap justify-center md:justify-start mb-4">
               {genres.slice(0, 5).map((g: string) => (
@@ -105,14 +105,14 @@ export default function ArtistPage() {
             </div>
           )}
           {detail && (
-            <div className="flex gap-6 justify-center md:justify-start">
+            <div className="flex gap-4 md:gap-6 justify-center md:justify-start">
               <div>
-                <div className="stat-number text-3xl">{detail.total_listens.toLocaleString()}</div>
-                <div className="text-gray-600 text-xs uppercase tracking-wider">listens</div>
+                <div className="stat-number text-xl md:text-3xl">{detail.total_listens.toLocaleString()}</div>
+                <div className="text-gray-600 text-[10px] md:text-xs uppercase tracking-wider">listens</div>
               </div>
               <div>
-                <div className="stat-number text-3xl">{detail.total_minutes.toLocaleString()}</div>
-                <div className="text-gray-600 text-xs uppercase tracking-wider">minutes</div>
+                <div className="stat-number text-xl md:text-3xl">{detail.total_minutes.toLocaleString()}</div>
+                <div className="text-gray-600 text-[10px] md:text-xs uppercase tracking-wider">minutes</div>
               </div>
               {detail.first_listen && (
                 <div>
@@ -129,7 +129,7 @@ export default function ArtistPage() {
 
       {/* Timeline */}
       <section className="mb-10">
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 mb-4">
           <h2 className="text-sm font-bold uppercase tracking-widest text-gray-500">
             Listening Timeline
           </h2>
