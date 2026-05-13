@@ -1,0 +1,20 @@
+certifi==2024.8.30
+charset-normalizer==3.4.0
+idna==3.10
+requests==2.32.3
+spotipy==2.24.0
+urllib3==2.2.3
+
+# FastAPI + SQLAlchemy
+fastapi>=0.115.0
+uvicorn[standard]>=0.32.0
+sqlalchemy>=2.0.0
+alembic>=1.14.0
+pydantic>=2.0.0
+pydantic-settings>=2.0.0
+python-multipart>=0.0.12
+python-jose[cryptography]>=3.3.0
+cryptography>=43.0.0
+
+# Celery + Redis
+celery[redis]>=5.4.0
