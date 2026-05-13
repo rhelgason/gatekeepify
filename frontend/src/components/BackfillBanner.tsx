@@ -15,6 +15,7 @@ export default function BackfillBanner() {
 
   useEffect(() => {
     if (!isLoggedIn()) return;
+    if (show) return;
     if (typeof window !== "undefined" && sessionStorage.getItem("backfill_dismissed")) {
       return;
     }
@@ -23,7 +24,7 @@ export default function BackfillBanner() {
         setShow(true);
       }
     }).catch(() => {});
-  }, []);
+  }, [pathname]);
 
   if (!show || dismissed) return null;
   if (pathname === "/" || HIDDEN_ON.some((p) => pathname.startsWith(p))) return null;
