@@ -316,7 +316,9 @@ def timeline(
         from fastapi import HTTPException
         raise HTTPException(status_code=400, detail="Provide artist_id or track_id")
 
-    if mode == "friends":
+    if mode == "global":
+        user_ids = None
+    elif mode == "friends":
         friend_rows = db.execute(
             select(Friendship.user_id_2).where(Friendship.user_id_1 == user.user_id)
         ).all()
@@ -331,8 +333,9 @@ def timeline(
             Listen.ts,
         )
         .join(User, Listen.user_id == User.user_id)
-        .where(Listen.user_id.in_(user_ids))
     )
+    if user_ids is not None:
+        stmt = stmt.where(Listen.user_id.in_(user_ids))
     if artist_id:
         stmt = stmt.join(TrackArtist, Listen.track_id == TrackArtist.track_id).where(
             TrackArtist.artist_id == artist_id
@@ -345,25 +348,42 @@ def timeline(
     rows = db.execute(stmt).all()
 
     from collections import defaultdict
-    counts: dict = {}
-    for row in rows:
-        uid = row.user_id
-        if uid not in counts:
-            counts[uid] = {"user_name": row.user_name, "months": defaultdict(int)}
-        ts = row.ts if isinstance(row.ts, datetime) else datetime.fromisoformat(str(row.ts))
-        month_key = ts.strftime("%Y-%m")
-        counts[uid]["months"][month_key] += 1
 
-    data: dict = {}
-    for uid, info in counts.items():
-        data[uid] = {
-            "user_id": uid,
-            "user_name": info["user_name"],
-            "months": [
-                {"month": m, "listen_count": c}
-                for m, c in sorted(info["months"].items())
-            ],
+    if mode == "global":
+        global_months: dict[str, int] = defaultdict(int)
+        for row in rows:
+            ts = row.ts if isinstance(row.ts, datetime) else datetime.fromisoformat(str(row.ts))
+            global_months[ts.strftime("%Y-%m")] += 1
+        data = {
+            "_global": {
+                "user_id": "_global",
+                "user_name": "All Users",
+                "months": [
+                    {"month": m, "listen_count": c}
+                    for m, c in sorted(global_months.items())
+                ],
+            }
         }
+    else:
+        counts: dict = {}
+        for row in rows:
+            uid = row.user_id
+            if uid not in counts:
+                counts[uid] = {"user_name": row.user_name, "months": defaultdict(int)}
+            ts = row.ts if isinstance(row.ts, datetime) else datetime.fromisoformat(str(row.ts))
+            month_key = ts.strftime("%Y-%m")
+            counts[uid]["months"][month_key] += 1
+
+        data = {}
+        for uid, info in counts.items():
+            data[uid] = {
+                "user_id": uid,
+                "user_name": info["user_name"],
+                "months": [
+                    {"month": m, "listen_count": c}
+                    for m, c in sorted(info["months"].items())
+                ],
+            }
 
     log_action(
         db, "stats.timeline_viewed",

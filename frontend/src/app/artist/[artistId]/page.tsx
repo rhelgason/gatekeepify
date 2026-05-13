@@ -14,7 +14,7 @@ export default function ArtistPage() {
   const [detail, setDetail] = useState<any>(null);
   const [comparison, setComparison] = useState<any>(null);
   const [timeline, setTimeline] = useState<any>(null);
-  const [timelineMode, setTimelineMode] = useState<"personal" | "friends">("personal");
+  const [timelineMode, setTimelineMode] = useState<"personal" | "friends" | "global">("personal");
   const [challenge, setChallenge] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
@@ -136,26 +136,19 @@ export default function ArtistPage() {
               Listening Timeline
             </h2>
             <div className="flex gap-1 bg-white/5 rounded-full p-1">
-              <button
-                onClick={() => setTimelineMode("personal")}
-                className={`px-4 py-1.5 rounded-full text-xs transition-all ${
-                  timelineMode === "personal"
-                    ? "bg-[var(--green)] text-black font-bold"
-                    : "text-gray-500 hover:text-white"
-                }`}
-              >
-                Your Listens
-              </button>
-              <button
-                onClick={() => setTimelineMode("friends")}
-                className={`px-4 py-1.5 rounded-full text-xs transition-all ${
-                  timelineMode === "friends"
-                    ? "bg-[var(--green)] text-black font-bold"
-                    : "text-gray-500 hover:text-white"
-                }`}
-              >
-                Friends
-              </button>
+              {(["personal", "friends", "global"] as const).map((m) => (
+                <button
+                  key={m}
+                  onClick={() => setTimelineMode(m)}
+                  className={`px-4 py-1.5 rounded-full text-xs transition-all ${
+                    timelineMode === m
+                      ? "bg-[var(--green)] text-black font-bold"
+                      : "text-gray-500 hover:text-white"
+                  }`}
+                >
+                  {m === "personal" ? "Your Listens" : m === "friends" ? "Friends" : "Global"}
+                </button>
+              ))}
             </div>
           </div>
           <div className="card p-6">
