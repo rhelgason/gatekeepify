@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 import { isLoggedIn } from "@/lib/auth";
 import { api } from "@/lib/api";
 
-const HIDDEN_ON = ["/upload", "/auth", "/invite", "/"];
+const HIDDEN_ON = ["/upload", "/auth", "/invite"];
 
 export default function BackfillBanner() {
   const pathname = usePathname();
@@ -26,7 +26,7 @@ export default function BackfillBanner() {
   }, []);
 
   if (!show || dismissed) return null;
-  if (HIDDEN_ON.some((p) => pathname.startsWith(p))) return null;
+  if (pathname === "/" || HIDDEN_ON.some((p) => pathname.startsWith(p))) return null;
 
   return (
     <div className="bg-gradient-to-r from-orange-500/10 to-yellow-500/10 border border-orange-500/20 rounded-2xl p-4 mb-6 flex items-center justify-between gap-4 animate-slide-up">
