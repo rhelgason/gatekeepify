@@ -156,6 +156,13 @@ export const api = {
   getHeadToHead: (friendId: string) =>
     cachedRequest<any>(`/gatekeep/awards/head-to-head?friend_id=${friendId}`),
 
+  getFriendsFreshFinds: (days = 7) =>
+    cachedRequest<any[]>(`/discover/friends-fresh-finds?days=${days}`),
+
+  getYoureLateOn: () => cachedRequest<any[]>("/discover/youre-late-on"),
+
+  getRisingArtists: () => cachedRequest<any[]>("/discover/rising"),
+
   createChallenge: (artistId: string) =>
     request<any>(`/gatekeep/challenge?artist_id=${artistId}`, { method: "POST" }),
 };
