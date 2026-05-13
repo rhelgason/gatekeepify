@@ -323,8 +323,7 @@ def timeline(
         select(
             Listen.user_id,
             User.user_name,
-            func.strftime("%Y-%m", Listen.ts).label("month"),
-            func.count().label("listen_count"),
+            Listen.ts,
         )
         .join(User, Listen.user_id == User.user_id)
         .where(Listen.user_id.in_(user_ids))
@@ -336,21 +335,30 @@ def timeline(
     elif track_id:
         stmt = stmt.where(Listen.track_id == track_id)
 
-    stmt = stmt.group_by(
-        Listen.user_id, User.user_name, func.strftime("%Y-%m", Listen.ts)
-    ).order_by("month")
+    stmt = stmt.order_by(Listen.ts)
 
     rows = db.execute(stmt).all()
 
-    data: dict = {}
+    from collections import defaultdict
+    counts: dict = {}
     for row in rows:
         uid = row.user_id
-        if uid not in data:
-            data[uid] = {"user_id": uid, "user_name": row.user_name, "months": []}
-        data[uid]["months"].append({
-            "month": row.month,
-            "listen_count": row.listen_count,
-        })
+        if uid not in counts:
+            counts[uid] = {"user_name": row.user_name, "months": defaultdict(int)}
+        ts = row.ts if isinstance(row.ts, datetime) else datetime.fromisoformat(str(row.ts))
+        month_key = ts.strftime("%Y-%m")
+        counts[uid]["months"][month_key] += 1
+
+    data: dict = {}
+    for uid, info in counts.items():
+        data[uid] = {
+            "user_id": uid,
+            "user_name": info["user_name"],
+            "months": [
+                {"month": m, "listen_count": c}
+                for m, c in sorted(info["months"].items())
+            ],
+        }
 
     log_action(
         db, "stats.timeline_viewed",

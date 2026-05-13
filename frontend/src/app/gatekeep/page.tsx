@@ -40,8 +40,12 @@ function GatekeepContent() {
     setChallenge(null);
     setResults([]);
     setQuery("");
-    const data = await api.gatekeepArtist(artistId);
-    setComparison(data);
+    try {
+      const data = await api.gatekeepArtist(artistId);
+      setComparison(data);
+    } catch (e: any) {
+      setComparison({ artist_id: artistId, artist_name: "Unknown", entries: [] });
+    }
     setLoading(false);
   }
 

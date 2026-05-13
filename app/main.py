@@ -29,6 +29,22 @@ logger = logging.getLogger("gatekeepify.http")
 validate_settings()
 Base.metadata.create_all(bind=engine)
 
+def _add_column_if_missing(engine, table, column, col_type):
+    from sqlalchemy import inspect as sa_inspect, text as sa_text
+    insp = sa_inspect(engine)
+    existing = [c["name"] for c in insp.get_columns(table)]
+    if column not in existing:
+        with engine.begin() as conn:
+            conn.execute(sa_text(f"ALTER TABLE {table} ADD COLUMN {column} {col_type}"))
+        logger.info(f"Added column {table}.{column}")
+
+try:
+    _add_column_if_missing(engine, "dim_all_albums", "image_url", "VARCHAR(512)")
+    _add_column_if_missing(engine, "dim_all_tracks", "image_url", "VARCHAR(512)")
+    _add_column_if_missing(engine, "dim_all_artists", "image_url", "VARCHAR(512)")
+except Exception as e:
+    logger.warning(f"Column migration skipped: {e}")
+
 app = FastAPI(
     title="Gatekeepify",
     description="Prove you listened first.",
