@@ -12,6 +12,7 @@ export default function Navbar() {
 
   const links = [
     { href: "/dashboard", label: "Stats" },
+    { href: "/wrapped", label: "Wrapped" },
     { href: "/gatekeep", label: "Gatekeep" },
     { href: "/leaderboard", label: "Crowns" },
     { href: "/friends", label: "Friends" },
