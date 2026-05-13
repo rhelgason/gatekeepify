@@ -1,20 +1,29 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { isLoggedIn } from "@/lib/auth";
 import { api } from "@/lib/api";
 
 export default function Landing() {
   const router = useRouter();
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (isLoggedIn()) router.replace("/dashboard");
   }, [router]);
 
   async function handleLogin() {
-    const { auth_url } = await api.getLoginUrl();
-    window.location.href = auth_url;
+    setLoading(true);
+    setError("");
+    try {
+      const { auth_url } = await api.getLoginUrl();
+      window.location.href = auth_url;
+    } catch (e: any) {
+      setError(e.message || "Failed to connect to server");
+      setLoading(false);
+    }
   }
 
   return (
@@ -28,10 +37,14 @@ export default function Landing() {
       </p>
       <button
         onClick={handleLogin}
-        className="bg-green-500 hover:bg-green-400 text-black font-bold py-3 px-8 rounded-full text-lg transition"
+        disabled={loading}
+        className="bg-green-500 hover:bg-green-400 text-black font-bold py-3 px-8 rounded-full text-lg transition disabled:opacity-50"
       >
-        Sign in with Spotify
+        {loading ? "Connecting..." : "Sign in with Spotify"}
       </button>
+      {error && (
+        <p className="text-red-400 text-sm mt-4">{error}</p>
+      )}
       <p className="text-gray-600 text-sm mt-6">
         We only read your listening history. We never post or modify anything.
       </p>
