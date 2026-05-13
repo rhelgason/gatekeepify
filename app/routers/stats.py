@@ -11,6 +11,7 @@ from app.models import (
     Album,
     Artist,
     ArtistGenre,
+    Friendship,
     Listen,
     Track,
     TrackArtist,
@@ -296,3 +297,65 @@ def wrapped(
         total_minutes=total_minutes,
         year=year,
     )
+
+
+@router.get("/timeline")
+def timeline(
+    artist_id: str = Query(None),
+    track_id: str = Query(None),
+    mode: str = Query("personal"),
+    user: UserModel = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    if not artist_id and not track_id:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=400, detail="Provide artist_id or track_id")
+
+    if mode == "friends":
+        friend_rows = db.execute(
+            select(Friendship.user_id_2).where(Friendship.user_id_1 == user.user_id)
+        ).all()
+        user_ids = [user.user_id] + [r[0] for r in friend_rows]
+    else:
+        user_ids = [user.user_id]
+
+    stmt = (
+        select(
+            Listen.user_id,
+            User.user_name,
+            func.strftime("%Y-%m", Listen.ts).label("month"),
+            func.count().label("listen_count"),
+        )
+        .join(User, Listen.user_id == User.user_id)
+        .where(Listen.user_id.in_(user_ids))
+    )
+    if artist_id:
+        stmt = stmt.join(TrackArtist, Listen.track_id == TrackArtist.track_id).where(
+            TrackArtist.artist_id == artist_id
+        )
+    elif track_id:
+        stmt = stmt.where(Listen.track_id == track_id)
+
+    stmt = stmt.group_by(
+        Listen.user_id, User.user_name, func.strftime("%Y-%m", Listen.ts)
+    ).order_by("month")
+
+    rows = db.execute(stmt).all()
+
+    data: dict = {}
+    for row in rows:
+        uid = row.user_id
+        if uid not in data:
+            data[uid] = {"user_id": uid, "user_name": row.user_name, "months": []}
+        data[uid]["months"].append({
+            "month": row.month,
+            "listen_count": row.listen_count,
+        })
+
+    log_action(
+        db, "stats.timeline_viewed",
+        user_id=user.user_id,
+        details={"artist_id": artist_id, "track_id": track_id, "mode": mode},
+    )
+
+    return {"users": list(data.values())}

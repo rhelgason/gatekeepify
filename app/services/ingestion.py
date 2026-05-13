@@ -82,6 +82,16 @@ def upsert_track_metadata(db: Session, track_items: List[dict]) -> int:
     return updated
 
 
+def _get_best_image(images: list) -> Optional[str]:
+    if not images:
+        return None
+    for img in images:
+        w = img.get("width") or 0
+        if 200 <= w <= 640:
+            return img["url"]
+    return images[0].get("url")
+
+
 def _upsert_track_and_relations(db: Session, track_data: dict) -> None:
     album_data = track_data.get("album") or {}
 
@@ -91,6 +101,7 @@ def _upsert_track_and_relations(db: Session, track_data: dict) -> None:
                 album_id=album_data["id"],
                 album_name=album_data.get("name"),
                 release_date=parse_release_date(album_data.get("release_date")),
+                image_url=_get_best_image(album_data.get("images", [])),
             )
         )
 
@@ -101,6 +112,9 @@ def _upsert_track_and_relations(db: Session, track_data: dict) -> None:
             album_id=album_data.get("id"),
             duration_ms=track_data.get("duration_ms"),
             is_local=track_data.get("is_local", False),
+            image_url=_get_best_image(
+                album_data.get("images", [])
+            ),
         )
     )
 
@@ -111,6 +125,7 @@ def _upsert_track_and_relations(db: Session, track_data: dict) -> None:
             Artist(
                 artist_id=artist_data["id"],
                 artist_name=artist_data.get("name"),
+                image_url=_get_best_image(artist_data.get("images", [])),
             )
         )
 

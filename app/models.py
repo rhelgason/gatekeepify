@@ -28,6 +28,7 @@ class Album(Base):
     album_id: Mapped[str] = mapped_column(String(255), primary_key=True)
     album_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     release_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    image_url: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
 
     tracks: Mapped[List["Track"]] = relationship(back_populates="album")
 
@@ -42,6 +43,7 @@ class Track(Base):
     )
     duration_ms: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     is_local: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True)
+    image_url: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
 
     album: Mapped[Optional["Album"]] = relationship(back_populates="tracks")
     artists: Mapped[List["Artist"]] = relationship(
@@ -54,6 +56,7 @@ class Artist(Base):
 
     artist_id: Mapped[str] = mapped_column(String(255), primary_key=True)
     artist_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    image_url: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
 
     tracks: Mapped[List["Track"]] = relationship(
         secondary="track_to_artist", back_populates="artists", viewonly=True

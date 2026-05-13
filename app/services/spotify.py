@@ -94,6 +94,7 @@ class SpotifyService:
         if not all_artist_ids:
             return
         genre_map: Dict[str, list] = {}
+        image_map: Dict[str, list] = {}
         artist_id_list = list(all_artist_ids)
         for i in range(0, len(artist_id_list), MAX_TRACKS_REQUEST):
             batch = artist_id_list[i : i + MAX_TRACKS_REQUEST]
@@ -102,10 +103,12 @@ class SpotifyService:
                 for a in artists_result["artists"]:
                     if a:
                         genre_map[a["id"]] = a.get("genres", [])
+                        image_map[a["id"]] = a.get("images", [])
         for item in track_items:
             track = item.get("track", {})
             for artist in track.get("artists", []):
                 artist["genres"] = genre_map.get(artist.get("id"), [])
+                artist["images"] = image_map.get(artist.get("id"), [])
 
 
 def encrypt_token(token: str) -> str:

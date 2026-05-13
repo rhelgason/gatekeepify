@@ -16,7 +16,7 @@ from app.models import (
 )
 from app.models import User as UserModel
 from app.routers.auth import get_current_user
-from app.schemas import ArtistSearchResult, TrackSearchResult
+from app.schemas import ArtistDetailResponse, ArtistSearchResult, TrackDetailResponse, TrackSearchResult
 from app.services.audit import log_action
 
 router = APIRouter(prefix="/search", tags=["search"])
@@ -42,6 +42,7 @@ def search_artists(
         select(
             Artist.artist_id,
             Artist.artist_name,
+            Artist.image_url,
             func.count(Listen.track_id).label("your_listen_count"),
         )
         .outerjoin(TrackArtist, Artist.artist_id == TrackArtist.artist_id)
@@ -78,6 +79,7 @@ def search_artists(
         ArtistSearchResult(
             artist_id=row.artist_id,
             artist_name=row.artist_name,
+            image_url=row.image_url,
             genres=genres_by_artist.get(row.artist_id, []),
             your_listen_count=row.your_listen_count,
         )
@@ -100,6 +102,7 @@ def search_tracks(
             Track.track_id,
             Track.track_name,
             Album.album_name,
+            Track.image_url,
             Track.duration_ms,
             func.count(Listen.track_id).label("your_listen_count"),
         )
@@ -143,8 +146,86 @@ def search_tracks(
             track_id=row.track_id,
             track_name=row.track_name,
             album_name=row.album_name,
+            image_url=row.image_url,
             artist_names=artists_by_track.get(row.track_id, []),
             your_listen_count=row.your_listen_count,
         )
         for row in rows
     ]
+
+
+@router.get("/artist/{artist_id}", response_model=ArtistDetailResponse)
+def get_artist_detail(
+    artist_id: str,
+    user: UserModel = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    from fastapi import HTTPException
+    import math
+
+    artist = db.query(Artist).filter(Artist.artist_id == artist_id).first()
+    if not artist:
+        raise HTTPException(status_code=404, detail="Artist not found")
+
+    genre_names = [g.genre for g in artist.genres]
+
+    stats_stmt = (
+        select(
+            func.count().label("total_listens"),
+            func.sum(Track.duration_ms).label("total_ms"),
+            func.min(Listen.ts).label("first_listen"),
+        )
+        .select_from(Listen)
+        .join(TrackArtist, Listen.track_id == TrackArtist.track_id)
+        .join(Track, Listen.track_id == Track.track_id)
+        .where(TrackArtist.artist_id == artist_id, Listen.user_id == user.user_id)
+    )
+    row = db.execute(stats_stmt).first()
+
+    return ArtistDetailResponse(
+        artist_id=artist.artist_id,
+        artist_name=artist.artist_name,
+        image_url=artist.image_url,
+        genres=genre_names,
+        total_listens=row.total_listens or 0,
+        total_minutes=math.floor((row.total_ms or 0) / 1000 / 60),
+        first_listen=row.first_listen,
+    )
+
+
+@router.get("/track/{track_id}", response_model=TrackDetailResponse)
+def get_track_detail(
+    track_id: str,
+    user: UserModel = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    from fastapi import HTTPException
+    import math
+
+    track = db.query(Track).filter(Track.track_id == track_id).first()
+    if not track:
+        raise HTTPException(status_code=404, detail="Track not found")
+
+    artist_names = [a.artist_name for a in track.artists if a.artist_name]
+    album_name = track.album.album_name if track.album else None
+
+    stats_stmt = (
+        select(
+            func.count().label("total_listens"),
+            func.min(Listen.ts).label("first_listen"),
+        )
+        .where(Listen.track_id == track_id, Listen.user_id == user.user_id)
+    )
+    row = db.execute(stats_stmt).first()
+
+    return TrackDetailResponse(
+        track_id=track.track_id,
+        track_name=track.track_name,
+        album_name=album_name,
+        image_url=track.image_url,
+        artist_names=artist_names,
+        duration_ms=track.duration_ms,
+        total_listens=row.total_listens or 0,
+        total_minutes=math.floor((row.total_listens or 0) * (track.duration_ms or 0) / 1000 / 60),
+        first_listen=row.first_listen,
+    )

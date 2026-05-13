@@ -138,7 +138,16 @@ Copy `.env.example` to `.env`. Required values:
 
 14. **Rotate Spotify credentials** -- after confirming production works, go to the Spotify Developer Dashboard and regenerate the client secret. Update the Railway env var. Delete `src/host_constants.py`, `src/.cache`, and `.cache` from the repo.
 
-### Phase 4: Frontend ✅ BUILT (needs deployment)
+### Backend: UI Support ✅ COMPLETE
+- `image_url` columns added to albums, tracks, artists (Alembic migration 004)
+- Ingestion service stores Spotify cover art URLs during polling/backfill
+- Artist enrichment now captures artist images alongside genres
+- `GET /stats/timeline?artist_id=X&mode=personal|friends` -- monthly listen counts per user for bar charts
+- `GET /search/artist/{id}` and `GET /search/track/{id}` -- detail endpoints with image, stats, first listen date
+- Search results now include `image_url`
+- New user sign-in immediately fetches their last 50 recent listens (no 15-min wait)
+
+### Phase 4: Frontend ✅ BUILT (needs overhaul)
 
 Next.js app in `frontend/`. Deployed separately on Vercel (free).
 

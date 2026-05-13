@@ -6,12 +6,17 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import jwt
 from sqlalchemy.orm import Session
 
+import logging
+
 from app.config import settings
 from app.database import get_db
 from app.models import User
 from app.schemas import AuthResponse, AuthUrlResponse, UserResponse
 from app.services.audit import log_action
+from app.services.ingestion import upsert_from_recent_listens
 from app.services.spotify import SpotifyService, encrypt_token
+
+logger = logging.getLogger("gatekeepify.auth")
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 security = HTTPBearer()
@@ -101,6 +106,15 @@ def callback(code: str = Query(...), db: Session = Depends(get_db)):
         user_id=user_id,
         details={"is_new_user": is_new, "display_name": display_name},
     )
+
+    if is_new:
+        try:
+            recent = service.get_recent_listens(access_token)
+            if recent:
+                count = upsert_from_recent_listens(db, recent, user_id)
+                logger.info(f"Ingested {count} recent listens for new user {user_id}")
+        except Exception as e:
+            logger.warning(f"Failed to fetch initial data for {user_id}: {e}")
 
     token = create_jwt(user_id)
 

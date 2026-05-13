@@ -176,6 +176,7 @@ class ArtistSearchResult(BaseModel):
     artist_id: str
     artist_name: Optional[str] = None
     genres: List[str] = []
+    image_url: Optional[str] = None
     your_listen_count: int
 
 
@@ -183,8 +184,31 @@ class TrackSearchResult(BaseModel):
     track_id: str
     track_name: Optional[str] = None
     album_name: Optional[str] = None
+    image_url: Optional[str] = None
     artist_names: List[str] = []
     your_listen_count: int
+
+
+class ArtistDetailResponse(BaseModel):
+    artist_id: str
+    artist_name: Optional[str] = None
+    image_url: Optional[str] = None
+    genres: List[str] = []
+    total_listens: int
+    total_minutes: int
+    first_listen: Optional[datetime] = None
+
+
+class TrackDetailResponse(BaseModel):
+    track_id: str
+    track_name: Optional[str] = None
+    album_name: Optional[str] = None
+    image_url: Optional[str] = None
+    artist_names: List[str] = []
+    duration_ms: Optional[int] = None
+    total_listens: int
+    total_minutes: int
+    first_listen: Optional[datetime] = None
 
 
 class ChallengeResponse(BaseModel):
