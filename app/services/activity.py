@@ -34,7 +34,7 @@ def _detect_binges(db: Session, user_id: str, since: datetime) -> List[dict]:
         .join(Track, Listen.track_id == Track.track_id)
         .join(TrackArtist, Listen.track_id == TrackArtist.track_id)
         .join(Artist, TrackArtist.artist_id == Artist.artist_id)
-        .where(Listen.user_id == user_id, Listen.ts >= since)
+        .where(Listen.user_id == user_id, Listen.ts >= since, Listen.source == ListenSource.api.value)
         .order_by(Listen.ts)
     ).all()
 
@@ -80,13 +80,15 @@ def _detect_new_obsessions(db: Session, user_id: str, since: datetime) -> List[d
         select(Listen.ts, TrackArtist.artist_id, Artist.artist_name)
         .join(TrackArtist, Listen.track_id == TrackArtist.track_id)
         .join(Artist, TrackArtist.artist_id == Artist.artist_id)
-        .where(Listen.user_id == user_id, Listen.ts >= since)
+        .where(Listen.user_id == user_id, Listen.ts >= since, Listen.source == ListenSource.api.value)
         .order_by(Listen.ts)
     ).all()
 
     if not rows:
         return []
 
+    # Check against ALL prior listens (both api and export) so we don't
+    # re-trigger for artists the user has historical data for
     prior_artists = set(
         r[0] for r in db.execute(
             select(TrackArtist.artist_id)
@@ -144,7 +146,8 @@ def _detect_milestones(db: Session, user_id: str) -> List[dict]:
                 last_listen = db.execute(
                     select(func.max(Listen.ts))
                     .join(TrackArtist, Listen.track_id == TrackArtist.track_id)
-                    .where(Listen.user_id == user_id, TrackArtist.artist_id == row.artist_id)
+                    .where(Listen.user_id == user_id, TrackArtist.artist_id == row.artist_id,
+                           Listen.source == ListenSource.api.value)
                 ).scalar()
 
                 if last_listen:
@@ -177,7 +180,7 @@ def _detect_late_to_party(
         select(TrackArtist.artist_id, Artist.artist_name, func.min(Listen.ts).label("first"))
         .join(TrackArtist, Listen.track_id == TrackArtist.track_id)
         .join(Artist, TrackArtist.artist_id == Artist.artist_id)
-        .where(Listen.user_id == user_id, Listen.ts >= since)
+        .where(Listen.user_id == user_id, Listen.ts >= since, Listen.source == ListenSource.api.value)
         .group_by(TrackArtist.artist_id, Artist.artist_name)
     ).all()
 
@@ -284,7 +287,9 @@ def _detect_crown_steals(db: Session, group_ids: List[str], since: datetime) -> 
 
 def _detect_broken_streaks(db: Session, user_id: str) -> List[dict]:
     rows = db.execute(
-        select(Listen.ts).where(Listen.user_id == user_id).order_by(Listen.ts)
+        select(Listen.ts).where(
+            Listen.user_id == user_id, Listen.source == ListenSource.api.value
+        ).order_by(Listen.ts)
     ).all()
 
     if not rows:
