@@ -233,18 +233,36 @@ def _get_total_listens(
     return db.execute(stmt).scalar() or 0
 
 
+def _resolve_target_user(
+    db: Session, requester: User, target_user_id: Optional[str]
+) -> str:
+    if not target_user_id or target_user_id == requester.user_id:
+        return requester.user_id
+    friend_ids = [
+        r[0] for r in db.execute(
+            select(Friendship.user_id_2).where(Friendship.user_id_1 == requester.user_id)
+        ).all()
+    ]
+    if target_user_id not in friend_ids:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=403, detail="You can only view friends' stats")
+    return target_user_id
+
+
 @router.get("/top-tracks", response_model=List[TopTrackEntry])
 def top_tracks(
     user: UserModel = Depends(get_current_user),
     period: TimePeriod = TimePeriod.all,
     limit: int = DEFAULT_LIMIT,
     offset: int = 0,
+    target_user_id: Optional[str] = None,
     db: Session = Depends(get_db),
 ):
+    uid = _resolve_target_user(db, user, target_user_id)
     since = _period_to_since(period)
-    results = _get_top_tracks(db, user.user_id, since, _clamp_limit(limit), _clamp_offset(offset))
+    results = _get_top_tracks(db, uid, since, _clamp_limit(limit), _clamp_offset(offset))
     log_action(db, "stats.top_tracks_viewed", user_id=user.user_id,
-               details={"period": period.value, "limit": limit, "offset": offset, "results": len(results)})
+               details={"period": period.value, "target": uid, "results": len(results)})
     return results
 
 
@@ -254,12 +272,14 @@ def top_artists(
     period: TimePeriod = TimePeriod.all,
     limit: int = DEFAULT_LIMIT,
     offset: int = 0,
+    target_user_id: Optional[str] = None,
     db: Session = Depends(get_db),
 ):
+    uid = _resolve_target_user(db, user, target_user_id)
     since = _period_to_since(period)
-    results = _get_top_artists(db, user.user_id, since, _clamp_limit(limit), _clamp_offset(offset))
+    results = _get_top_artists(db, uid, since, _clamp_limit(limit), _clamp_offset(offset))
     log_action(db, "stats.top_artists_viewed", user_id=user.user_id,
-               details={"period": period.value, "limit": limit, "offset": offset, "results": len(results)})
+               details={"period": period.value, "target": uid, "results": len(results)})
     return results
 
 
@@ -269,12 +289,14 @@ def top_genres(
     period: TimePeriod = TimePeriod.all,
     limit: int = DEFAULT_LIMIT,
     offset: int = 0,
+    target_user_id: Optional[str] = None,
     db: Session = Depends(get_db),
 ):
+    uid = _resolve_target_user(db, user, target_user_id)
     since = _period_to_since(period)
-    results = _get_top_genres(db, user.user_id, since, _clamp_limit(limit), _clamp_offset(offset))
+    results = _get_top_genres(db, uid, since, _clamp_limit(limit), _clamp_offset(offset))
     log_action(db, "stats.top_genres_viewed", user_id=user.user_id,
-               details={"period": period.value, "limit": limit, "offset": offset, "results": len(results)})
+               details={"period": period.value, "target": uid, "results": len(results)})
     return results
 
 

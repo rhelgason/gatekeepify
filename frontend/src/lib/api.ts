@@ -54,19 +54,19 @@ export const api = {
     "/auth/me"
   ),
 
-  getTopTracks: (period = "all", limit = 10, offset = 0) =>
+  getTopTracks: (period = "all", limit = 10, offset = 0, targetUserId?: string) =>
     request<any[]>(
-      `/stats/top-tracks?period=${period}&limit=${limit}&offset=${offset}`
+      `/stats/top-tracks?period=${period}&limit=${limit}&offset=${offset}${targetUserId ? `&target_user_id=${targetUserId}` : ""}`
     ),
 
-  getTopArtists: (period = "all", limit = 10, offset = 0) =>
+  getTopArtists: (period = "all", limit = 10, offset = 0, targetUserId?: string) =>
     request<any[]>(
-      `/stats/top-artists?period=${period}&limit=${limit}&offset=${offset}`
+      `/stats/top-artists?period=${period}&limit=${limit}&offset=${offset}${targetUserId ? `&target_user_id=${targetUserId}` : ""}`
     ),
 
-  getTopGenres: (period = "all", limit = 10, offset = 0) =>
+  getTopGenres: (period = "all", limit = 10, offset = 0, targetUserId?: string) =>
     request<any[]>(
-      `/stats/top-genres?period=${period}&limit=${limit}&offset=${offset}`
+      `/stats/top-genres?period=${period}&limit=${limit}&offset=${offset}${targetUserId ? `&target_user_id=${targetUserId}` : ""}`
     ),
 
   getWrapped: (year?: number) =>

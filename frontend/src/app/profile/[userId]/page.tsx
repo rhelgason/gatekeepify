@@ -1,0 +1,219 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { useRouter, useParams } from "next/navigation";
+import { isLoggedIn } from "@/lib/auth";
+import { api } from "@/lib/api";
+import Link from "next/link";
+
+type Period = "all" | "year" | "month" | "today";
+
+export default function Profile() {
+  const router = useRouter();
+  const params = useParams();
+  const userId = params.userId as string;
+
+  const [period, setPeriod] = useState<Period>("all");
+  const [tracks, setTracks] = useState<any[]>([]);
+  const [artists, setArtists] = useState<any[]>([]);
+  const [genres, setGenres] = useState<any[]>([]);
+  const [userName, setUserName] = useState("");
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!isLoggedIn()) {
+      router.replace("/");
+      return;
+    }
+    setLoading(true);
+    Promise.all([
+      api.getTopTracks(period, 10, 0, userId),
+      api.getTopArtists(period, 10, 0, userId),
+      api.getTopGenres(period, 5, 0, userId),
+    ]).then(([t, a, g]) => {
+      setTracks(t);
+      setArtists(a);
+      setGenres(g);
+      setLoading(false);
+    }).catch(() => {
+      setLoading(false);
+    });
+  }, [period, userId, router]);
+
+  useEffect(() => {
+    api.getFriends().then(friends => {
+      const friend = friends.find((f: any) => f.user_id === userId);
+      if (friend) setUserName(friend.user_name || friend.user_id);
+      else setUserName(userId);
+    });
+  }, [userId]);
+
+  const periods: { value: Period; label: string }[] = [
+    { value: "today", label: "Today" },
+    { value: "month", label: "30 Days" },
+    { value: "year", label: "Year" },
+    { value: "all", label: "All Time" },
+  ];
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="text-gray-500 animate-pulse text-lg">Loading profile...</div>
+      </div>
+    );
+  }
+
+  const isEmpty = tracks.length === 0 && artists.length === 0;
+
+  return (
+    <div className="animate-fade-in">
+      <button onClick={() => router.back()} className="text-xs text-gray-600 hover:text-gray-400 transition-colors">
+        &larr; back
+      </button>
+
+      <div className="flex items-center gap-4 mt-4 mb-8">
+        <div className="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center text-2xl text-gray-500">
+          {userName[0]?.toUpperCase() || "?"}
+        </div>
+        <div>
+          <h1 className="text-3xl font-black">{userName}</h1>
+          <p className="text-gray-500 text-sm">Friend&apos;s listening stats</p>
+        </div>
+      </div>
+
+      <div className="flex items-center justify-between mb-8">
+        <h2 className="text-sm font-bold uppercase tracking-widest text-gray-500">Stats</h2>
+        <div className="flex gap-1 bg-white/5 rounded-full p-1">
+          {periods.map((p) => (
+            <button
+              key={p.value}
+              onClick={() => setPeriod(p.value)}
+              className={`px-4 py-1.5 rounded-full text-sm transition-all duration-200 ${
+                period === p.value
+                  ? "bg-[var(--green)] text-black font-bold"
+                  : "text-gray-500 hover:text-white"
+              }`}
+            >
+              {p.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {isEmpty ? (
+        <div className="card p-12 text-center">
+          <p className="text-gray-400 text-lg mb-2">No listening data yet</p>
+          <p className="text-gray-600 text-sm">
+            This friend hasn&apos;t accumulated enough data yet.
+          </p>
+        </div>
+      ) : (
+        <>
+          {artists.length > 0 && (
+            <section className="mb-10">
+              <h2 className="text-sm font-bold uppercase tracking-widest text-gray-500 mb-4">
+                Top Artists
+              </h2>
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                {artists.slice(0, 5).map((a) => (
+                  <Link
+                    key={a.artist_id}
+                    href={`/artist/${a.artist_id}`}
+                    className="card-hover group p-4 flex flex-col items-center text-center"
+                  >
+                    {a.image_url ? (
+                      <img
+                        src={a.image_url}
+                        alt={a.artist_name}
+                        className="w-24 h-24 rounded-full object-cover mb-3 ring-2 ring-transparent group-hover:ring-[var(--green)] transition-all duration-200"
+                      />
+                    ) : (
+                      <div className="w-24 h-24 rounded-full bg-white/5 mb-3 flex items-center justify-center text-3xl text-gray-600">
+                        {a.artist_name?.[0] || "?"}
+                      </div>
+                    )}
+                    <span className="font-bold text-sm truncate w-full">
+                      {a.artist_name}
+                    </span>
+                    <span className="text-xs text-gray-500 mt-1">
+                      {a.listen_count} plays
+                    </span>
+                  </Link>
+                ))}
+              </div>
+              {artists.length > 5 && (
+                <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-2">
+                  {artists.slice(5).map((a) => (
+                    <Link
+                      key={a.artist_id}
+                      href={`/artist/${a.artist_id}`}
+                      className="card-hover flex items-center gap-3 px-4 py-3"
+                    >
+                      {a.image_url ? (
+                        <img src={a.image_url} alt="" className="w-10 h-10 rounded-full object-cover" />
+                      ) : (
+                        <div className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center text-sm text-gray-600">
+                          {a.artist_name?.[0]}
+                        </div>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <span className="text-sm font-medium truncate block">{a.artist_name}</span>
+                      </div>
+                      <span className="text-xs text-gray-500">{a.listen_count} plays</span>
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </section>
+          )}
+
+          {tracks.length > 0 && (
+            <section className="mb-10">
+              <h2 className="text-sm font-bold uppercase tracking-widest text-gray-500 mb-4">
+                Top Tracks
+              </h2>
+              <div className="space-y-1">
+                {tracks.map((t) => (
+                  <div key={t.track_id} className="card-hover flex items-center gap-4 px-4 py-3">
+                    <span className="text-gray-600 font-mono text-sm w-6 text-right">{t.rank}</span>
+                    {t.image_url ? (
+                      <img src={t.image_url} alt="" className="w-10 h-10 rounded object-cover" />
+                    ) : (
+                      <div className="w-10 h-10 rounded bg-white/5" />
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <span className="font-medium truncate block text-sm">{t.track_name || "Unknown"}</span>
+                      <span className="text-xs text-gray-600 truncate block">{t.album_name}</span>
+                    </div>
+                    <span className="text-sm text-gray-400">{t.listen_count} plays</span>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {genres.length > 0 && (
+            <section>
+              <h2 className="text-sm font-bold uppercase tracking-widest text-gray-500 mb-4">
+                Top Genres
+              </h2>
+              <div className="flex gap-2 flex-wrap">
+                {genres.map((g, i) => (
+                  <span
+                    key={g.genre}
+                    className={`card px-5 py-2.5 rounded-full text-sm font-medium ${
+                      i === 0 ? "bg-[var(--green-dim)] text-[var(--green)] border-[var(--green)]/20" : ""
+                    }`}
+                  >
+                    {g.genre}
+                    <span className="text-gray-500 ml-2">{g.listen_count}</span>
+                  </span>
+                ))}
+              </div>
+            </section>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
