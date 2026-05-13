@@ -166,6 +166,8 @@ export const api = {
 
   getRisingArtists: () => cachedRequest<any[]>("/discover/rising"),
 
+  getActivityFeed: () => cachedRequest<any[]>("/discover/feed"),
+
   createChallenge: (artistId: string) =>
     request<any>(`/gatekeep/challenge?artist_id=${artistId}`, { method: "POST" }),
 };

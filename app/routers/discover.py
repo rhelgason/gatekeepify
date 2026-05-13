@@ -18,6 +18,7 @@ from app.models import User as UserModel
 from app.routers.auth import get_current_user
 from app.routers.friends import get_friend_ids
 from app.services.audit import log_action
+from app.services.activity import generate_activity_feed
 from app.services.compatibility import compute_quick_score, get_user_artists
 
 router = APIRouter(prefix="/discover", tags=["discover"])
@@ -245,3 +246,18 @@ def rising_artists(
     log_action(db, "discover.rising_viewed", user_id=user.user_id,
                details={"results": len(results)})
     return results
+
+
+@router.get("/feed")
+def activity_feed(
+    user: UserModel = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    friend_ids = get_friend_ids(db, user.user_id)
+    group_ids = [user.user_id] + friend_ids
+
+    events = generate_activity_feed(db, group_ids)
+
+    log_action(db, "discover.feed_viewed", user_id=user.user_id,
+               details={"events": len(events)})
+    return events
