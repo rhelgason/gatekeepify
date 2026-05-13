@@ -113,6 +113,13 @@ def _upsert_track_and_relations(db: Session, track_data: dict) -> None:
                 artist_name=artist_data.get("name"),
             )
         )
+
+    # Entities must exist before relations that reference them
+    db.flush()
+
+    for artist_data in track_data.get("artists", []):
+        if not artist_data.get("id"):
+            continue
         db.merge(
             TrackArtist(
                 track_id=track_data["id"],

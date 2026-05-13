@@ -49,6 +49,7 @@ def poll_recent_listens():
             try:
                 _poll_single_user(db, service, user)
             except Exception as e:
+                db.rollback()
                 if _is_token_revoked(e):
                     _deactivate_user(db, user, f"token revoked ({e})")
                     log_job_run(
