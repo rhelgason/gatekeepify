@@ -30,31 +30,31 @@ export default function BackfillBanner() {
   if (pathname === "/" || HIDDEN_ON.some((p) => pathname.startsWith(p))) return null;
 
   return (
-    <div className="bg-gradient-to-r from-orange-500/10 to-yellow-500/10 border border-orange-500/20 rounded-2xl p-4 mb-6 flex items-center justify-between gap-4 animate-slide-up">
-      <div className="flex items-center gap-3">
-        <span className="text-2xl">📦</span>
+    <div className="bg-gradient-to-r from-orange-500/10 to-yellow-500/10 border border-orange-500/20 rounded-2xl p-4 mb-6 animate-slide-up">
+      <div className="flex items-start gap-3 mb-3">
+        <span className="text-2xl flex-shrink-0">📦</span>
         <div>
           <p className="text-sm font-bold text-orange-300">
             Upload your Spotify data for the full experience
           </p>
-          <p className="text-xs text-gray-500">
+          <p className="text-xs text-gray-500 mt-1">
             Without your data export, we only have your last few days of listening. Upload to unlock years of history, accurate timelines, and stronger gatekeeping claims.
           </p>
         </div>
       </div>
-      <div className="flex gap-2 flex-shrink-0">
-        <Link href="/upload" className="btn-primary text-xs py-2 px-4">
-          Upload
-        </Link>
+      <div className="flex gap-2 justify-end">
         <button
           onClick={() => {
             setDismissed(true);
             sessionStorage.setItem("backfill_dismissed", "1");
           }}
-          className="text-gray-600 hover:text-gray-400 text-xs px-2"
+          className="text-gray-600 hover:text-gray-400 text-xs px-3 py-2"
         >
           Later
         </button>
+        <Link href="/upload" className="btn-primary text-xs py-2 px-4">
+          Upload
+        </Link>
       </div>
     </div>
   );

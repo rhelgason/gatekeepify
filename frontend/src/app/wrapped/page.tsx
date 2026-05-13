@@ -45,7 +45,7 @@ export default function Wrapped() {
   return (
     <div className="animate-fade-in max-w-2xl mx-auto">
       {/* Year selector */}
-      <div className="flex items-center justify-between mb-10">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-10">
         <div>
           <h1 className="text-4xl font-black">
             Your <span className="gradient-text">Wrapped</span>

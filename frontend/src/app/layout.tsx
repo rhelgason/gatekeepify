@@ -19,7 +19,7 @@ export default function RootLayout({
       <body>
         <Navbar />
         <PageTracker />
-        <main className="mx-auto max-w-6xl px-6 py-8">
+        <main className="mx-auto max-w-6xl px-4 md:px-6 py-6 md:py-8">
           <BackfillBanner />
           {children}
         </main>

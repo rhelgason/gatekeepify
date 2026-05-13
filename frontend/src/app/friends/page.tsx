@@ -95,7 +95,7 @@ export default function Friends() {
           </h2>
           <div className="space-y-2">
             {pendingRequests.map((r) => (
-              <div key={r.id} className="card p-4 flex items-center justify-between">
+              <div key={r.id} className="card p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div>
                   <span className="font-medium">{r.from_user_name || r.from_user_id}</span>
                   <span className="text-gray-600 text-sm ml-2">
@@ -147,7 +147,7 @@ export default function Friends() {
         {userResults.length > 0 && (
           <div className="space-y-2 animate-slide-up">
             {userResults.map((u) => (
-              <div key={u.user_id} className="card p-4 flex items-center justify-between">
+              <div key={u.user_id} className="card p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center text-sm text-gray-500">
                     {(u.user_name || u.user_id)[0]?.toUpperCase()}
