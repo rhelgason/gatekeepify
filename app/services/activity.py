@@ -107,7 +107,7 @@ def _detect_new_obsessions(db: Session, user_id: str, since: datetime) -> List[d
 
     events = []
     for artist_id, listens in new_artist_listens.items():
-        if len(listens) >= 3:
+        if len(listens) >= 10:
             artist_name = listens[0].artist_name
             quip = _new_obsession_quip(user_name, artist_name, len(listens))
             events.append({
