@@ -2,7 +2,7 @@ import logging
 import time
 import traceback
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from sqlalchemy.exc import OperationalError, SQLAlchemyError
@@ -16,6 +16,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings, validate_settings
 from app.database import Base, SessionLocal, engine
 from app.routers import auth, backfill, friends, gatekeep, search, stats
+from app.routers.auth import get_current_user
 from app.services.audit import log_action
 
 logging.basicConfig(
@@ -152,3 +153,17 @@ def health():
     finally:
         db.close()
     return {"status": "ok", "checks": checks}
+
+
+@app.post("/admin/trigger-poll")
+def trigger_poll(user: "User" = Depends(get_current_user)):
+    from app.tasks import poll_recent_listens
+    poll_recent_listens.delay()
+    return {"status": "triggered", "task": "poll_recent_listens"}
+
+
+@app.post("/admin/trigger-backfill")
+def trigger_backfill(user: "User" = Depends(get_current_user)):
+    from app.tasks import backfill_track_metadata
+    backfill_track_metadata.delay()
+    return {"status": "triggered", "task": "backfill_track_metadata"}
