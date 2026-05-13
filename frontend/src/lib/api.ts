@@ -8,6 +8,28 @@ export class ApiError extends Error {
   }
 }
 
+const cache = new Map<string, { data: any; ts: number }>();
+const CACHE_TTL = 30_000; // 30 seconds
+
+function getCached<T>(key: string): T | null {
+  const entry = cache.get(key);
+  if (entry && Date.now() - entry.ts < CACHE_TTL) return entry.data as T;
+  if (entry) cache.delete(key);
+  return null;
+}
+
+function setCache(key: string, data: any) {
+  cache.set(key, { data, ts: Date.now() });
+}
+
+async function cachedRequest<T>(path: string): Promise<T> {
+  const cached = getCached<T>(path);
+  if (cached) return cached;
+  const data = await request<T>(path);
+  setCache(path, data);
+  return data;
+}
+
 async function request<T>(
   path: string,
   options: RequestInit = {}
@@ -55,22 +77,22 @@ export const api = {
   ),
 
   getTopTracks: (period = "all", limit = 10, offset = 0, targetUserId?: string) =>
-    request<any[]>(
+    cachedRequest<any[]>(
       `/stats/top-tracks?period=${period}&limit=${limit}&offset=${offset}${targetUserId ? `&target_user_id=${targetUserId}` : ""}`
     ),
 
   getTopArtists: (period = "all", limit = 10, offset = 0, targetUserId?: string) =>
-    request<any[]>(
+    cachedRequest<any[]>(
       `/stats/top-artists?period=${period}&limit=${limit}&offset=${offset}${targetUserId ? `&target_user_id=${targetUserId}` : ""}`
     ),
 
   getTopGenres: (period = "all", limit = 10, offset = 0, targetUserId?: string) =>
-    request<any[]>(
+    cachedRequest<any[]>(
       `/stats/top-genres?period=${period}&limit=${limit}&offset=${offset}${targetUserId ? `&target_user_id=${targetUserId}` : ""}`
     ),
 
   getWrapped: (year?: number) =>
-    request<any>(`/stats/wrapped${year ? `?year=${year}` : ""}`),
+    cachedRequest<any>(`/stats/wrapped${year ? `?year=${year}` : ""}`),
 
   uploadBackfill: (file: File) => {
     const form = new FormData();
@@ -108,7 +130,7 @@ export const api = {
 
   searchTracks: (q: string) => request<any[]>(`/search/tracks?q=${encodeURIComponent(q)}`),
 
-  getArtistDetail: (artistId: string) => request<any>(`/search/artist/${artistId}`),
+  getArtistDetail: (artistId: string) => cachedRequest<any>(`/search/artist/${artistId}`),
 
   resolveArtist: (name: string) =>
     request<{ artist_id: string; artist_name: string; resolved: string }>(
@@ -118,16 +140,16 @@ export const api = {
   getTrackDetail: (trackId: string) => request<any>(`/search/track/${trackId}`),
 
   getTimeline: (artistId: string, mode: string = "personal") =>
-    request<any>(`/stats/timeline?artist_id=${artistId}&mode=${mode}`),
+    cachedRequest<any>(`/stats/timeline?artist_id=${artistId}&mode=${mode}`),
 
   getLastfmTimeline: (artistName: string) =>
-    request<any>(`/stats/lastfm-timeline?artist_name=${encodeURIComponent(artistName)}`),
+    cachedRequest<any>(`/stats/lastfm-timeline?artist_name=${encodeURIComponent(artistName)}`),
 
-  gatekeepArtist: (artistId: string) => request<any>(`/gatekeep/artist/${artistId}`),
+  gatekeepArtist: (artistId: string) => cachedRequest<any>(`/gatekeep/artist/${artistId}`),
 
-  gatekeepTrack: (trackId: string) => request<any>(`/gatekeep/track/${trackId}`),
+  gatekeepTrack: (trackId: string) => cachedRequest<any>(`/gatekeep/track/${trackId}`),
 
-  getLeaderboard: () => request<any>("/gatekeep/leaderboard"),
+  getLeaderboard: () => cachedRequest<any>("/gatekeep/leaderboard"),
 
   createChallenge: (artistId: string) =>
     request<any>(`/gatekeep/challenge?artist_id=${artistId}`, { method: "POST" }),
