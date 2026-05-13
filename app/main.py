@@ -185,8 +185,3 @@ def trigger_backfill(user: "User" = Depends(get_current_user)):
     return {"status": "triggered", "task": "backfill_track_metadata"}
 
 
-@app.post("/admin/backfill-images")
-def backfill_images(user: "User" = Depends(get_current_user)):
-    from app.tasks import backfill_images as backfill_images_task
-    backfill_images_task.delay()
-    return {"status": "triggered", "task": "backfill_images"}
