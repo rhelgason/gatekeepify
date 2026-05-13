@@ -15,7 +15,7 @@ export default function ArtistPage() {
   const [comparison, setComparison] = useState<any>(null);
   const [timeline, setTimeline] = useState<any>(null);
   const [lastfmData, setLastfmData] = useState<any>(null);
-  const [timelineMode, setTimelineMode] = useState<"personal" | "friends" | "global" | "lastfm">("personal");
+  const [timelineMode, setTimelineMode] = useState<"personal" | "friends" | "global">("personal");
   const [challenge, setChallenge] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
@@ -29,7 +29,7 @@ export default function ArtistPage() {
 
   useEffect(() => {
     if (artistId && !loading) {
-      if (timelineMode === "lastfm") {
+      if (timelineMode === "global") {
         if (detail?.artist_name) {
           api.getLastfmTimeline(detail.artist_name).then(setLastfmData).catch(() => {});
         }
@@ -145,8 +145,7 @@ export default function ArtistPage() {
             {([
               { key: "personal", label: "Yours" },
               { key: "friends", label: "Friends" },
-              { key: "global", label: "Gatekeepify" },
-              { key: "lastfm", label: "Last.fm" },
+              { key: "global", label: "Global" },
             ] as const).map(({ key, label }) => (
               <button
                 key={key}
@@ -164,12 +163,12 @@ export default function ArtistPage() {
         </div>
 
         {(() => {
-          if (timelineMode === "lastfm") {
+          // Global mode uses Last.fm
+          if (timelineMode === "global") {
             if (!lastfmData?.data) {
               return (
                 <div className="card p-8 text-center">
-                  <p className="text-gray-500">Last.fm data unavailable for this artist.</p>
-                  <p className="text-gray-600 text-sm mt-1">Set LASTFM_API_KEY to enable.</p>
+                  <p className="text-gray-500">Global popularity data unavailable for this artist.</p>
                 </div>
               );
             }
@@ -186,7 +185,7 @@ export default function ArtistPage() {
                       <div className="text-gray-600 text-xs uppercase tracking-wider">total plays</div>
                     </div>
                   </div>
-                  <p className="text-center text-gray-600 text-xs mt-3">Global stats from Last.fm</p>
+                  <p className="text-center text-gray-600 text-xs mt-3">Global stats via Last.fm</p>
                 </div>
               );
             }
@@ -213,13 +212,15 @@ export default function ArtistPage() {
                     <span>{months[months.length - 1]?.month}</span>
                   </div>
                 )}
-                <p className="text-center text-gray-600 text-xs mt-3">Global weekly plays from Last.fm</p>
+                <p className="text-center text-gray-600 text-xs mt-3">Global popularity via Last.fm</p>
               </div>
             );
           }
 
+          // Personal / Friends modes
           const users = timeline?.users || [];
           const hasData = users.some((u: any) => u.months?.length > 0);
+
           if (!hasData) {
             return (
               <div className="card p-8 text-center">
@@ -235,6 +236,36 @@ export default function ArtistPage() {
             );
           }
 
+          // Few data points: show stat cards instead of a chart
+          const totalMonths = Math.max(...users.map((u: any) => u.months?.length || 0));
+          if (totalMonths <= 2) {
+            return (
+              <div className="card p-6">
+                {users.map((user: any, i: number) => (
+                  <div key={user.user_id} className="mb-4 last:mb-0">
+                    {users.length > 1 && (
+                      <div className="text-xs text-gray-500 mb-2 font-medium">{user.user_name}</div>
+                    )}
+                    <div className="flex gap-6">
+                      {user.months.map((m: any) => (
+                        <div key={m.month} className="text-center">
+                          <div className={`stat-number text-2xl ${i === 0 ? "gradient-text" : "text-gray-300"}`}>
+                            {m.listen_count}
+                          </div>
+                          <div className="text-gray-600 text-xs">{m.month}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+                <p className="text-gray-600 text-xs mt-3">
+                  A full timeline will appear as more months of data are collected.
+                </p>
+              </div>
+            );
+          }
+
+          // Full bar chart
           return (
             <div className="card p-6">
               {users.map((user: any, userIdx: number) => (
