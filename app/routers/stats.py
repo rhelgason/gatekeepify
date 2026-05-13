@@ -317,12 +317,41 @@ def wrapped(
         year = current_year
         since = datetime(year, 1, 1, tzinfo=timezone.utc)
 
-    until = datetime(year + 1, 1, 1, tzinfo=timezone.utc) if year < current_year else None
+    # Spotify Wrapped typically covers Jan 1 - Oct 31.
+    # For past years, scope to full year. For current year, use Oct 31 cutoff
+    # if we're past November, otherwise use today.
+    if year < current_year:
+        until = datetime(year + 1, 1, 1, tzinfo=timezone.utc)
+        period_label = f"Jan 1 - Dec 31, {year}"
+    else:
+        now = datetime.now(timezone.utc)
+        if now.month >= 11:
+            until = datetime(year, 11, 1, tzinfo=timezone.utc)
+            period_label = f"Jan 1 - Oct 31, {year}"
+        else:
+            until = None
+            period_label = f"Jan 1 - {now.strftime('%b %d')}, {year}"
 
     top_tracks = _get_top_tracks(db, user.user_id, since, WRAPPED_LIMIT, until=until)
     top_artists = _get_top_artists(db, user.user_id, since, WRAPPED_LIMIT, until=until)
-    top_genres = _get_top_genres(db, user.user_id, since, 1, until=until)
+    top_genres = _get_top_genres(db, user.user_id, since, 5, until=until)
     total_minutes = _get_total_minutes(db, user.user_id, since, until=until)
+    total_listens = _get_total_listens(db, user.user_id, since)
+
+    unique_artists = db.execute(
+        select(func.count(func.distinct(TrackArtist.artist_id)))
+        .select_from(Listen)
+        .join(TrackArtist, Listen.track_id == TrackArtist.track_id)
+        .where(Listen.user_id == user.user_id, Listen.ts >= since,
+               *([Listen.ts < until] if until else []))
+    ).scalar() or 0
+
+    unique_tracks = db.execute(
+        select(func.count(func.distinct(Listen.track_id)))
+        .select_from(Listen)
+        .where(Listen.user_id == user.user_id, Listen.ts >= since,
+               *([Listen.ts < until] if until else []))
+    ).scalar() or 0
 
     log_action(db, "stats.wrapped_viewed", user_id=user.user_id,
                details={"year": year, "total_minutes": total_minutes})
@@ -331,8 +360,13 @@ def wrapped(
         top_artists=top_artists,
         top_tracks=top_tracks,
         top_genre=top_genres[0].genre if top_genres else None,
+        top_genres=top_genres,
         total_minutes=total_minutes,
+        total_listens=total_listens,
+        unique_artists=unique_artists,
+        unique_tracks=unique_tracks,
         year=year,
+        data_period=period_label,
     )
 
 

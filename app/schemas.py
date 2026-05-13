@@ -80,8 +80,13 @@ class WrappedResponse(BaseModel):
     top_artists: List[TopArtistEntry]
     top_tracks: List[TopTrackEntry]
     top_genre: Optional[str] = None
+    top_genres: List[TopGenreEntry] = []
     total_minutes: int
+    total_listens: int = 0
+    unique_artists: int = 0
+    unique_tracks: int = 0
     year: Optional[int] = None
+    data_period: Optional[str] = None
 
 
 class UserResponse(BaseModel):

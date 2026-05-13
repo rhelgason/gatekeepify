@@ -83,6 +83,12 @@ export default function Wrapped() {
         </div>
       ) : (
         <div className="space-y-8">
+          {data.data_period && (
+            <p className="text-center text-gray-600 text-xs -mb-4">
+              Based on {data.data_period}
+            </p>
+          )}
+
           {/* Total minutes */}
           <div className="card p-8 text-center bg-gradient-to-br from-[var(--green-dim)] to-transparent border-[var(--green)]/10">
             <div className="text-gray-400 text-sm uppercase tracking-widest mb-2">
@@ -95,6 +101,22 @@ export default function Wrapped() {
               That&apos;s {Math.round(data.total_minutes / 60).toLocaleString()} hours
               {data.total_minutes > 1440 &&
                 ` or ${Math.round(data.total_minutes / 1440).toLocaleString()} days`}
+            </div>
+          </div>
+
+          {/* Stats row */}
+          <div className="grid grid-cols-3 gap-3">
+            <div className="card p-4 text-center">
+              <div className="text-2xl font-black">{(data.total_listens || 0).toLocaleString()}</div>
+              <div className="text-gray-600 text-xs">total listens</div>
+            </div>
+            <div className="card p-4 text-center">
+              <div className="text-2xl font-black">{(data.unique_artists || 0).toLocaleString()}</div>
+              <div className="text-gray-600 text-xs">artists</div>
+            </div>
+            <div className="card p-4 text-center">
+              <div className="text-2xl font-black">{(data.unique_tracks || 0).toLocaleString()}</div>
+              <div className="text-gray-600 text-xs">tracks</div>
             </div>
           </div>
 
@@ -197,8 +219,27 @@ export default function Wrapped() {
             </div>
           )}
 
-          {/* Top Genre */}
-          {data.top_genre && (
+          {/* Top Genres */}
+          {data.top_genres?.length > 0 ? (
+            <div>
+              <h2 className="text-sm font-bold uppercase tracking-widest text-gray-500 mb-4">
+                Your Top Genres
+              </h2>
+              <div className="flex gap-2 flex-wrap">
+                {data.top_genres.map((g: any, i: number) => (
+                  <span
+                    key={g.genre}
+                    className={`card px-5 py-2.5 rounded-full text-sm font-medium ${
+                      i === 0 ? "bg-[var(--green-dim)] text-[var(--green)] border-[var(--green)]/20" : ""
+                    }`}
+                  >
+                    {g.genre}
+                    <span className="text-gray-500 ml-2">{g.listen_count}</span>
+                  </span>
+                ))}
+              </div>
+            </div>
+          ) : data.top_genre && (
             <div className="card p-8 text-center">
               <div className="text-gray-400 text-sm uppercase tracking-widest mb-2">
                 Top Genre
