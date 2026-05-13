@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { clearToken, isLoggedIn } from "@/lib/auth";
 import { api } from "@/lib/api";
+import { trackEvent } from "@/lib/track";
 
 export default function Navbar() {
   const pathname = usePathname();
@@ -62,7 +63,7 @@ export default function Navbar() {
           ))}
           <button
             onClick={() => {
-              clearToken();
+              trackEvent("sign_out"); clearToken();
               window.location.href = "/";
             }}
             className="text-sm text-gray-600 hover:text-red-400 ml-2 px-3 py-2 rounded-full transition-all duration-200"
@@ -111,7 +112,7 @@ export default function Navbar() {
             ))}
             <button
               onClick={() => {
-                clearToken();
+                trackEvent("sign_out"); clearToken();
                 window.location.href = "/";
               }}
               className="block w-full text-left px-4 py-3 rounded-xl text-sm text-gray-600 hover:text-red-400 transition-all"

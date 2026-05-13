@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { isLoggedIn } from "@/lib/auth";
 import { api } from "@/lib/api";
+import { trackEvent } from "@/lib/track";
 import Link from "next/link";
 
 type Period = "all" | "year" | "month" | "today";
@@ -91,7 +92,7 @@ export default function Dashboard() {
           {periods.map((p) => (
             <button
               key={p.value}
-              onClick={() => setPeriod(p.value)}
+              onClick={() => { setPeriod(p.value); trackEvent("period_changed", { period: p.value }); }}
               className={`px-3 md:px-4 py-1.5 rounded-full text-xs md:text-sm transition-all duration-200 ${
                 period === p.value
                   ? "bg-[var(--green)] text-black font-bold"

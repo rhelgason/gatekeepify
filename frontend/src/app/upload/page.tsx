@@ -4,6 +4,7 @@ import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { isLoggedIn } from "@/lib/auth";
 import { api } from "@/lib/api";
+import { trackEvent } from "@/lib/track";
 
 export default function Upload() {
   const router = useRouter();
@@ -24,17 +25,21 @@ export default function Upload() {
 
   async function handleFile(file: File) {
     if (!file.name.endsWith(".zip")) {
+      trackEvent("upload_invalid_file", { filename: file.name });
       setError("Please upload a ZIP file");
       return;
     }
+    trackEvent("upload_started", { filename: file.name, size_bytes: file.size });
     setUploading(true);
     setError("");
     setResult(null);
     try {
       const data = await api.uploadBackfill(file);
+      trackEvent("upload_completed", { accepted: data.total_listens_accepted, rejected: data.total_listens_rejected });
       setResult(data);
       api.getBackfillStatus().then(setStatus);
     } catch (e: any) {
+      trackEvent("upload_failed", { error: e.message });
       setError(e.message || "Upload failed");
     } finally {
       setUploading(false);

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { isLoggedIn } from "@/lib/auth";
 import { api, ApiError } from "@/lib/api";
+import { trackEvent } from "@/lib/track";
 import Link from "next/link";
 
 export default function Friends() {
@@ -37,6 +38,7 @@ export default function Friends() {
   }
 
   async function handleCreateInvite() {
+    trackEvent("invite_generated");
     const data = await api.createInvite();
     setInviteCode(data.invite_code);
     setMessage("");
@@ -44,6 +46,7 @@ export default function Friends() {
 
   async function handleAcceptInvite() {
     if (!acceptCode.trim()) return;
+    trackEvent("invite_code_pasted");
     try {
       await api.acceptInvite(acceptCode.trim());
       setMessage("Friend added!");
@@ -57,12 +60,14 @@ export default function Friends() {
   async function handleSearchUsers() {
     if (!userQuery.trim()) return;
     setSearching(true);
+    trackEvent("friend_search", { query: userQuery.trim() });
     const data = await api.searchUsers(userQuery);
     setUserResults(data);
     setSearching(false);
   }
 
   async function handleSendRequest(toUserId: string) {
+    trackEvent("friend_request_sent", { to_user: toUserId }, "user", toUserId);
     try {
       await api.sendFriendRequest(toUserId);
       setUserResults(prev =>
@@ -74,11 +79,13 @@ export default function Friends() {
   }
 
   async function handleAcceptRequest(requestId: number) {
+    trackEvent("friend_request_accepted", { request_id: requestId });
     await api.acceptFriendRequest(requestId);
     loadData();
   }
 
   async function handleDeclineRequest(requestId: number) {
+    trackEvent("friend_request_declined", { request_id: requestId });
     await api.declineFriendRequest(requestId);
     loadData();
   }
@@ -199,7 +206,7 @@ export default function Friends() {
                   {typeof window !== "undefined" ? `${window.location.origin}/invite/${inviteCode}` : inviteCode}
                 </code>
                 <button
-                  onClick={() => navigator.clipboard.writeText(`${window.location.origin}/invite/${inviteCode}`)}
+                  onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/invite/${inviteCode}`); trackEvent("invite_link_copied"); }}
                   className="btn-secondary text-xs py-1.5 px-4"
                 >
                   Copy

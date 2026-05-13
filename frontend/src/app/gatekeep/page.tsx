@@ -4,6 +4,7 @@ import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { isLoggedIn } from "@/lib/auth";
 import { api } from "@/lib/api";
+import { trackEvent } from "@/lib/track";
 import Link from "next/link";
 
 function GatekeepContent() {
@@ -36,6 +37,7 @@ function GatekeepContent() {
     if (!query.trim()) return;
     setSearching(true);
     setSpotifyResults([]);
+    trackEvent("gatekeep_search", { query: query.trim() });
     const data = await api.searchArtists(query);
     setResults(data);
     if (data.length < 3) {

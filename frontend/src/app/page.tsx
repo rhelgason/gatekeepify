@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { isLoggedIn } from "@/lib/auth";
+import { trackEvent } from "@/lib/track";
 import { api } from "@/lib/api";
 
 export default function Landing() {
@@ -17,10 +18,12 @@ export default function Landing() {
   async function handleLogin() {
     setLoading(true);
     setError("");
+    trackEvent("login_clicked");
     try {
       const { auth_url } = await api.getLoginUrl();
       window.location.href = auth_url;
     } catch (e: any) {
+      trackEvent("login_error", { error: e.message });
       setError(e.message || "Failed to connect to server");
       setLoading(false);
     }

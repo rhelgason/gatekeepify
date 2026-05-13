@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { isLoggedIn } from "@/lib/auth";
 import { api, ApiError } from "@/lib/api";
+import { trackEvent } from "@/lib/track";
 
 export default function InvitePage() {
   const router = useRouter();
@@ -23,8 +24,10 @@ export default function InvitePage() {
 
   async function acceptInvite() {
     setStatus("accepting");
+    trackEvent("invite_link_opened", { code });
     try {
       await api.acceptInvite(code);
+      trackEvent("invite_link_accepted", { code });
       setStatus("success");
       setMessage("You're now friends! Redirecting to your dashboard...");
       setTimeout(() => router.replace("/dashboard"), 2000);

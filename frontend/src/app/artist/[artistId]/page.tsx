@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { isLoggedIn } from "@/lib/auth";
 import { api } from "@/lib/api";
+import { trackEvent } from "@/lib/track";
 import Link from "next/link";
 
 export default function ArtistPage() {
@@ -58,6 +59,7 @@ export default function ArtistPage() {
   }
 
   async function handleChallenge() {
+    trackEvent("challenge_created", { artist_id: artistId }, "artist", artistId);
     const data = await api.createChallenge(artistId);
     setChallenge(data);
   }
@@ -141,7 +143,7 @@ export default function ArtistPage() {
             ] as const).map(({ key, label }) => (
               <button
                 key={key}
-                onClick={() => setTimelineMode(key)}
+                onClick={() => { setTimelineMode(key); trackEvent("timeline_mode_changed", { mode: key, artist_id: artistId }, "artist", artistId); }}
                 className={`px-3 py-1.5 rounded-full text-xs transition-all ${
                   timelineMode === key
                     ? "bg-[var(--green)] text-black font-bold"
@@ -315,6 +317,7 @@ export default function ArtistPage() {
                           {d.similar_artists.map((artistName: string) => (
                             <button key={artistName}
                               onClick={async () => {
+                                trackEvent("similar_artist_clicked", { from_artist: artistId, to_artist: artistName });
                                 try {
                                   const resolved = await api.resolveArtist(artistName);
                                   router.push(`/artist/${resolved.artist_id}`);
@@ -435,7 +438,7 @@ export default function ArtistPage() {
                 {challenge.invite_code}
               </code>
               <button
-                onClick={() => navigator.clipboard.writeText(challenge.invite_code)}
+                onClick={() => { navigator.clipboard.writeText(challenge.invite_code); trackEvent("challenge_code_copied", { artist_id: artistId }); }}
                 className="btn-secondary text-xs py-1.5 px-4"
               >
                 Copy

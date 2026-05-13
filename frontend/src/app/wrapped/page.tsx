@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { isLoggedIn } from "@/lib/auth";
 import { api } from "@/lib/api";
+import { trackEvent } from "@/lib/track";
 import Link from "next/link";
 
 export default function Wrapped() {
@@ -59,7 +60,7 @@ export default function Wrapped() {
           {years.map((y) => (
             <button
               key={y}
-              onClick={() => setYear(y)}
+              onClick={() => { setYear(y); trackEvent("wrapped_year_changed", { year: y }); }}
               className={`px-3 py-1.5 rounded-full text-xs transition-all ${
                 year === y
                   ? "bg-[var(--green)] text-black font-bold"

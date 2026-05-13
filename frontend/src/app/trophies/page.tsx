@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { isLoggedIn } from "@/lib/auth";
 import { api } from "@/lib/api";
+import { trackEvent } from "@/lib/track";
 import Link from "next/link";
 
 const TIER_COLORS: Record<string, string> = {
@@ -92,7 +93,7 @@ export default function Trophies() {
         {awards.map((a: any) => (
           <button
             key={a.award_id}
-            onClick={() => setSelectedAward(selectedAward === a.award_id ? null : a.award_id)}
+            onClick={() => { const next = selectedAward === a.award_id ? null : a.award_id; setSelectedAward(next); if (next) trackEvent("award_viewed", { award_id: next }); }}
             className={`flex-shrink-0 card p-4 text-center transition-all duration-200 min-w-[100px] ${
               a.held
                 ? `${TIER_BG[a.tier]} ring-1`
