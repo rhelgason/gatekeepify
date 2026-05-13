@@ -400,9 +400,9 @@ def lastfm_timeline(
     user: UserModel = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    from app.services.lastfm import get_artist_weekly_listeners
+    from app.services.lastfm import get_artist_global_stats
 
-    result = get_artist_weekly_listeners(artist_name)
+    result = get_artist_global_stats(artist_name)
 
     log_action(
         db, "stats.lastfm_timeline_viewed",
@@ -413,19 +413,8 @@ def lastfm_timeline(
     if result is None:
         return {"source": "lastfm", "data": None, "message": "Last.fm data unavailable"}
 
-    if result and result[0].get("source") == "lastfm_summary":
-        return {
-            "source": "lastfm",
-            "type": "summary",
-            "data": result[0],
-        }
-
     return {
         "source": "lastfm",
-        "type": "timeline",
-        "data": {
-            "user_id": "_lastfm",
-            "user_name": "Last.fm Global",
-            "months": result,
-        },
+        "type": "summary",
+        "data": result,
     }

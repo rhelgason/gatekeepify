@@ -1,5 +1,4 @@
 import logging
-from datetime import datetime
 from typing import Optional
 
 import requests
@@ -11,98 +10,78 @@ logger = logging.getLogger("gatekeepify.lastfm")
 BASE_URL = "https://ws.audioscrobbler.com/2.0/"
 
 
-def get_artist_weekly_listeners(
-    artist_name: str,
-) -> Optional[list[dict]]:
+def _lastfm_get(method: str, params: dict) -> Optional[dict]:
+    params.update({
+        "method": method,
+        "api_key": settings.lastfm_api_key,
+        "format": "json",
+    })
+    resp = requests.get(BASE_URL, params=params, timeout=10)
+    if resp.status_code != 200:
+        logger.warning(f"Last.fm {method} returned {resp.status_code}: {resp.text[:200]}")
+        return None
+    data = resp.json()
+    if "error" in data:
+        logger.warning(f"Last.fm {method} error: {data.get('message')}")
+        return None
+    return data
+
+
+def get_artist_global_stats(artist_name: str) -> Optional[dict]:
     if not settings.lastfm_api_key:
         logger.warning("LASTFM_API_KEY is not set")
         return None
 
-    logger.info(f"Fetching Last.fm data for '{artist_name}' with key '{settings.lastfm_api_key[:4]}...'")
+    logger.info(f"Fetching Last.fm data for '{artist_name}'")
 
     try:
-        charts_resp = requests.get(
-            BASE_URL,
-            params={
-                "method": "artist.getWeeklyChartList",
-                "artist": artist_name,
-                "api_key": settings.lastfm_api_key,
-                "format": "json",
-            },
-            timeout=10,
-        )
-        logger.info(f"Last.fm chart list response: {charts_resp.status_code}")
-        charts_resp.raise_for_status()
-        chart_json = charts_resp.json()
-        charts = chart_json.get("weeklychartlist", {}).get("chart", [])
-        logger.info(f"Last.fm returned {len(charts)} chart periods")
-
-        if not charts:
+        info = _lastfm_get("artist.getInfo", {"artist": artist_name})
+        if not info:
             return None
 
-        recent_charts = charts[-52:]
+        artist = info.get("artist", {})
+        stats = artist.get("stats", {})
+        total_listeners = int(stats.get("listeners", 0))
+        total_playcount = int(stats.get("playcount", 0))
 
-        monthly: dict[str, int] = {}
-        for chart in recent_charts:
-            from_ts = int(chart["from"])
-            chart_date = datetime.utcfromtimestamp(from_ts)
-            month_key = chart_date.strftime("%Y-%m")
+        tags = [t.get("name") for t in artist.get("tags", {}).get("tag", []) if t.get("name")]
 
-            detail_resp = requests.get(
-                BASE_URL,
-                params={
-                    "method": "artist.getWeeklyPlaycountChart",
-                    "artist": artist_name,
-                    "from": chart["from"],
-                    "to": chart["to"],
-                    "api_key": settings.lastfm_api_key,
-                    "format": "json",
-                },
-                timeout=10,
-            )
+        similar_artists = []
+        similar = artist.get("similar", {}).get("artist", [])
+        for s in similar[:5]:
+            similar_artists.append(s.get("name", ""))
 
-            if detail_resp.status_code == 200:
-                playcount_data = detail_resp.json()
-                playcount = 0
-                weekly_chart = playcount_data.get("weeklyartistchart", {})
-                if weekly_chart:
-                    artist_entries = weekly_chart.get("artist", [])
-                    if isinstance(artist_entries, dict):
-                        artist_entries = [artist_entries]
-                    for entry in artist_entries:
-                        if entry.get("name", "").lower() == artist_name.lower():
-                            playcount = int(entry.get("playcount", 0))
-                            break
+        result: dict = {
+            "total_listeners": total_listeners,
+            "total_playcount": total_playcount,
+            "tags": tags,
+            "similar_artists": similar_artists,
+        }
 
-                monthly[month_key] = monthly.get(month_key, 0) + playcount
+        top_tracks = _lastfm_get("artist.getTopTracks", {"artist": artist_name, "limit": "10"})
+        if top_tracks:
+            tracks = top_tracks.get("toptracks", {}).get("track", [])
+            result["top_tracks"] = [
+                {
+                    "name": t.get("name", ""),
+                    "playcount": int(t.get("playcount", 0)),
+                }
+                for t in tracks[:10]
+            ]
 
-        if not any(v > 0 for v in monthly.values()):
-            info_resp = requests.get(
-                BASE_URL,
-                params={
-                    "method": "artist.getInfo",
-                    "artist": artist_name,
-                    "api_key": settings.lastfm_api_key,
-                    "format": "json",
-                },
-                timeout=10,
-            )
-            if info_resp.status_code == 200:
-                info = info_resp.json().get("artist", {})
-                stats = info.get("stats", {})
-                total_listeners = int(stats.get("listeners", 0))
-                total_playcount = int(stats.get("playcount", 0))
-                return [{
-                    "source": "lastfm_summary",
-                    "total_listeners": total_listeners,
-                    "total_playcount": total_playcount,
-                }]
+        top_albums = _lastfm_get("artist.getTopAlbums", {"artist": artist_name, "limit": "5"})
+        if top_albums:
+            albums = top_albums.get("topalbums", {}).get("album", [])
+            result["top_albums"] = [
+                {
+                    "name": a.get("name", ""),
+                    "playcount": int(a.get("playcount", 0)),
+                }
+                for a in albums[:5]
+            ]
 
-        return [
-            {"month": m, "listen_count": c}
-            for m, c in sorted(monthly.items())
-            if c > 0
-        ]
+        logger.info(f"Last.fm data for '{artist_name}': {total_listeners} listeners, {total_playcount} plays")
+        return result
 
     except Exception as e:
         logger.error(f"Last.fm API error for '{artist_name}': {type(e).__name__}: {e}")
