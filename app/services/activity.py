@@ -20,6 +20,9 @@ def generate_activity_feed(
         events.extend(_detect_new_obsessions(db, uid, since))
         events.extend(_detect_milestones(db, uid))
         events.extend(_detect_late_to_party(db, uid, user_ids, since))
+        events.extend(_detect_broken_streaks(db, uid))
+
+    events.extend(_detect_crown_steals(db, user_ids, since))
 
     events.sort(key=lambda e: e["ts"], reverse=True)
     return events[:limit]
@@ -225,6 +228,120 @@ def _detect_late_to_party(
     return events
 
 
+def _detect_crown_steals(db: Session, group_ids: List[str], since: datetime) -> List[dict]:
+    artist_user_first = (
+        select(
+            TrackArtist.artist_id,
+            Artist.artist_name,
+            Listen.user_id,
+            func.min(Listen.ts).label("first_listen"),
+        )
+        .select_from(Listen)
+        .join(TrackArtist, Listen.track_id == TrackArtist.track_id)
+        .join(Artist, TrackArtist.artist_id == Artist.artist_id)
+        .where(Listen.user_id.in_(group_ids))
+        .group_by(TrackArtist.artist_id, Artist.artist_name, Listen.user_id)
+    )
+    rows = db.execute(artist_user_first).all()
+
+    artist_entries: dict = defaultdict(list)
+    for row in rows:
+        ts = row.first_listen if isinstance(row.first_listen, datetime) else datetime.fromisoformat(str(row.first_listen))
+        artist_entries[row.artist_id].append({
+            "user_id": row.user_id,
+            "ts": ts,
+            "artist_name": row.artist_name,
+        })
+
+    events = []
+    for artist_id, entries in artist_entries.items():
+        if len(entries) < 2:
+            continue
+        entries.sort(key=lambda e: e["ts"])
+
+        # Check if the current winner uploaded data recently (crown steal)
+        winner = entries[0]
+        runner_up = entries[1]
+        if winner["ts"] >= since and runner_up["ts"] < since:
+            # Winner's first listen is recent but runner_up's is old = winner just uploaded backdated data
+            winner_name = _get_user_name(db, winner["user_id"])
+            loser_name = _get_user_name(db, runner_up["user_id"])
+            quip = _crown_steal_quip(winner_name, loser_name, winner["artist_name"])
+            events.append({
+                "type": "crown_stolen",
+                "ts": winner["ts"].isoformat(),
+                "user_id": winner["user_id"],
+                "user_name": winner_name,
+                "artist_id": artist_id,
+                "artist_name": winner["artist_name"],
+                "message": quip,
+                "stat": f"Took crown from {loser_name}",
+                "emoji": "👑",
+            })
+
+    return events
+
+
+def _detect_broken_streaks(db: Session, user_id: str) -> List[dict]:
+    rows = db.execute(
+        select(Listen.ts).where(Listen.user_id == user_id).order_by(Listen.ts)
+    ).all()
+
+    if not rows:
+        return []
+
+    days = sorted(set(
+        (r[0] if isinstance(r[0], datetime) else datetime.fromisoformat(str(r[0]))).date()
+        for r in rows
+    ))
+
+    if len(days) < 5:
+        return []
+
+    # Find the most recent streak
+    streaks = []
+    current_start = 0
+    for i in range(1, len(days)):
+        if (days[i] - days[i - 1]).days != 1:
+            streak_len = i - current_start
+            if streak_len >= 5:
+                streaks.append((current_start, i - 1, streak_len))
+            current_start = i
+    # Final streak
+    final_len = len(days) - current_start
+    if final_len >= 5:
+        streaks.append((current_start, len(days) - 1, final_len))
+
+    if not streaks:
+        return []
+
+    # Check if the most recent streak ended in the last 7 days
+    today = datetime.now(timezone.utc).date()
+    last_streak = streaks[-1]
+    streak_end = days[last_streak[1]]
+    days_since_end = (today - streak_end).days
+
+    if 1 <= days_since_end <= 7 and last_streak[2] >= 5:
+        # Streak is broken (gap between streak end and today)
+        # Make sure the streak isn't still active
+        if days[-1] < today - timedelta(days=1):
+            user_name = _get_user_name(db, user_id)
+            quip = _streak_broken_quip(user_name, last_streak[2])
+            return [{
+                "type": "streak_broken",
+                "ts": datetime.combine(streak_end, datetime.min.time()).isoformat(),
+                "user_id": user_id,
+                "user_name": user_name,
+                "artist_id": None,
+                "artist_name": None,
+                "message": quip,
+                "stat": f"{last_streak[2]}-day streak ended",
+                "emoji": "💀",
+            }]
+
+    return []
+
+
 def _get_user_name(db: Session, user_id: str) -> str:
     from app.models import User
     user = db.query(User).filter(User.user_id == user_id).first()
@@ -291,5 +408,31 @@ def _late_quip(user: str, artist: str, friend_count: int) -> str:
         f"Better late than never: {user} discovered {artist}. {friend_count} friends are rolling their eyes.",
         f"{user} just found out about {artist}. {friend_count} of their friends: 'we been knew.'",
         f"Fashionably late: {user} finally listened to {artist}. Only about a year behind {friend_count} friends.",
+    ]
+    return random.choice(quips)
+
+
+def _crown_steal_quip(thief: str, victim: str, artist: str) -> str:
+    quips = [
+        f"{thief} just snatched the {artist} crown from {victim}. Cold blooded.",
+        f"Crown heist: {thief} uploaded proof they heard {artist} before {victim}. Drama.",
+        f"{victim} thought they discovered {artist} first. {thief} just proved otherwise.",
+        f"Plot twist: {thief} had {artist} on repeat before {victim} even knew they existed.",
+        f"{thief} pulled receipts on {artist}. {victim}'s crown has been revoked.",
+        f"The {artist} crown just changed hands. {thief} dethroned {victim}. Brutal.",
+        f"{victim} held the {artist} crown for a while. {thief} just ended that era.",
+    ]
+    return random.choice(quips)
+
+
+def _streak_broken_quip(user: str, streak_days: int) -> str:
+    quips = [
+        f"{user}'s {streak_days}-day listening streak just died. Rest in peace.",
+        f"Moment of silence: {user} broke their {streak_days}-day streak. Life got in the way.",
+        f"{user} went {streak_days} days without missing a day of music. That's over now.",
+        f"RIP to {user}'s {streak_days}-day streak. Gone but not forgotten.",
+        f"{user} forgot to listen to music yesterday. {streak_days}-day streak: destroyed.",
+        f"After {streak_days} days, {user} finally touched grass. Streak broken.",
+        f"{user}'s {streak_days}-day streak just flatlined. The silence is deafening.",
     ]
     return random.choice(quips)
