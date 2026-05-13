@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import Navbar from "@/components/Navbar";
 import PageTracker from "@/components/PageTracker";
+import BackfillBanner from "@/components/BackfillBanner";
 
 export const metadata: Metadata = {
   title: "Gatekeepify",
@@ -18,7 +19,10 @@ export default function RootLayout({
       <body>
         <Navbar />
         <PageTracker />
-        <main className="mx-auto max-w-6xl px-6 py-8">{children}</main>
+        <main className="mx-auto max-w-6xl px-6 py-8">
+          <BackfillBanner />
+          {children}
+        </main>
       </body>
     </html>
   );

@@ -345,8 +345,15 @@ def backfill_status(
         .where(Listen.user_id == user.user_id)
     ).scalar() or 0
 
+    has_export = db.execute(
+        select(func.count())
+        .select_from(Listen)
+        .where(Listen.user_id == user.user_id, Listen.source == ListenSource.export.value)
+    ).scalar() or 0
+
     return BackfillStatusResponse(
         tracks_missing_metadata=missing_meta,
         total_listens=total_listens,
         total_tracks=total_tracks,
+        has_export_data=has_export > 0,
     )

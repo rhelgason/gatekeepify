@@ -114,6 +114,7 @@ class BackfillStatusResponse(BaseModel):
     tracks_missing_metadata: int
     total_listens: int
     total_tracks: int
+    has_export_data: bool = False
 
 
 # --- Social / Friends ---
