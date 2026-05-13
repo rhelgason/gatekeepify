@@ -55,13 +55,18 @@ def get_current_user(
 
 
 @router.get("/login", response_model=AuthUrlResponse)
-def login():
+def login(return_url: str = Query(None)):
     service = SpotifyService()
-    return AuthUrlResponse(auth_url=service.get_auth_url())
+    auth_url = service.get_auth_url()
+    if return_url:
+        import base64
+        state = base64.urlsafe_b64encode(return_url.encode()).decode()
+        auth_url += f"&state={state}"
+    return AuthUrlResponse(auth_url=auth_url)
 
 
 @router.get("/callback", response_model=AuthResponse)
-def callback(code: str = Query(...), db: Session = Depends(get_db)):
+def callback(code: str = Query(...), state: str = Query(None), db: Session = Depends(get_db)):
     service = SpotifyService()
 
     try:
@@ -118,9 +123,19 @@ def callback(code: str = Query(...), db: Session = Depends(get_db)):
 
     token = create_jwt(user_id)
 
-    if settings.frontend_url:
+    redirect_url = None
+    if state:
+        try:
+            import base64
+            redirect_url = base64.urlsafe_b64decode(state.encode()).decode()
+        except Exception:
+            pass
+    if not redirect_url:
+        redirect_url = settings.frontend_url
+
+    if redirect_url:
         return RedirectResponse(
-            url=f"{settings.frontend_url}/auth/callback?token={token}"
+            url=f"{redirect_url}/auth/callback?token={token}"
         )
 
     return AuthResponse(

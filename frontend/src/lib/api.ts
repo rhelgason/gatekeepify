@@ -44,7 +44,11 @@ async function request<T>(
 }
 
 export const api = {
-  getLoginUrl: () => request<{ auth_url: string }>("/auth/login"),
+  getLoginUrl: () => {
+    const returnUrl = typeof window !== "undefined" ? window.location.origin : "";
+    const params = returnUrl ? `?return_url=${encodeURIComponent(returnUrl)}` : "";
+    return request<{ auth_url: string }>(`/auth/login${params}`);
+  },
 
   getMe: () => request<{ user_id: string; user_name: string; email: string }>(
     "/auth/me"
