@@ -300,6 +300,16 @@ def upload_data_export(
         except Exception as e:
             logger.warning(f"Immediate enrichment failed, will backfill later: {e}")
 
+    from app.services.anomaly import analyze_user_export
+    anomaly_result = analyze_user_export(db, user.user_id)
+    if anomaly_result["flags"]:
+        log_action(
+            db, "backfill.anomaly_detected",
+            user_id=user.user_id,
+            status="warning",
+            details=anomaly_result,
+        )
+
     log_action(
         db, "backfill.upload",
         user_id=user.user_id,
@@ -309,6 +319,7 @@ def upload_data_export(
             "total_rejected": len(raw_listens) - len(accepted),
             "rejection_reasons": rejection_reasons,
             "tracks_enriched_immediately": enriched,
+            "trust_score": anomaly_result["score"],
         },
     )
 

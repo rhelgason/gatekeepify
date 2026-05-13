@@ -214,3 +214,14 @@ def track_event(
     return {"status": "ok"}
 
 
+@app.get("/admin/trust-score")
+def trust_score(
+    target_user_id: str = None,
+    user: "User" = Depends(get_current_user),
+    db: "Session" = Depends(get_db),
+):
+    from app.services.anomaly import analyze_user_export
+    uid = target_user_id or user.user_id
+    return analyze_user_export(db, uid)
+
+
