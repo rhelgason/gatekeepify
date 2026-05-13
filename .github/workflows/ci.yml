@@ -21,9 +21,13 @@ jobs:
         run: pip install -r requirements-server.txt pytest httpx
 
       - name: Run tests
+        env:
+          DATABASE_URL: "sqlite://"
         run: python -m pytest tests/test_app/ -v
 
       - name: Verify server starts
+        env:
+          DATABASE_URL: "sqlite://"
         run: |
           uvicorn app.main:app --host 127.0.0.1 --port 8000 &
           sleep 3
