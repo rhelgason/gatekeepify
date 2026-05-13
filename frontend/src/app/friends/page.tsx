@@ -12,7 +12,6 @@ export default function Friends() {
   const [friends, setFriends] = useState<any[]>([]);
   const [pendingRequests, setPendingRequests] = useState<any[]>([]);
   const [inviteCode, setInviteCode] = useState("");
-  const [acceptCode, setAcceptCode] = useState("");
   const [userQuery, setUserQuery] = useState("");
   const [userResults, setUserResults] = useState<any[]>([]);
   const [searching, setSearching] = useState(false);
@@ -41,20 +40,6 @@ export default function Friends() {
     trackEvent("invite_generated");
     const data = await api.createInvite();
     setInviteCode(data.invite_code);
-    setMessage("");
-  }
-
-  async function handleAcceptInvite() {
-    if (!acceptCode.trim()) return;
-    trackEvent("invite_code_pasted");
-    try {
-      await api.acceptInvite(acceptCode.trim());
-      setMessage("Friend added!");
-      setAcceptCode("");
-      loadData();
-    } catch (e) {
-      if (e instanceof ApiError) setMessage(e.message);
-    }
   }
 
   async function handleSearchUsers() {
@@ -190,7 +175,7 @@ export default function Friends() {
       </section>
 
       {/* Invite Link */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-10">
+      <section className="mb-10">
         <div className="card p-6">
           <h2 className="font-bold text-lg mb-4">Invite a Friend</h2>
           <p className="text-gray-500 text-sm mb-3">
@@ -215,28 +200,7 @@ export default function Friends() {
             </div>
           )}
         </div>
-
-        <div className="card p-6">
-          <h2 className="font-bold text-lg mb-4">Have a Code?</h2>
-          <p className="text-gray-500 text-sm mb-3">
-            Paste an invite code from a friend
-          </p>
-          <div className="flex gap-2">
-            <input
-              type="text"
-              value={acceptCode}
-              onChange={(e) => setAcceptCode(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleAcceptInvite()}
-              placeholder="Paste code..."
-              className="flex-1 bg-white/5 border border-white/10 rounded-full px-5 py-3 text-gray-100 placeholder-gray-600 focus:border-[var(--green)] focus:outline-none text-sm transition-all"
-            />
-            <button onClick={handleAcceptInvite} className="btn-primary">
-              Accept
-            </button>
-          </div>
-          {message && <p className="text-sm mt-3 text-gray-400">{message}</p>}
-        </div>
-      </div>
+      </section>
 
       {/* Friend List */}
       <h2 className="text-sm font-bold uppercase tracking-widest text-gray-500 mb-4">
