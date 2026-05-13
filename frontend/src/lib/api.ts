@@ -104,6 +104,8 @@ export const api = {
 
   searchArtists: (q: string) => request<any[]>(`/search/artists?q=${encodeURIComponent(q)}`),
 
+  searchSpotifyArtists: (q: string) => request<any[]>(`/search/spotify-artists?q=${encodeURIComponent(q)}`),
+
   searchTracks: (q: string) => request<any[]>(`/search/tracks?q=${encodeURIComponent(q)}`),
 
   getArtistDetail: (artistId: string) => request<any>(`/search/artist/${artistId}`),

@@ -14,6 +14,7 @@ function GatekeepContent() {
 
   const [query, setQuery] = useState(prefillQuery || "");
   const [results, setResults] = useState<any[]>([]);
+  const [spotifyResults, setSpotifyResults] = useState<any[]>([]);
   const [searching, setSearching] = useState(false);
 
   useEffect(() => {
@@ -34,8 +35,14 @@ function GatekeepContent() {
   async function handleSearch() {
     if (!query.trim()) return;
     setSearching(true);
+    setSpotifyResults([]);
     const data = await api.searchArtists(query);
     setResults(data);
+    if (data.length < 3) {
+      const spotify = await api.searchSpotifyArtists(query).catch(() => []);
+      const existingIds = new Set(data.map((a: any) => a.artist_id));
+      setSpotifyResults(spotify.filter((a: any) => !existingIds.has(a.artist_id)));
+    }
     setSearching(false);
   }
 
@@ -99,7 +106,43 @@ function GatekeepContent() {
         </div>
       )}
 
-      {results.length === 0 && query && !searching && (
+      {spotifyResults.length > 0 && (
+        <div className="mt-6 animate-slide-up">
+          <h2 className="text-xs font-bold uppercase tracking-widest text-gray-600 mb-3">
+            From Spotify
+          </h2>
+          <div className="space-y-2">
+            {spotifyResults.map((a) => (
+              <Link
+                key={a.artist_id}
+                href={`/artist/${a.artist_id}`}
+                className="card-hover w-full flex items-center gap-4 px-4 py-3"
+              >
+                {a.image_url ? (
+                  <img src={a.image_url} alt="" className="w-12 h-12 rounded-full object-cover" />
+                ) : (
+                  <div className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center text-lg text-gray-600">
+                    {a.artist_name?.[0]}
+                  </div>
+                )}
+                <div className="flex-1 min-w-0">
+                  <span className="font-bold">{a.artist_name}</span>
+                  <span className="text-gray-600 text-sm ml-3">
+                    {a.genres?.slice(0, 3).join(", ")}
+                  </span>
+                </div>
+                {a.spotify_followers > 0 && (
+                  <span className="text-gray-600 text-xs">
+                    {a.spotify_followers.toLocaleString()} followers
+                  </span>
+                )}
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {results.length === 0 && spotifyResults.length === 0 && query && !searching && (
         <div className="card p-12 text-center">
           <p className="text-gray-500">No artists found for &ldquo;{query}&rdquo;</p>
         </div>

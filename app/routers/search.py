@@ -296,3 +296,49 @@ def resolve_artist(
     except Exception as e:
         logger.warning(f"Failed to resolve artist '{name}': {e}")
         raise HTTPException(status_code=404, detail="Could not resolve artist")
+
+
+@router.get("/spotify-artists")
+def search_spotify_artists(
+    q: str = Query(..., min_length=1),
+    user: UserModel = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    user_obj = db.query(User).filter(User.user_id == user.user_id).first()
+    if not user_obj or not user_obj.spotify_refresh_token:
+        return []
+
+    try:
+        service = SpotifyService()
+        refresh_token = decrypt_token(user_obj.spotify_refresh_token)
+        token_info = service.refresh_access_token(refresh_token)
+        client = service.get_client(token_info["access_token"])
+
+        results = client.search(q=q, type="artist", limit=8)
+        artists = results.get("artists", {}).get("items", [])
+
+        output = []
+        for a in artists:
+            if not a or not a.get("id"):
+                continue
+            db.merge(Artist(
+                artist_id=a["id"],
+                artist_name=a.get("name"),
+                image_url=_get_best_image(a.get("images", [])),
+            ))
+            for genre in a.get("genres", []):
+                if genre:
+                    db.merge(ArtistGenre(artist_id=a["id"], genre=genre))
+            output.append({
+                "artist_id": a["id"],
+                "artist_name": a.get("name"),
+                "image_url": _get_best_image(a.get("images", [])),
+                "genres": a.get("genres", [])[:3],
+                "spotify_followers": a.get("followers", {}).get("total", 0),
+            })
+        db.commit()
+        return output
+
+    except Exception as e:
+        logger.warning(f"Spotify artist search failed: {e}")
+        return []
