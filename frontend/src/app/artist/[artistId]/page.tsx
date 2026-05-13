@@ -76,9 +76,9 @@ export default function ArtistPage() {
 
   return (
     <div className="animate-fade-in">
-      <Link href="/dashboard" className="text-xs text-gray-600 hover:text-gray-400 transition-colors">
-        &larr; back to stats
-      </Link>
+      <button onClick={() => router.back()} className="text-xs text-gray-600 hover:text-gray-400 transition-colors">
+        &larr; back
+      </button>
 
       {/* Hero */}
       <div className="mt-4 flex flex-col md:flex-row items-center md:items-end gap-8 mb-10">
