@@ -147,7 +147,7 @@ Copy `.env.example` to `.env`. Required values:
 - Search results now include `image_url`
 - New user sign-in immediately fetches their last 50 recent listens (no 15-min wait)
 
-### Phase 4: Frontend ✅ BUILT (needs overhaul)
+### Phase 4: Frontend ✅ COMPLETE
 
 Next.js app in `frontend/`. Deployed separately on Vercel (free).
 
@@ -166,18 +166,30 @@ Next.js app in `frontend/`. Deployed separately on Vercel (free).
 - `frontend/src/lib/api.ts` -- API client, auto-injects Bearer token, redirects to `/` on 401
 - `frontend/src/lib/auth.ts` -- JWT storage in localStorage
 - `frontend/src/app/page.tsx` -- Landing page with Spotify sign-in
-- `frontend/src/app/auth/callback/page.tsx` -- Receives JWT from backend redirect, stores it
-- `frontend/src/app/dashboard/page.tsx` -- Top tracks/artists/genres with period selector
-- `frontend/src/app/gatekeep/page.tsx` -- Search artists, compare first-listen dates, challenge friends
+- `frontend/src/app/auth/callback/page.tsx` -- Full-screen auth callback, stores JWT
+- `frontend/src/app/dashboard/page.tsx` -- Top tracks/artists/genres with period selector, responsive grid
+- `frontend/src/app/wrapped/page.tsx` -- Predicted Wrapped with year selector, animated stats
+- `frontend/src/app/artist/[artistId]/page.tsx` -- Artist detail: hero, SVG line chart timeline, gatekeep comparison, Last.fm global stats, similar artists
+- `frontend/src/app/gatekeep/page.tsx` -- Search-to-artist-page flow
 - `frontend/src/app/leaderboard/page.tsx` -- Crown rankings among friends
-- `frontend/src/app/friends/page.tsx` -- Invite generation, invite acceptance, friend list
-- `frontend/src/app/upload/page.tsx` -- Drag-and-drop ZIP upload with results display
-- `frontend/src/components/Navbar.tsx` -- Navigation bar (only shows when logged in)
+- `frontend/src/app/friends/page.tsx` -- User search, friend requests, invite codes, friend list with profiles
+- `frontend/src/app/profile/[userId]/page.tsx` -- View a friend's stats (top artists, tracks, genres)
+- `frontend/src/app/upload/page.tsx` -- Drag-and-drop ZIP upload with direct Spotify link
+- `frontend/src/components/Navbar.tsx` -- Responsive nav with mobile hamburger menu
 
 **Backend changes for frontend support:**
 - `FRONTEND_URL` env var -- when set, OAuth callback redirects to frontend instead of returning JSON
-- CORS middleware -- allows frontend domain to call the API
-- Both changes are backward-compatible (Swagger UI still works when `FRONTEND_URL` is not set)
+- OAuth state parameter passes frontend origin through for preview deployment support
+- CORS middleware -- allows all origins (safe with Bearer token auth)
+- Stats endpoints accept `target_user_id` to view a friend's stats (validated: must be a friend)
+- `GET /friends/search-users?q=` -- search Gatekeepify users by name
+- `POST /friends/request?to_user_id=` -- send direct friend request
+- `GET /friends/requests` -- list incoming pending requests
+- `POST /friends/requests/{id}/accept` and `/decline`
+- `GET /search/resolve-artist?name=` -- find artist in DB or search Spotify + create record
+- `GET /stats/lastfm-timeline?artist_name=` -- Last.fm global stats (listeners, plays, top tracks, similar artists)
+- `GET /stats/timeline?mode=global` -- aggregate all Gatekeepify users' listening data
+- Wrapped endpoint correctly scopes past years to Jan 1 - Dec 31
 
 ## Implementation Phases
 
