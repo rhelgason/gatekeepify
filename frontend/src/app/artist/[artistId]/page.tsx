@@ -155,7 +155,7 @@ export default function ArtistPage() {
           const lineColors = ["#1DB954", "#34d399", "#2dd4bf", "#22d3ee", "#38bdf8", "#a78bfa"];
 
           function renderLineChart(datasets: { label: string; months: any[]; color: string }[], footnote?: string) {
-            const allMonths = [...new Set(datasets.flatMap(d => d.months.map((m: any) => m.month)))].sort();
+            const allMonths = Array.from(new Set(datasets.flatMap(d => d.months.map((m: any) => m.month)))).sort();
             const maxVal = Math.max(...datasets.flatMap(d => d.months.map((m: any) => m.listen_count)), 1);
 
             const W = 600, H = 140, padX = 0, padY = 10;
