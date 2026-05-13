@@ -166,6 +166,82 @@ def backfill_track_metadata():
         db.close()
 
 
+@celery_app.task(name="app.tasks.backfill_images")
+def backfill_images():
+    from sqlalchemy import or_, select
+
+    from app.models import Album, Artist, Track
+    from app.services.ingestion import _get_best_image
+
+    db = SessionLocal()
+    started_at = datetime.now(timezone.utc)
+    try:
+        service = SpotifyService()
+        users = get_active_users(db)
+        if not users:
+            return
+
+        access_token = _get_working_access_token(db, service, users)
+        if not access_token:
+            return
+
+        client = service.get_client(access_token)
+
+        artists_missing = (
+            db.execute(
+                select(Artist.artist_id).where(Artist.image_url.is_(None))
+            )
+            .scalars()
+            .all()
+        )
+        updated = 0
+        for i in range(0, len(artists_missing), 50):
+            batch = artists_missing[i : i + 50]
+            result = client.artists(batch)
+            if result and result.get("artists"):
+                for a in result["artists"]:
+                    if a and a.get("images"):
+                        img = _get_best_image(a["images"])
+                        if img:
+                            db.merge(Artist(artist_id=a["id"], artist_name=a.get("name"), image_url=img))
+                            updated += 1
+        db.flush()
+
+        tracks_missing = (
+            db.execute(
+                select(Track.track_id).where(
+                    Track.image_url.is_(None), Track.album_id.isnot(None)
+                )
+            )
+            .scalars()
+            .all()
+        )
+        for i in range(0, len(tracks_missing), 50):
+            batch = tracks_missing[i : i + 50]
+            result = client.tracks(batch)
+            if result and result.get("tracks"):
+                for t in result["tracks"]:
+                    if not t:
+                        continue
+                    album = t.get("album", {})
+                    img = _get_best_image(album.get("images", []))
+                    if img:
+                        db.merge(Track(track_id=t["id"], track_name=t.get("name"), image_url=img))
+                        if album.get("id"):
+                            db.merge(Album(album_id=album["id"], album_name=album.get("name"), image_url=img))
+                        updated += 1
+        db.commit()
+
+        log_job_run(db, "backfill_images", None, started_at, datetime.now(timezone.utc), "success", updated)
+        logger.info(f"Backfilled images for {updated} entities")
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Failed to backfill images: {e}")
+        log_job_run(db, "backfill_images", None, started_at, datetime.now(timezone.utc), "error")
+    finally:
+        db.close()
+
+
 def _get_working_access_token(db, service: SpotifyService, users: list) -> str | None:
     for user in users:
         try:
