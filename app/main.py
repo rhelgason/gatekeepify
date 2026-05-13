@@ -15,7 +15,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings, validate_settings
 from app.database import Base, SessionLocal, engine
-from app.routers import auth, backfill, friends, gatekeep, search, stats
+from app.routers import auth, awards, backfill, friends, gatekeep, search, stats
 from app.routers.auth import get_current_user
 from app.services.audit import log_action
 
@@ -66,6 +66,7 @@ app.include_router(backfill.router)
 app.include_router(friends.router)
 app.include_router(gatekeep.router)
 app.include_router(search.router)
+app.include_router(awards.router)
 
 
 def _error_response(status_code: int, error: str, detail: str) -> JSONResponse:
@@ -184,5 +185,12 @@ def trigger_backfill(user: "User" = Depends(get_current_user)):
     from app.tasks import backfill_track_metadata
     backfill_track_metadata.delay()
     return {"status": "triggered", "task": "backfill_track_metadata"}
+
+
+@app.post("/admin/trigger-awards")
+def trigger_awards(user: "User" = Depends(get_current_user)):
+    from app.tasks import compute_award_snapshots
+    compute_award_snapshots.delay()
+    return {"status": "triggered", "task": "compute_award_snapshots"}
 
 

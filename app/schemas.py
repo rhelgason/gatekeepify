@@ -220,3 +220,48 @@ class ChallengeResponse(BaseModel):
     artist_name: Optional[str] = None
     your_first_listen: datetime
     your_total_listens: int
+
+
+# --- Awards / Trophies ---
+
+
+class AwardEntry(BaseModel):
+    award_id: str
+    award_name: str
+    description: str
+    rank: int
+    stat_value: Optional[float] = None
+    stat_detail: Optional[str] = None
+    entity_id: Optional[str] = None
+    entity_name: Optional[str] = None
+    held: bool
+    tier: str
+
+
+class AwardLeaderboardEntry(BaseModel):
+    user_id: str
+    user_name: Optional[str] = None
+    rank: int
+    stat_value: Optional[float] = None
+    stat_detail: Optional[str] = None
+
+
+class TrophyCaseResponse(BaseModel):
+    user_awards: List[AwardEntry]
+    leaderboards: dict
+    title: Optional[dict] = None
+
+
+class HeadToHeadComparison(BaseModel):
+    award_id: str
+    award_name: str
+    you: Optional[float] = None
+    friend: Optional[float] = None
+    winner: Optional[str] = None
+    label: str
+
+
+class HeadToHeadResponse(BaseModel):
+    you: dict
+    friend: dict
+    comparisons: List[HeadToHeadComparison]

@@ -23,5 +23,9 @@ celery_app.conf.update(
             "task": "app.tasks.backfill_track_metadata",
             "schedule": settings.backfill_interval_seconds,
         },
+        "compute-award-snapshots": {
+            "task": "app.tasks.compute_award_snapshots",
+            "schedule": 21600,
+        },
     },
 )

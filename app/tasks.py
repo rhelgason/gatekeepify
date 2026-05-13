@@ -166,6 +166,78 @@ def backfill_track_metadata():
         db.close()
 
 
+@celery_app.task(name="app.tasks.compute_award_snapshots")
+def compute_award_snapshots():
+    from app.models import AwardSnapshot
+    from app.services.awards import (
+        ALL_COMPUTE_FUNCTIONS,
+        get_friend_group_hash,
+    )
+
+    db = SessionLocal()
+    started_at = datetime.now(timezone.utc)
+    try:
+        users = get_active_users(db)
+        all_users = db.query(User).all()
+        processed_groups = set()
+        total_snapshots = 0
+
+        for u in all_users:
+            friend_ids = [
+                r[0] for r in db.execute(
+                    __import__("sqlalchemy", fromlist=["select"]).select(
+                        __import__("app.models", fromlist=["Friendship"]).Friendship.user_id_2
+                    ).where(
+                        __import__("app.models", fromlist=["Friendship"]).Friendship.user_id_1 == u.user_id
+                    )
+                ).all()
+            ]
+            if not friend_ids:
+                continue
+
+            group_ids = sorted([u.user_id] + friend_ids)
+            group_hash = get_friend_group_hash(group_ids)
+
+            if group_hash in processed_groups:
+                continue
+            processed_groups.add(group_hash)
+
+            cached_awards = {"archaeologist", "patient_zero", "completionist", "genre_snob", "time_traveler", "streak", "hypebeast"}
+            for award_id in cached_awards:
+                fn = ALL_COMPUTE_FUNCTIONS.get(award_id)
+                if not fn:
+                    continue
+                try:
+                    results = fn(db, group_ids)
+                    for entry in results:
+                        db.merge(AwardSnapshot(
+                            user_id=entry["user_id"],
+                            friend_group_hash=group_hash,
+                            award_id=award_id,
+                            rank=entry["rank"],
+                            stat_value=entry.get("stat_value"),
+                            stat_detail=entry.get("stat_detail"),
+                            entity_id=entry.get("entity_id"),
+                            entity_name=entry.get("entity_name"),
+                            computed_at=datetime.now(timezone.utc),
+                        ))
+                        total_snapshots += 1
+                except Exception as e:
+                    logger.warning(f"Failed to compute {award_id}: {e}")
+                    db.rollback()
+
+            db.commit()
+
+        log_job_run(db, "compute_award_snapshots", None, started_at, datetime.now(timezone.utc), "success", total_snapshots)
+        logger.info(f"Computed {total_snapshots} award snapshots across {len(processed_groups)} groups")
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Failed to compute award snapshots: {e}")
+        log_job_run(db, "compute_award_snapshots", None, started_at, datetime.now(timezone.utc), "error")
+    finally:
+        db.close()
+
+
 def _get_working_access_token(db, service: SpotifyService, users: list) -> str | None:
     for user in users:
         try:

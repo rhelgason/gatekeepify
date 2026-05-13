@@ -6,6 +6,7 @@ from sqlalchemy import (
     Boolean,
     Date,
     DateTime,
+    Float,
     ForeignKey,
     Index,
     Integer,
@@ -168,6 +169,28 @@ class AuditLog(Base):
     __table_args__ = (
         Index("ix_audit_user_ts", "user_id", "ts"),
         Index("ix_audit_action_ts", "action", "ts"),
+    )
+
+
+class AwardSnapshot(Base):
+    __tablename__ = "award_snapshots"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[str] = mapped_column(
+        String(255), ForeignKey("dim_all_users.user_id")
+    )
+    friend_group_hash: Mapped[str] = mapped_column(String(64))
+    award_id: Mapped[str] = mapped_column(String(50))
+    rank: Mapped[int] = mapped_column(Integer)
+    stat_value: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    stat_detail: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    entity_id: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    entity_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    computed_at: Mapped[datetime] = mapped_column(DateTime)
+
+    __table_args__ = (
+        Index("ix_award_user_group", "user_id", "friend_group_hash"),
+        Index("ix_award_group_award", "friend_group_hash", "award_id"),
     )
 
 
