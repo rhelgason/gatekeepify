@@ -68,6 +68,7 @@ def _get_top_tracks(
             Track.track_id,
             Track.track_name,
             Album.album_name,
+            Track.image_url,
             Track.duration_ms,
             func.count().label("listen_count"),
         )
@@ -79,6 +80,7 @@ def _get_top_tracks(
             Track.track_id,
             Track.track_name,
             Album.album_name,
+            Track.image_url,
             Track.duration_ms,
         )
         .order_by(func.count().desc())
@@ -94,6 +96,7 @@ def _get_top_tracks(
             track_id=row.track_id,
             track_name=row.track_name,
             album_name=row.album_name,
+            image_url=row.image_url,
             listen_count=row.listen_count,
             total_minutes=_ms_to_minutes(
                 (row.duration_ms or 0) * row.listen_count
@@ -110,6 +113,7 @@ def _get_top_artists(
         select(
             Artist.artist_id,
             Artist.artist_name,
+            Artist.image_url,
             func.count().label("listen_count"),
             func.sum(Track.duration_ms).label("total_ms"),
         )
@@ -118,7 +122,7 @@ def _get_top_artists(
         .join(Artist, TrackArtist.artist_id == Artist.artist_id)
         .join(Track, Listen.track_id == Track.track_id)
         .where(Listen.user_id == user_id)
-        .group_by(Artist.artist_id, Artist.artist_name)
+        .group_by(Artist.artist_id, Artist.artist_name, Artist.image_url)
         .order_by(func.count().desc())
         .limit(limit)
         .offset(offset)
@@ -143,6 +147,7 @@ def _get_top_artists(
             rank=offset + i + 1,
             artist_id=row.artist_id,
             artist_name=row.artist_name,
+            image_url=row.image_url,
             genres=genres_by_artist.get(row.artist_id, []),
             listen_count=row.listen_count,
             total_minutes=_ms_to_minutes(row.total_ms),

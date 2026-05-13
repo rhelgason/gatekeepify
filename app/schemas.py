@@ -47,6 +47,7 @@ class TopTrackEntry(BaseModel):
     track_id: str
     track_name: Optional[str] = None
     album_name: Optional[str] = None
+    image_url: Optional[str] = None
     listen_count: int
     total_minutes: int
 
@@ -55,6 +56,7 @@ class TopArtistEntry(BaseModel):
     rank: int
     artist_id: str
     artist_name: Optional[str] = None
+    image_url: Optional[str] = None
     genres: List[str] = []
     listen_count: int
     total_minutes: int
