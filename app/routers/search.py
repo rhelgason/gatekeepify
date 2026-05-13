@@ -147,6 +147,9 @@ def search_tracks(
         details={"query": q, "results": len(rows)},
     )
 
+    log_action(db, "search.tracks", user_id=user.user_id,
+               details={"query": q, "results": len(rows)})
+
     return [
         TrackSearchResult(
             track_id=row.track_id,
@@ -188,6 +191,9 @@ def get_artist_detail(
     )
     row = db.execute(stats_stmt).first()
 
+    log_action(db, "search.artist_detail_viewed", user_id=user.user_id,
+               entity_type="artist", entity_id=artist_id)
+
     return ArtistDetailResponse(
         artist_id=artist.artist_id,
         artist_name=artist.artist_name,
@@ -223,6 +229,9 @@ def get_track_detail(
         .where(Listen.track_id == track_id, Listen.user_id == user.user_id)
     )
     row = db.execute(stats_stmt).first()
+
+    log_action(db, "search.track_detail_viewed", user_id=user.user_id,
+               entity_type="track", entity_id=track_id)
 
     return TrackDetailResponse(
         track_id=track.track_id,
@@ -337,6 +346,8 @@ def search_spotify_artists(
                 "spotify_followers": a.get("followers", {}).get("total", 0),
             })
         db.commit()
+        log_action(db, "search.spotify_artists", user_id=user.user_id,
+                   details={"query": q, "results": len(output)})
         return output
 
     except Exception as e:

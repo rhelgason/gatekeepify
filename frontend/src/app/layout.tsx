@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import Navbar from "@/components/Navbar";
+import PageTracker from "@/components/PageTracker";
 
 export const metadata: Metadata = {
   title: "Gatekeepify",
@@ -16,6 +17,7 @@ export default function RootLayout({
     <html lang="en">
       <body>
         <Navbar />
+        <PageTracker />
         <main className="mx-auto max-w-6xl px-6 py-8">{children}</main>
       </body>
     </html>

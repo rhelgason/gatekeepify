@@ -45,6 +45,8 @@ def list_friends(
         .offset(offset)
     )
     rows = db.execute(stmt).all()
+    log_action(db, "friends.list_viewed", user_id=user.user_id,
+               details={"count": len(rows)})
     return [
         FriendResponse(
             user_id=row[0],
@@ -203,6 +205,8 @@ def search_users(
         .limit(10)
     ).all()
 
+    log_action(db, "friends.search_users", user_id=user.user_id,
+               details={"query": q, "results": len(users)})
     return [
         {
             "user_id": u.user_id,
@@ -275,6 +279,8 @@ def get_pending_requests(
         .order_by(FriendInvite.created_at.desc())
     ).all()
 
+    log_action(db, "friends.requests_viewed", user_id=user.user_id,
+               details={"pending_count": len(incoming)})
     return [
         {
             "id": r.id,

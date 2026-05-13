@@ -14,7 +14,7 @@ from sqlalchemy import text
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings, validate_settings
-from app.database import Base, SessionLocal, engine
+from app.database import Base, SessionLocal, engine, get_db
 from app.routers import auth, awards, backfill, discover, friends, gatekeep, search, stats
 from app.routers.auth import get_current_user
 from app.services.audit import log_action
@@ -193,5 +193,24 @@ def trigger_awards(user: "User" = Depends(get_current_user)):
     from app.tasks import compute_award_snapshots
     compute_award_snapshots.delay()
     return {"status": "triggered", "task": "compute_award_snapshots"}
+
+
+@app.post("/track-event")
+def track_event(
+    event: dict,
+    user: "User" = Depends(get_current_user),
+    db: "Session" = Depends(get_db),
+):
+    from app.services.audit import log_action
+    action = event.get("action", "frontend.unknown")
+    log_action(
+        db,
+        f"frontend.{action}",
+        user_id=user.user_id,
+        entity_type=event.get("entity_type"),
+        entity_id=event.get("entity_id"),
+        details=event.get("details"),
+    )
+    return {"status": "ok"}
 
 
