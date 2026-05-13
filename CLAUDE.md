@@ -138,9 +138,37 @@ Copy `.env.example` to `.env`. Required values:
 
 14. **Rotate Spotify credentials** -- after confirming production works, go to the Spotify Developer Dashboard and regenerate the client secret. Update the Railway env var. Delete `src/host_constants.py`, `src/.cache`, and `.cache` from the repo.
 
-### Post-deployment: next code work
+### Phase 4: Frontend ✅ BUILT (needs deployment)
 
-- **Frontend (Phase 4)** -- Next.js web app. The backend API is fully ready. Key pages: landing, dashboard, upload, friends, `/gatekeep/[artistId]` (the product page), leaderboard.
+Next.js app in `frontend/`. Deployed separately on Vercel (free).
+
+**Setup checklist for Vercel:**
+1. Push repo to GitHub (frontend/ is inside the same repo)
+2. Sign up at vercel.com, connect GitHub
+3. Import the repo, set **Root Directory** to `frontend`
+4. Add environment variable: `NEXT_PUBLIC_API_URL=https://gatekeepify-production.up.railway.app`
+5. Deploy
+6. Copy the Vercel domain (e.g., `gatekeepify.vercel.app`)
+7. In Railway, add env var: `FRONTEND_URL=https://gatekeepify.vercel.app`
+8. In Spotify Developer Dashboard, add `https://gatekeepify.vercel.app/auth/callback` as a redirect URI (keep the Railway one too)
+9. Redeploy Railway so it picks up `FRONTEND_URL`
+
+**Frontend key files:**
+- `frontend/src/lib/api.ts` -- API client, auto-injects Bearer token, redirects to `/` on 401
+- `frontend/src/lib/auth.ts` -- JWT storage in localStorage
+- `frontend/src/app/page.tsx` -- Landing page with Spotify sign-in
+- `frontend/src/app/auth/callback/page.tsx` -- Receives JWT from backend redirect, stores it
+- `frontend/src/app/dashboard/page.tsx` -- Top tracks/artists/genres with period selector
+- `frontend/src/app/gatekeep/page.tsx` -- Search artists, compare first-listen dates, challenge friends
+- `frontend/src/app/leaderboard/page.tsx` -- Crown rankings among friends
+- `frontend/src/app/friends/page.tsx` -- Invite generation, invite acceptance, friend list
+- `frontend/src/app/upload/page.tsx` -- Drag-and-drop ZIP upload with results display
+- `frontend/src/components/Navbar.tsx` -- Navigation bar (only shows when logged in)
+
+**Backend changes for frontend support:**
+- `FRONTEND_URL` env var -- when set, OAuth callback redirects to frontend instead of returning JSON
+- CORS middleware -- allows frontend domain to call the API
+- Both changes are backward-compatible (Swagger UI still works when `FRONTEND_URL` is not set)
 
 ## Implementation Phases
 

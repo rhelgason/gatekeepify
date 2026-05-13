@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import RedirectResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import jwt
 from sqlalchemy.orm import Session
@@ -102,6 +103,12 @@ def callback(code: str = Query(...), db: Session = Depends(get_db)):
     )
 
     token = create_jwt(user_id)
+
+    if settings.frontend_url:
+        return RedirectResponse(
+            url=f"{settings.frontend_url}/auth/callback?token={token}"
+        )
+
     return AuthResponse(
         access_token=token,
         user=UserResponse(

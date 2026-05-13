@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     jwt_expiration_hours: int = 24 * 7
     encryption_key: str = ""
     redis_url: str = "redis://localhost:6379/0"
+    frontend_url: str = ""
     poll_interval_seconds: int = 900
     backfill_interval_seconds: int = 120
 

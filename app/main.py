@@ -11,7 +11,9 @@ from spotipy.oauth2 import SpotifyOauthError
 
 from sqlalchemy import text
 
-from app.config import validate_settings
+from fastapi.middleware.cors import CORSMiddleware
+
+from app.config import settings, validate_settings
 from app.database import Base, SessionLocal, engine
 from app.routers import auth, backfill, friends, gatekeep, search, stats
 from app.services.audit import log_action
@@ -30,6 +32,14 @@ app = FastAPI(
     title="Gatekeepify",
     description="Prove you listened first.",
     version="0.1.0",
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[settings.frontend_url] if settings.frontend_url else ["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 app.include_router(auth.router)
