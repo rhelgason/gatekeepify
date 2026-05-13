@@ -11,10 +11,6 @@ export default function Discover() {
   const [freshFinds, setFreshFinds] = useState<any[]>([]);
   const [lateOn, setLateOn] = useState<any[]>([]);
   const [rising, setRising] = useState<any[]>([]);
-  const [feed, setFeed] = useState<any[]>([]);
-  const [feedDays, setFeedDays] = useState(7);
-  const [feedLoading, setFeedLoading] = useState(false);
-  const [feedHasMore, setFeedHasMore] = useState(true);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -23,12 +19,10 @@ export default function Discover() {
       return;
     }
     Promise.all([
-      api.getActivityFeed().catch(() => []),
       api.getFriendsFreshFinds().catch(() => []),
       api.getYoureLateOn().catch(() => []),
       api.getRisingArtists().catch(() => []),
-    ]).then(([f, ff, lo, r]) => {
-      setFeed(f);
+    ]).then(([ff, lo, r]) => {
       setFreshFinds(ff);
       setLateOn(lo);
       setRising(r);
@@ -44,7 +38,7 @@ export default function Discover() {
     );
   }
 
-  const isEmpty = feed.length === 0 && freshFinds.length === 0 && lateOn.length === 0 && rising.length === 0;
+  const isEmpty = freshFinds.length === 0 && lateOn.length === 0 && rising.length === 0;
 
   return (
     <div className="animate-fade-in">
@@ -63,63 +57,6 @@ export default function Discover() {
         </div>
       ) : (
         <>
-          {/* Activity Feed */}
-          {feed.length > 0 && (
-            <section className="mb-10">
-              <div className="flex items-center gap-3 mb-4">
-                <span className="text-2xl">📢</span>
-                <div>
-                  <h2 className="text-lg font-black text-white">What&apos;s Happening</h2>
-                  <p className="text-gray-600 text-xs">Recent activity from your circle</p>
-                </div>
-              </div>
-              <div className="space-y-3">
-                {feed.map((event, i) => (
-                  <Link
-                    key={`${event.type}-${event.user_id}-${event.ts}-${i}`}
-                    href={event.artist_id ? `/artist/${event.artist_id}` : "/discover"}
-                    className="card-hover p-4 block animate-slide-up"
-                    style={{ animationDelay: `${i * 0.05}s` }}
-                  >
-                    <div className="flex items-start gap-3">
-                      <span className="text-xl flex-shrink-0 mt-0.5">{event.emoji}</span>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm text-gray-200 leading-relaxed">
-                          {event.message}
-                        </p>
-                        <div className="flex items-center gap-3 mt-2">
-                          <span className="text-xs text-gray-600">
-                            {new Date(event.ts).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
-                          </span>
-                          {event.stat && (
-                            <span className="text-xs text-gray-500">{event.stat}</span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </Link>
-                ))}
-              </div>
-              {feedHasMore && (
-                <button
-                  onClick={async () => {
-                    setFeedLoading(true);
-                    const newDays = feedDays + 14;
-                    const more = await api.getActivityFeed(50, newDays).catch(() => []);
-                    setFeed(more);
-                    setFeedDays(newDays);
-                    setFeedHasMore(more.length > feed.length);
-                    setFeedLoading(false);
-                  }}
-                  disabled={feedLoading}
-                  className="btn-secondary w-full mt-4 text-sm"
-                >
-                  {feedLoading ? "Loading..." : "Load more"}
-                </button>
-              )}
-            </section>
-          )}
-
           {/* You're Late On */}
           {lateOn.length > 0 && (
             <section className="mb-10">

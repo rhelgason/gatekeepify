@@ -26,8 +26,9 @@ export default function Navbar() {
 
   const links = [
     { href: "/dashboard", label: "Stats" },
-    { href: "/wrapped", label: "Wrapped" },
+    { href: "/feed", label: "Feed" },
     { href: "/discover", label: "Discover" },
+    { href: "/wrapped", label: "Wrapped" },
     { href: "/gatekeep", label: "Gatekeep" },
     { href: "/trophies", label: "Trophies" },
     { href: "/friends", label: "Friends", badge: pendingCount },
