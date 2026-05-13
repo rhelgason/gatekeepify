@@ -1,14 +1,25 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { clearToken, isLoggedIn } from "@/lib/auth";
+import { api } from "@/lib/api";
 
 export default function Navbar() {
   const pathname = usePathname();
   const loggedIn = isLoggedIn();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [pendingCount, setPendingCount] = useState(0);
+
+  useEffect(() => {
+    if (!loggedIn) return;
+    api.getPendingRequests().then(r => setPendingCount(r.length)).catch(() => {});
+    const interval = setInterval(() => {
+      api.getPendingRequests().then(r => setPendingCount(r.length)).catch(() => {});
+    }, 60000);
+    return () => clearInterval(interval);
+  }, [loggedIn]);
 
   if (!loggedIn) return null;
 
@@ -17,7 +28,7 @@ export default function Navbar() {
     { href: "/wrapped", label: "Wrapped" },
     { href: "/gatekeep", label: "Gatekeep" },
     { href: "/leaderboard", label: "Crowns" },
-    { href: "/friends", label: "Friends" },
+    { href: "/friends", label: "Friends", badge: pendingCount },
     { href: "/upload", label: "Upload" },
   ];
 
@@ -34,13 +45,18 @@ export default function Navbar() {
             <Link
               key={link.href}
               href={link.href}
-              className={`text-sm px-4 py-2 rounded-full transition-all duration-200 ${
+              className={`relative text-sm px-4 py-2 rounded-full transition-all duration-200 ${
                 pathname.startsWith(link.href)
                   ? "bg-white/10 text-white font-medium"
                   : "text-gray-500 hover:text-white hover:bg-white/5"
               }`}
             >
               {link.label}
+              {link.badge > 0 && (
+                <span className="absolute -top-1 -right-1 w-4 h-4 bg-[var(--green)] rounded-full text-[10px] font-bold text-black flex items-center justify-center">
+                  {link.badge}
+                </span>
+              )}
             </Link>
           ))}
           <button
@@ -78,13 +94,18 @@ export default function Navbar() {
                 key={link.href}
                 href={link.href}
                 onClick={() => setMobileOpen(false)}
-                className={`block px-4 py-3 rounded-xl text-sm transition-all ${
+                className={`flex items-center justify-between px-4 py-3 rounded-xl text-sm transition-all ${
                   pathname.startsWith(link.href)
                     ? "bg-white/10 text-white font-medium"
                     : "text-gray-400 hover:text-white hover:bg-white/5"
                 }`}
               >
                 {link.label}
+                {link.badge > 0 && (
+                  <span className="w-5 h-5 bg-[var(--green)] rounded-full text-[10px] font-bold text-black flex items-center justify-center">
+                    {link.badge}
+                  </span>
+                )}
               </Link>
             ))}
             <button
