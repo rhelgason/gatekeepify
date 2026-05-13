@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { clearToken, isLoggedIn } from "@/lib/auth";
@@ -11,7 +11,9 @@ export default function Navbar() {
   const pathname = usePathname();
   const loggedIn = isLoggedIn();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const [pendingCount, setPendingCount] = useState(0);
+  const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!loggedIn) return;
@@ -22,18 +24,32 @@ export default function Navbar() {
     return () => clearInterval(interval);
   }, [loggedIn]);
 
+  useEffect(() => {
+    if (!menuOpen) return;
+    function handleClick(e: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [menuOpen]);
+
   if (!loggedIn) return null;
 
   const links = [
-    { href: "/dashboard", label: "Stats" },
+    { href: "/dashboard", label: "Home" },
     { href: "/feed", label: "Feed" },
-    { href: "/discover", label: "Discover" },
-    { href: "/wrapped", label: "Wrapped" },
     { href: "/gatekeep", label: "Gatekeep" },
     { href: "/trophies", label: "Trophies" },
     { href: "/friends", label: "Friends", badge: pendingCount },
-    { href: "/upload", label: "Upload" },
   ];
+
+  const handleSignOut = () => {
+    trackEvent("sign_out");
+    clearToken();
+    window.location.href = "/";
+  };
 
   return (
     <nav className="sticky top-0 z-50 backdrop-blur-xl bg-[#0a0a0a]/80 border-b border-white/5">
@@ -62,15 +78,47 @@ export default function Navbar() {
               )}
             </Link>
           ))}
-          <button
-            onClick={() => {
-              trackEvent("sign_out"); clearToken();
-              window.location.href = "/";
-            }}
-            className="text-sm text-gray-600 hover:text-red-400 ml-2 px-3 py-2 rounded-full transition-all duration-200"
-          >
-            Sign Out
-          </button>
+
+          {/* User menu */}
+          <div className="relative ml-2" ref={menuRef}>
+            <button
+              onClick={() => setMenuOpen(!menuOpen)}
+              className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-gray-400 hover:text-white hover:bg-white/15 transition-all duration-200"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                <circle cx="12" cy="7" r="4" />
+              </svg>
+            </button>
+            {menuOpen && (
+              <div className="absolute right-0 mt-2 w-48 rounded-xl border border-white/10 bg-[#141414] shadow-xl overflow-hidden animate-fade-in">
+                <Link
+                  href="/upload"
+                  onClick={() => setMenuOpen(false)}
+                  className="flex items-center gap-3 px-4 py-3 text-sm text-gray-400 hover:text-white hover:bg-white/5 transition-all"
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                    <polyline points="17 8 12 3 7 8" />
+                    <line x1="12" y1="3" x2="12" y2="15" />
+                  </svg>
+                  Upload Data
+                </Link>
+                <div className="border-t border-white/5" />
+                <button
+                  onClick={handleSignOut}
+                  className="flex items-center gap-3 w-full px-4 py-3 text-sm text-gray-600 hover:text-red-400 transition-all"
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                    <polyline points="16 17 21 12 16 7" />
+                    <line x1="21" y1="12" x2="9" y2="12" />
+                  </svg>
+                  Sign Out
+                </button>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Mobile hamburger */}
@@ -111,10 +159,18 @@ export default function Navbar() {
                 )}
               </Link>
             ))}
+            <div className="border-t border-white/5 my-2" />
+            <Link
+              href="/upload"
+              onClick={() => setMobileOpen(false)}
+              className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm text-gray-400 hover:text-white hover:bg-white/5 transition-all"
+            >
+              Upload Data
+            </Link>
             <button
               onClick={() => {
-                trackEvent("sign_out"); clearToken();
-                window.location.href = "/";
+                setMobileOpen(false);
+                handleSignOut();
               }}
               className="block w-full text-left px-4 py-3 rounded-xl text-sm text-gray-600 hover:text-red-400 transition-all"
             >
