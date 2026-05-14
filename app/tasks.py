@@ -352,6 +352,17 @@ def process_backfill_upload(job_id: int, user_id: str, encoded_content: str):
         batch_size = 500
         for i in range(0, len(accepted), batch_size):
             batch = accepted[i:i + batch_size]
+            seen_tracks = set()
+            for listen, track_name in batch:
+                if listen.track_id not in seen_tracks:
+                    seen_tracks.add(listen.track_id)
+                    existing_track = (
+                        db.query(Track).filter(Track.track_id == listen.track_id).first()
+                    )
+                    if not existing_track:
+                        db.merge(Track(track_id=listen.track_id, track_name=track_name))
+            db.flush()
+
             for listen, track_name in batch:
                 from sqlalchemy import select as sa_select
                 existing = db.execute(
@@ -363,13 +374,6 @@ def process_backfill_upload(job_id: int, user_id: str, encoded_content: str):
                 ).first()
                 if existing:
                     continue
-
-                existing_track = (
-                    db.query(Track).filter(Track.track_id == listen.track_id).first()
-                )
-                if not existing_track:
-                    db.merge(Track(track_id=listen.track_id, track_name=track_name))
-
                 db.add(listen)
                 inserted += 1
             db.commit()
