@@ -25,6 +25,7 @@ export default function Upload() {
   const [job, setJob] = useState<any>(null);
   const [status, setStatus] = useState<any>(null);
   const [error, setError] = useState("");
+  const [checkingJob, setCheckingJob] = useState(true);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
@@ -40,7 +41,7 @@ export default function Upload() {
       } else if (j.status === "completed" || j.status === "error") {
         setJob(j);
       }
-    }).catch(() => {});
+    }).catch(() => {}).finally(() => setCheckingJob(false));
 
     return () => {
       if (pollRef.current) clearInterval(pollRef.current);
@@ -128,7 +129,12 @@ export default function Upload() {
         </ol>
       </div>
 
-      {!isProcessing && (
+      {checkingJob ? (
+        <div className="card p-16 text-center">
+          <div className="h-8 w-8 mx-auto bg-white/5 rounded animate-pulse mb-3" />
+          <div className="h-4 w-48 mx-auto bg-white/5 rounded animate-pulse" />
+        </div>
+      ) : !isProcessing && (
         <div
           onDragOver={(e) => {
             e.preventDefault();
@@ -153,7 +159,8 @@ export default function Upload() {
           {uploading ? (
             <div>
               <div className="text-3xl mb-3 animate-pulse">📦</div>
-              <p className="text-gray-400">Uploading file...</p>
+              <p className="text-gray-400">Uploading file to server...</p>
+              <p className="text-orange-400 text-xs mt-2">Do not navigate away until upload completes.</p>
             </div>
           ) : (
             <div>
