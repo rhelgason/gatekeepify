@@ -98,6 +98,7 @@ class User(Base):
     )
     created_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     last_poll_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    token_invalidated_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
 
 
 class Listen(Base):

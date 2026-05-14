@@ -43,6 +43,7 @@ try:
     _add_column_if_missing(engine, "dim_all_tracks", "image_url", "VARCHAR(512)")
     _add_column_if_missing(engine, "dim_all_artists", "image_url", "VARCHAR(512)")
     _add_column_if_missing(engine, "friend_invites", "to_user_id", "VARCHAR(255)")
+    _add_column_if_missing(engine, "dim_all_users", "token_invalidated_at", "TIMESTAMP")
 except Exception as e:
     logger.warning(f"Column migration skipped: {e}")
 
@@ -228,5 +229,38 @@ def trust_score(
     log_action(db, "admin.trust_score", user_id=user.user_id,
                details={"target_user_id": uid})
     return analyze_user_export(db, uid)
+
+
+@app.post("/admin/force-logout-all")
+def force_logout_all(
+    user: "User" = Depends(get_current_user),
+    db: "Session" = Depends(get_db),
+):
+    from datetime import datetime, timezone
+    from app.models import User as UserModel
+    now = datetime.now(timezone.utc)
+    db.query(UserModel).update({"token_invalidated_at": now})
+    db.commit()
+    log_action(db, "admin.force_logout_all", user_id=user.user_id)
+    return {"status": "all_tokens_invalidated", "invalidated_at": now.isoformat()}
+
+
+@app.post("/admin/force-logout/{target_user_id}")
+def force_logout_user(
+    target_user_id: str,
+    user: "User" = Depends(get_current_user),
+    db: "Session" = Depends(get_db),
+):
+    from datetime import datetime, timezone
+    from app.models import User as UserModel
+    now = datetime.now(timezone.utc)
+    target = db.query(UserModel).filter(UserModel.user_id == target_user_id).first()
+    if not target:
+        raise HTTPException(status_code=404, detail="User not found")
+    target.token_invalidated_at = now
+    db.commit()
+    log_action(db, "admin.force_logout_user", user_id=user.user_id,
+               details={"target_user_id": target_user_id})
+    return {"status": "token_invalidated", "target_user_id": target_user_id, "invalidated_at": now.isoformat()}
 
 

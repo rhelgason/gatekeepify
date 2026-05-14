@@ -51,6 +51,10 @@ def get_current_user(
     user = db.query(User).filter(User.user_id == user_id).first()
     if not user:
         raise HTTPException(status_code=401, detail="User not found")
+    if user.token_invalidated_at:
+        iat = payload.get("iat")
+        if iat and datetime.fromtimestamp(iat, tz=timezone.utc) < user.token_invalidated_at.replace(tzinfo=timezone.utc):
+            raise HTTPException(status_code=401, detail="Token has been revoked")
     return user
 
 
