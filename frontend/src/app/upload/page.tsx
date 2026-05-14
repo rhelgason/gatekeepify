@@ -188,78 +188,11 @@ export default function Upload() {
 
       {error && <p className="text-red-400 mt-4">{error}</p>}
 
-      {isProcessing && (
-        <div className="card mt-6 p-6 animate-slide-up">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="text-2xl animate-pulse">⚙️</div>
-            <div>
-              <h2 className="font-bold text-lg">Processing your data...</h2>
-              <p className="text-gray-500 text-sm">You can navigate away — this runs in the background.</p>
-            </div>
-          </div>
-          <div className="w-full bg-white/5 rounded-full h-3 mb-3 overflow-hidden">
-            <div
-              className="h-full bg-[var(--green)] rounded-full transition-all duration-500"
-              style={{ width: `${job.progress || 0}%` }}
-            />
-          </div>
-          <div className="flex justify-between text-xs text-gray-500">
-            <span>{PHASE_LABELS[job.phase] || job.phase}</span>
-            <span>{job.progress || 0}%</span>
-          </div>
-          {job.total_listens && (
-            <p className="text-xs text-gray-600 mt-2">
-              {job.total_listens.toLocaleString()} listens found
-              {job.inserted != null && ` · ${job.inserted.toLocaleString()} inserted so far`}
-            </p>
-          )}
-        </div>
-      )}
-
-      {isDone && (
-        <div className="card mt-6 p-6 animate-slide-up">
-          <h2 className="font-bold text-[var(--green)] mb-4 text-lg">Upload Complete</h2>
-          <div className="grid grid-cols-3 gap-4 text-center">
-            <div>
-              <div className="stat-number">{(job.total_listens || 0).toLocaleString()}</div>
-              <div className="text-gray-500 text-sm">Processed</div>
-            </div>
-            <div>
-              <div className="stat-number text-[var(--green)]">
-                {(job.accepted || 0).toLocaleString()}
-              </div>
-              <div className="text-gray-500 text-sm">Accepted</div>
-            </div>
-            <div>
-              <div className="stat-number text-red-400">
-                {(job.rejected || 0).toLocaleString()}
-              </div>
-              <div className="text-gray-500 text-sm">Rejected</div>
-            </div>
-          </div>
-          {job.rejection_reasons && Object.keys(job.rejection_reasons).length > 0 && (
-            <div className="mt-4 text-xs text-gray-600 bg-white/5 rounded-xl p-3">
-              Rejections:{" "}
-              {Object.entries(job.rejection_reasons)
-                .map(([k, v]) => `${k}: ${v}`)
-                .join(", ")}
-            </div>
-          )}
-        </div>
-      )}
-
-      {isFailed && (
-        <div className="card mt-6 p-6 animate-slide-up">
-          <h2 className="font-bold text-red-400 mb-2 text-lg">Upload Failed</h2>
-          <p className="text-gray-400 text-sm">{job.error || "An unexpected error occurred. Try uploading again."}</p>
-        </div>
-      )}
-
       <div className="card mt-6 p-6">
         <h2 className="text-sm font-bold uppercase tracking-widest text-gray-500 mb-3">
           Your Data
         </h2>
-        <div className="grid grid-cols-3 gap-4 text-center">
+        <div className="grid grid-cols-3 gap-4 text-center mb-4">
           {status ? (
             <>
               <div>
@@ -292,6 +225,75 @@ export default function Upload() {
             </>
           )}
         </div>
+
+        {isProcessing && (
+          <div className="border-t border-white/5 pt-4 animate-slide-up">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="text-lg animate-pulse">⚙️</div>
+              <div>
+                <p className="font-bold text-sm">Processing your data...</p>
+                <p className="text-gray-600 text-xs">You can navigate away — this runs in the background.</p>
+              </div>
+            </div>
+            <div className="w-full bg-white/5 rounded-full h-2.5 mb-2 overflow-hidden">
+              <div
+                className="h-full bg-[var(--green)] rounded-full transition-all duration-500"
+                style={{ width: `${job.progress || 0}%` }}
+              />
+            </div>
+            <div className="flex justify-between text-xs text-gray-500">
+              <span>{PHASE_LABELS[job.phase] || job.phase}</span>
+              <span>{job.progress || 0}%</span>
+            </div>
+            {job.total_listens && (
+              <p className="text-xs text-gray-600 mt-1">
+                {job.total_listens.toLocaleString()} listens found
+                {job.inserted != null && ` · ${job.inserted.toLocaleString()} inserted so far`}
+              </p>
+            )}
+          </div>
+        )}
+
+        {isDone && (
+          <div className="border-t border-white/5 pt-4 animate-slide-up">
+            <p className="text-[var(--green)] font-bold text-sm mb-3">Last upload complete</p>
+            <div className="grid grid-cols-3 gap-3 text-center text-xs">
+              <div>
+                <div className="font-bold text-sm">{(job.total_listens || 0).toLocaleString()}</div>
+                <div className="text-gray-600">Processed</div>
+              </div>
+              <div>
+                <div className="font-bold text-sm text-[var(--green)]">{(job.accepted || 0).toLocaleString()}</div>
+                <div className="text-gray-600">Accepted</div>
+              </div>
+              <div>
+                <div className="font-bold text-sm text-red-400">{(job.rejected || 0).toLocaleString()}</div>
+                <div className="text-gray-600">Rejected</div>
+              </div>
+            </div>
+            {job.rejection_reasons && Object.keys(job.rejection_reasons).length > 0 && (
+              <div className="mt-3 text-xs text-gray-600 bg-white/5 rounded-lg p-2">
+                Rejections: {Object.entries(job.rejection_reasons).map(([k, v]) => `${k}: ${v}`).join(", ")}
+              </div>
+            )}
+          </div>
+        )}
+
+        {isFailed && (
+          <div className="border-t border-white/5 pt-4 animate-slide-up">
+            <div className="flex items-center justify-between">
+              <p className="text-red-400 text-sm">
+                Last upload failed: {job.error || "An unexpected error occurred."}
+              </p>
+              <button
+                onClick={() => setJob(null)}
+                className="text-gray-600 hover:text-gray-400 text-xs ml-3 flex-shrink-0"
+              >
+                Dismiss
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
