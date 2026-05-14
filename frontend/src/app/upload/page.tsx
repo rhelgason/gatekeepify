@@ -236,27 +236,44 @@ export default function Upload() {
         </div>
       )}
 
-      {status && (
-        <div className="card mt-6 p-6">
-          <h2 className="text-sm font-bold uppercase tracking-widest text-gray-500 mb-3">
-            Your Data
-          </h2>
-          <div className="grid grid-cols-3 gap-4 text-center">
-            <div>
-              <div className="text-2xl font-black">{status.total_listens.toLocaleString()}</div>
-              <div className="text-gray-600 text-sm">Total Listens</div>
-            </div>
-            <div>
-              <div className="text-2xl font-black">{status.total_tracks.toLocaleString()}</div>
-              <div className="text-gray-600 text-sm">Unique Tracks</div>
-            </div>
-            <div>
-              <div className="text-2xl font-black">{status.tracks_missing_metadata.toLocaleString()}</div>
-              <div className="text-gray-600 text-sm">Awaiting Metadata</div>
-            </div>
-          </div>
+      <div className="card mt-6 p-6">
+        <h2 className="text-sm font-bold uppercase tracking-widest text-gray-500 mb-3">
+          Your Data
+        </h2>
+        <div className="grid grid-cols-3 gap-4 text-center">
+          {status ? (
+            <>
+              <div>
+                <div className="text-2xl font-black">{status.total_listens.toLocaleString()}</div>
+                <div className="text-gray-600 text-sm">Total Listens</div>
+              </div>
+              <div>
+                <div className="text-2xl font-black">{status.total_tracks.toLocaleString()}</div>
+                <div className="text-gray-600 text-sm">Unique Tracks</div>
+              </div>
+              <div>
+                <div className="text-2xl font-black">{status.tracks_missing_metadata.toLocaleString()}</div>
+                <div className="text-gray-600 text-sm">Awaiting Metadata</div>
+              </div>
+            </>
+          ) : (
+            <>
+              <div>
+                <div className="h-8 w-16 mx-auto bg-white/5 rounded animate-pulse" />
+                <div className="text-gray-600 text-sm mt-1">Total Listens</div>
+              </div>
+              <div>
+                <div className="h-8 w-16 mx-auto bg-white/5 rounded animate-pulse" />
+                <div className="text-gray-600 text-sm mt-1">Unique Tracks</div>
+              </div>
+              <div>
+                <div className="h-8 w-16 mx-auto bg-white/5 rounded animate-pulse" />
+                <div className="text-gray-600 text-sm mt-1">Awaiting Metadata</div>
+              </div>
+            </>
+          )}
         </div>
-      )}
+      </div>
     </div>
   );
 }
