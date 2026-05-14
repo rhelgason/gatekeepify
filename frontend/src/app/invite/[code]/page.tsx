@@ -37,6 +37,8 @@ export default function InvitePage() {
         if (e.message.includes("Already friends")) {
           setMessage("You're already friends! Redirecting...");
           setTimeout(() => router.replace("/dashboard"), 2000);
+        } else if (e.message.includes("your own invite")) {
+          setMessage("You're signed in as the person who created this invite. Sign out first, then have your friend open this link on their device.");
         } else {
           setMessage(e.message);
         }
