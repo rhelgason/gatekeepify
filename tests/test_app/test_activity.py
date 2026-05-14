@@ -223,6 +223,37 @@ class TestGenerateActivityFeed:
         crown_events = [e for e in events if e["type"] == "crown_stolen" and e["user_id"] == test_user.user_id]
         assert len(crown_events) <= 4
 
+    def test_track_repeat_detected(self, db, seeded_db, test_user):
+        now = datetime.now(timezone.utc)
+        for i in range(12):
+            db.add(Listen(
+                ts=now - timedelta(hours=i),
+                user_id=test_user.user_id,
+                track_id="track_1",
+                source=ListenSource.api.value,
+            ))
+        db.commit()
+
+        events = generate_activity_feed(db, [test_user.user_id], limit=50, days=7)
+        repeat_events = [e for e in events if e["type"] == "track_repeat"]
+        assert len(repeat_events) >= 1
+        assert "Paranoid Android" in repeat_events[0]["stat"]
+
+    def test_track_repeat_not_triggered_below_threshold(self, db, seeded_db, test_user):
+        now = datetime.now(timezone.utc)
+        for i in range(5):
+            db.add(Listen(
+                ts=now - timedelta(hours=i),
+                user_id=test_user.user_id,
+                track_id="track_3",
+                source=ListenSource.api.value,
+            ))
+        db.commit()
+
+        events = generate_activity_feed(db, [test_user.user_id], limit=50, days=7)
+        repeat_events = [e for e in events if e["type"] == "track_repeat" and "Karma Police" in (e.get("stat") or "")]
+        assert len(repeat_events) == 0
+
     def test_feed_respects_limit(self, db, seeded_db, test_user):
         now = datetime.now(timezone.utc)
         for i in range(100):

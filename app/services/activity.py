@@ -27,6 +27,7 @@ def generate_activity_feed(
         events.extend(_detect_milestones(db, uid))
         events.extend(_detect_late_to_party(db, uid, user_ids, since))
         events.extend(_detect_broken_streaks(db, uid))
+        events.extend(_detect_track_repeats(db, uid, since))
 
     crown_events = _detect_crown_steals(db, user_ids, since)
     for uid in upload_user_ids:
@@ -385,6 +386,46 @@ def _detect_broken_streaks(db: Session, user_id: str) -> List[dict]:
     return []
 
 
+def _detect_track_repeats(db: Session, user_id: str, since: datetime) -> List[dict]:
+    rows = db.execute(
+        select(
+            Listen.track_id,
+            Track.track_name,
+            TrackArtist.artist_id,
+            Artist.artist_name,
+            func.count().label("play_count"),
+            func.max(Listen.ts).label("last_ts"),
+        )
+        .join(Track, Listen.track_id == Track.track_id)
+        .join(TrackArtist, Listen.track_id == TrackArtist.track_id)
+        .join(Artist, TrackArtist.artist_id == Artist.artist_id)
+        .where(Listen.user_id == user_id, Listen.ts >= since, Listen.source == ListenSource.api.value)
+        .group_by(Listen.track_id, Track.track_name, TrackArtist.artist_id, Artist.artist_name)
+        .having(func.count() >= 10)
+    ).all()
+
+    if not rows:
+        return []
+
+    user_name = _get_user_name(db, user_id)
+    events = []
+    for row in rows:
+        ts = row.last_ts if isinstance(row.last_ts, datetime) else datetime.fromisoformat(str(row.last_ts))
+        quip = _track_repeat_quip(user_name, row.track_name, row.artist_name, row.play_count)
+        events.append({
+            "type": "track_repeat",
+            "ts": ts.isoformat(),
+            "user_id": user_id,
+            "user_name": user_name,
+            "artist_id": row.artist_id,
+            "artist_name": row.artist_name,
+            "message": quip,
+            "stat": f"{row.track_name} — {row.play_count} plays",
+            "emoji": "🔂",
+        })
+    return events
+
+
 def _detect_uploads(db: Session, user_id: str, since: datetime) -> List[dict]:
     rows = db.execute(
         select(AuditLog.ts, AuditLog.details)
@@ -614,6 +655,19 @@ def _streak_broken_quip(user: str, streak_days: int) -> str:
         f"{user}'s {streak_days}-day streak just flatlined. The silence is deafening.",
     ]
     return _pick(quips, "streak", user, str(streak_days))
+
+
+def _track_repeat_quip(user: str, track: str, artist: str, count: int) -> str:
+    quips = [
+        f"{user} played \"{track}\" by {artist} {count} times. Someone intervene.",
+        f"\"{track}\" by {artist}, {count} times. {user} is stuck in a loop.",
+        f"{user} has listened to \"{track}\" {count} times this week. This is not healthy.",
+        f"Repeat offender: {user} can't stop playing \"{track}\" by {artist}. {count} plays.",
+        f"{user} put \"{track}\" on repeat and forgot about it. {count} plays and counting.",
+        f"{count} plays of \"{track}\" by {artist}. {user} has memorized every millisecond.",
+        f"{user} and \"{track}\" by {artist} are in a committed relationship. {count} plays.",
+    ]
+    return _pick(quips, "track_repeat", user, track, artist)
 
 
 def _new_user_quip(user: str) -> str:
