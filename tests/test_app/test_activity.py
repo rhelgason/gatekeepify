@@ -64,7 +64,7 @@ class TestGenerateActivityFeed:
         db.add(TrackArtist(track_id="new_tr", artist_id="new_art"))
         db.flush()
 
-        for i in range(15):
+        for i in range(25):
             db.add(Listen(
                 ts=now - timedelta(hours=i),
                 user_id=test_user.user_id,
@@ -92,7 +92,7 @@ class TestGenerateActivityFeed:
             track_id="old_tr",
             source=ListenSource.export.value,
         ))
-        for i in range(15):
+        for i in range(25):
             db.add(Listen(
                 ts=now - timedelta(hours=i),
                 user_id=test_user.user_id,
@@ -102,6 +102,28 @@ class TestGenerateActivityFeed:
         db.commit()
 
         events = generate_activity_feed(db, [test_user.user_id], limit=50, days=7)
+        obsession_events = [e for e in events if e["type"] == "new_obsession"]
+        assert len(obsession_events) == 0
+
+    def test_new_obsession_skipped_for_new_user(self, db):
+        now = datetime.now(timezone.utc)
+        new_user = User(user_id="brand_new", user_name="Brand New", created_at=now - timedelta(hours=1))
+        db.add(new_user)
+        artist = Artist(artist_id="skip_art", artist_name="Skip Artist")
+        track = Track(track_id="skip_tr", track_name="Skip Track", duration_ms=200000)
+        db.add_all([artist, track])
+        db.add(TrackArtist(track_id="skip_tr", artist_id="skip_art"))
+        db.flush()
+        for i in range(25):
+            db.add(Listen(
+                ts=now - timedelta(minutes=i * 5),
+                user_id="brand_new",
+                track_id="skip_tr",
+                source=ListenSource.api.value,
+            ))
+        db.commit()
+
+        events = generate_activity_feed(db, ["brand_new"], limit=50, days=7)
         obsession_events = [e for e in events if e["type"] == "new_obsession"]
         assert len(obsession_events) == 0
 

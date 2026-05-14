@@ -104,6 +104,14 @@ def _detect_binges(db: Session, user_id: str, since: datetime) -> List[dict]:
 
 
 def _detect_new_obsessions(db: Session, user_id: str, since: datetime) -> List[dict]:
+    user_obj = db.query(User).filter(User.user_id == user_id).first()
+    if user_obj and user_obj.created_at:
+        created = user_obj.created_at
+        if created.tzinfo is None:
+            created = created.replace(tzinfo=timezone.utc)
+        if created >= since:
+            return []
+
     rows = db.execute(
         select(Listen.ts, TrackArtist.artist_id, Artist.artist_name)
         .join(TrackArtist, Listen.track_id == TrackArtist.track_id)
@@ -115,8 +123,6 @@ def _detect_new_obsessions(db: Session, user_id: str, since: datetime) -> List[d
     if not rows:
         return []
 
-    # Check against ALL prior listens (both api and export) so we don't
-    # re-trigger for artists the user has historical data for
     prior_artists = set(
         r[0] for r in db.execute(
             select(TrackArtist.artist_id)
@@ -135,7 +141,7 @@ def _detect_new_obsessions(db: Session, user_id: str, since: datetime) -> List[d
 
     events = []
     for artist_id, listens in new_artist_listens.items():
-        if len(listens) >= 10:
+        if len(listens) >= 20:
             artist_name = listens[0].artist_name
             quip = _new_obsession_quip(user_name, artist_name, len(listens))
             events.append({
