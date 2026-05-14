@@ -283,9 +283,51 @@ export default function ArtistPage() {
                   </div>
                 )}
                 {lastfmLoading && (
-                  <div className="card p-8 text-center">
-                    <div className="text-gray-500 animate-pulse">Loading global stats...</div>
-                  </div>
+                  <>
+                    {/* Last.fm stats skeleton */}
+                    <div className="card p-6">
+                      <div className="flex justify-center gap-10 mb-2">
+                        <div className="text-center">
+                          <div className="h-9 w-24 bg-white/5 rounded animate-pulse mx-auto" />
+                          <div className="text-gray-600 text-xs uppercase tracking-wider mt-1">listeners</div>
+                        </div>
+                        <div className="text-center">
+                          <div className="h-9 w-24 bg-white/5 rounded animate-pulse mx-auto" />
+                          <div className="text-gray-600 text-xs uppercase tracking-wider mt-1">total plays</div>
+                        </div>
+                      </div>
+                      <div className="flex gap-2 justify-center mt-4">
+                        {[1, 2, 3].map(n => (
+                          <div key={n} className="h-6 w-16 bg-white/5 rounded-full animate-pulse" />
+                        ))}
+                      </div>
+                      <p className="text-center text-gray-600 text-xs mt-3">Global stats via Last.fm</p>
+                    </div>
+                    {/* Top tracks skeleton */}
+                    <div className="card p-5">
+                      <h3 className="text-xs font-bold uppercase tracking-widest text-gray-500 mb-3">Top Tracks (Global)</h3>
+                      <div className="space-y-2">
+                        {[1, 2, 3, 4, 5].map(n => (
+                          <div key={n} className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                              <div className="h-4 w-5 bg-white/5 rounded animate-pulse" />
+                              <div className="h-4 w-32 bg-white/5 rounded animate-pulse" />
+                            </div>
+                            <div className="h-4 w-16 bg-white/5 rounded animate-pulse" />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    {/* Similar artists skeleton */}
+                    <div className="card p-5">
+                      <h3 className="text-xs font-bold uppercase tracking-widest text-gray-500 mb-3">Similar Artists</h3>
+                      <div className="flex gap-2 flex-wrap">
+                        {[1, 2, 3, 4, 5].map(n => (
+                          <div key={n} className="h-8 w-24 bg-white/5 rounded-full animate-pulse" />
+                        ))}
+                      </div>
+                    </div>
+                  </>
                 )}
                 {!lastfmLoading && d && (
                   <>

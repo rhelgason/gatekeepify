@@ -44,8 +44,51 @@ export default function Trophies() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="text-gray-500 animate-pulse text-lg">Loading trophies...</div>
+      <div className="animate-fade-in max-w-2xl mx-auto">
+        {/* Hero skeleton */}
+        <div className="text-center mb-10">
+          <h1 className="text-3xl font-black mb-2">Trophy Case</h1>
+          <div className="h-4 w-48 bg-white/5 rounded animate-pulse mx-auto mb-3" />
+          <div className="flex items-center justify-center gap-1 mt-3">
+            {Array.from({ length: 12 }).map((_, i) => (
+              <div key={i} className="w-5 h-5 bg-white/5 rounded animate-pulse" />
+            ))}
+          </div>
+          <div className="h-3 w-24 bg-white/5 rounded animate-pulse mx-auto mt-2" />
+        </div>
+        {/* Award tiers skeleton */}
+        <div className="space-y-8">
+          {[1, 2, 3, 4].map(tier => (
+            <section key={tier}>
+              <div className="h-3 w-20 bg-white/5 rounded animate-pulse mb-3" />
+              <div className="space-y-2">
+                {[1, 2, 3].map(award => (
+                  <div key={award} className="card p-4 flex items-center gap-4">
+                    <div className="w-8 h-8 bg-white/5 rounded animate-pulse flex-shrink-0" />
+                    <div className="flex-1 space-y-2">
+                      <div className="h-4 w-28 bg-white/5 rounded animate-pulse" />
+                      <div className="h-3 w-48 bg-white/5 rounded animate-pulse" />
+                    </div>
+                    <div className="h-4 w-6 bg-white/5 rounded animate-pulse" />
+                  </div>
+                ))}
+              </div>
+            </section>
+          ))}
+        </div>
+        {/* Head-to-head skeleton */}
+        <section className="mt-10">
+          <div className="h-3 w-24 bg-white/5 rounded animate-pulse mb-4" />
+          <div className="space-y-2">
+            {[1, 2].map(i => (
+              <div key={i} className="card px-4 py-3 flex items-center gap-3">
+                <div className="w-8 h-8 rounded-full bg-white/5 animate-pulse" />
+                <div className="h-4 w-28 bg-white/5 rounded animate-pulse flex-1" />
+                <div className="h-3 w-16 bg-white/5 rounded animate-pulse" />
+              </div>
+            ))}
+          </div>
+        </section>
       </div>
     );
   }

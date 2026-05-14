@@ -39,8 +39,51 @@ export default function Feed() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="text-gray-500 animate-pulse text-lg">Loading feed...</div>
+      <div className="animate-fade-in">
+        <h1 className="text-3xl font-black mb-2">Feed</h1>
+        <p className="text-gray-500 mb-8">What&apos;s happening in your circle.</p>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          {/* Discover column skeleton */}
+          <div className="space-y-6">
+            <div className="h-4 w-20 bg-white/5 rounded animate-pulse" />
+            {[1, 2, 3].map(section => (
+              <div key={section} className="space-y-3">
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="h-5 w-5 bg-white/5 rounded animate-pulse" />
+                  <div className="h-4 w-32 bg-white/5 rounded animate-pulse" />
+                </div>
+                {[1, 2, 3].map(row => (
+                  <div key={row} className="card p-3 flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-white/5 animate-pulse" />
+                    <div className="flex-1 space-y-2">
+                      <div className="h-4 w-28 bg-white/5 rounded animate-pulse" />
+                      <div className="h-3 w-20 bg-white/5 rounded animate-pulse" />
+                    </div>
+                    <div className="h-4 w-14 bg-white/5 rounded animate-pulse" />
+                  </div>
+                ))}
+              </div>
+            ))}
+          </div>
+          {/* Activity column skeleton */}
+          <div>
+            <div className="h-4 w-16 bg-white/5 rounded animate-pulse mb-6" />
+            <div className="space-y-3 mt-4">
+              {[1, 2, 3, 4, 5].map(i => (
+                <div key={i} className="card p-4 flex items-start gap-3">
+                  <div className="w-6 h-6 bg-white/5 rounded animate-pulse flex-shrink-0 mt-0.5" />
+                  <div className="flex-1 space-y-2">
+                    <div className="h-4 w-full bg-white/5 rounded animate-pulse" />
+                    <div className="flex items-center gap-3">
+                      <div className="h-3 w-16 bg-white/5 rounded animate-pulse" />
+                      <div className="h-3 w-20 bg-white/5 rounded animate-pulse" />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
       </div>
     );
   }

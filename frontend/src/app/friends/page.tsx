@@ -18,6 +18,7 @@ export default function Friends() {
   const [searching, setSearching] = useState(false);
   const [message, setMessage] = useState("");
   const [compatScores, setCompatScores] = useState<Record<string, number>>({});
+  const [compatLoading, setCompatLoading] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -37,10 +38,18 @@ export default function Friends() {
     setPendingRequests(r);
     setLoading(false);
 
+    const loadingInit: Record<string, boolean> = {};
+    for (const friend of f) {
+      loadingInit[friend.user_id] = true;
+    }
+    setCompatLoading(loadingInit);
+
     for (const friend of f) {
       api.getCompatibility(friend.user_id).then(c => {
         setCompatScores(prev => ({ ...prev, [friend.user_id]: c.score }));
-      }).catch(() => {});
+      }).catch(() => {}).finally(() => {
+        setCompatLoading(prev => ({ ...prev, [friend.user_id]: false }));
+      });
     }
   }
 
@@ -245,14 +254,16 @@ export default function Friends() {
                   </span>
                 </div>
               </div>
-              {compatScores[f.user_id] !== undefined && (
+              {compatScores[f.user_id] !== undefined ? (
                 <span className={`text-sm font-bold ${
                   compatScores[f.user_id] >= 70 ? "text-[var(--green)]" :
                   compatScores[f.user_id] >= 40 ? "text-yellow-400" : "text-red-400"
                 }`}>
                   {compatScores[f.user_id]}% match
                 </span>
-              )}
+              ) : compatLoading[f.user_id] ? (
+                <div className="w-12 h-5 bg-white/5 rounded-full animate-pulse" />
+              ) : null}
             </Link>
           ))}
         </div>
