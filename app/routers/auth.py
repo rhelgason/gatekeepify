@@ -65,12 +65,17 @@ def get_admin_user(user: User = Depends(get_current_user)) -> User:
 
 
 @router.get("/login", response_model=AuthUrlResponse)
-def login(return_url: str = Query(None)):
+def login(return_url: str = Query(None), invite_code: str = Query(None)):
+    import base64, json as _json
     service = SpotifyService()
     auth_url = service.get_auth_url()
-    if return_url:
-        import base64
-        state = base64.urlsafe_b64encode(return_url.encode()).decode()
+    if return_url or invite_code:
+        state_data = {}
+        if return_url:
+            state_data["url"] = return_url
+        if invite_code:
+            state_data["invite"] = invite_code
+        state = base64.urlsafe_b64encode(_json.dumps(state_data).encode()).decode()
         auth_url += f"&state={state}"
     return AuthUrlResponse(auth_url=auth_url)
 
@@ -134,24 +139,33 @@ def callback(code: str = Query(...), state: str = Query(None), db: Session = Dep
     token = create_jwt(user_id)
 
     redirect_url = None
+    invite_code = None
     if state:
         try:
-            import base64
+            import base64, json as _json
             decoded = base64.urlsafe_b64decode(state.encode()).decode()
+            try:
+                state_data = _json.loads(decoded)
+                origin = state_data.get("url", "")
+                invite_code = state_data.get("invite")
+            except (_json.JSONDecodeError, AttributeError):
+                origin = decoded
             allowed_origins = {settings.frontend_url}
-            if decoded in allowed_origins or decoded.endswith(".vercel.app"):
-                redirect_url = decoded
+            if origin in allowed_origins or origin.endswith(".vercel.app"):
+                redirect_url = origin
             else:
-                logger.warning(f"Rejected redirect to untrusted origin: {decoded}")
+                logger.warning(f"Rejected redirect to untrusted origin: {origin}")
         except Exception:
             pass
     if not redirect_url:
         redirect_url = settings.frontend_url
 
     if redirect_url:
-        return RedirectResponse(
-            url=f"{redirect_url}/auth/callback?token={token}"
-        )
+        callback_url = f"{redirect_url}/auth/callback?token={token}"
+        if invite_code:
+            from urllib.parse import quote
+            callback_url += f"&invite={quote(invite_code)}"
+        return RedirectResponse(url=callback_url)
 
     return AuthResponse(
         access_token=token,

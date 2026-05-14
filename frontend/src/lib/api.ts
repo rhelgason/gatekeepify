@@ -66,10 +66,13 @@ async function request<T>(
 }
 
 export const api = {
-  getLoginUrl: () => {
+  getLoginUrl: (inviteCode?: string) => {
     const returnUrl = typeof window !== "undefined" ? window.location.origin : "";
-    const params = returnUrl ? `?return_url=${encodeURIComponent(returnUrl)}` : "";
-    return request<{ auth_url: string }>(`/auth/login${params}`);
+    const params = new URLSearchParams();
+    if (returnUrl) params.set("return_url", returnUrl);
+    if (inviteCode) params.set("invite_code", inviteCode);
+    const qs = params.toString();
+    return request<{ auth_url: string }>(`/auth/login${qs ? `?${qs}` : ""}`);
   },
 
   getMe: () => request<{ user_id: string; user_name: string; email: string; created_at: string | null }>(

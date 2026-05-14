@@ -16,7 +16,7 @@ export default function InvitePage() {
   useEffect(() => {
     if (!isLoggedIn()) {
       localStorage.setItem("pending_invite", code);
-      router.replace("/");
+      router.replace(`/?invite=${encodeURIComponent(code)}`);
       return;
     }
     acceptInvite();

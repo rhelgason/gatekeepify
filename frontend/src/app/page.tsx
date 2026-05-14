@@ -1,13 +1,15 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { isLoggedIn } from "@/lib/auth";
 import { trackEvent } from "@/lib/track";
 import { api } from "@/lib/api";
 
-export default function Landing() {
+function LandingContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const inviteCode = searchParams.get("invite");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -20,7 +22,7 @@ export default function Landing() {
     setError("");
     trackEvent("login_clicked");
     try {
-      const { auth_url } = await api.getLoginUrl();
+      const { auth_url } = await api.getLoginUrl(inviteCode || undefined);
       window.location.href = auth_url;
     } catch (e: any) {
       trackEvent("login_error", { error: e.message });
@@ -54,11 +56,28 @@ export default function Landing() {
       >
         {loading ? "Connecting..." : "Sign in with Spotify"}
       </button>
+      {inviteCode && (
+        <p className="text-[var(--green)] text-sm mt-4">
+          You&apos;ve been invited! Sign in to accept.
+        </p>
+      )}
       {error && <p className="text-red-400 text-sm mt-4">{error}</p>}
       <p className="text-gray-700 text-xs mt-8 max-w-sm">
         We only read your listening history. We never post, modify, or share
         anything on your behalf.
       </p>
     </div>
+  );
+}
+
+export default function Landing() {
+  return (
+    <Suspense fallback={
+      <div className="flex flex-col items-center justify-center min-h-[85vh] text-center">
+        <div className="text-gray-500 animate-pulse text-lg">Loading...</div>
+      </div>
+    }>
+      <LandingContent />
+    </Suspense>
   );
 }

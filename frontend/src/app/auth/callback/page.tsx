@@ -14,10 +14,10 @@ function CallbackHandler() {
     if (token) {
       setToken(token);
       trackEvent("login_completed");
-      const pendingInvite = localStorage.getItem("pending_invite");
-      if (pendingInvite) {
+      const invite = searchParams.get("invite") || localStorage.getItem("pending_invite");
+      if (invite) {
         localStorage.removeItem("pending_invite");
-        router.replace(`/invite/${pendingInvite}`);
+        router.replace(`/invite/${invite}`);
       } else {
         router.replace("/dashboard");
       }
