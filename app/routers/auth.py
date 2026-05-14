@@ -66,7 +66,8 @@ def get_admin_user(user: User = Depends(get_current_user)) -> User:
 
 @router.get("/login", response_model=AuthUrlResponse)
 def login(return_url: str = Query(None), invite_code: str = Query(None)):
-    import base64, json as _json
+    import base64
+    import json as _json
     service = SpotifyService()
     auth_url = service.get_auth_url()
     if return_url or invite_code:
@@ -142,7 +143,8 @@ def callback(code: str = Query(...), state: str = Query(None), db: Session = Dep
     invite_code = None
     if state:
         try:
-            import base64, json as _json
+            import base64
+            import json as _json
             decoded = base64.urlsafe_b64decode(state.encode()).decode()
             try:
                 state_data = _json.loads(decoded)

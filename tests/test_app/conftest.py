@@ -180,8 +180,8 @@ def seeded_db(db, test_user):
             source=ListenSource.export.value,
         ),
     ]
-    for l in listens:
-        db.add(l)
+    for listen in listens:
+        db.add(listen)
 
     db.commit()
     return db

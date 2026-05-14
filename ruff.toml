@@ -1,0 +1,13 @@
+line-length = 120
+
+[lint]
+select = ["E", "F", "W"]
+ignore = [
+    "E501",  # line too long (handled by formatter, not strict here)
+    "F401",  # unused import (some are re-exports)
+    "E402",  # module level import not at top of file (lazy imports in functions)
+    "F811",  # redefinition of unused name
+]
+
+[lint.per-file-ignores]
+"tests/*" = ["F811", "E711"]

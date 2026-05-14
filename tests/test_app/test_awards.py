@@ -94,8 +94,8 @@ def award_db(db):
         Listen(ts=datetime(2020, 1, 1, 10), user_id="bob", track_id="t3", source="api"),
         Listen(ts=datetime(2023, 8, 1, 10), user_id="charlie", track_id="t1", source="api"),
     ]
-    for l in listens:
-        db.add(l)
+    for listen in listens:
+        db.add(listen)
     db.commit()
     return db
 

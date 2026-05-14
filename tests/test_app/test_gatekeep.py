@@ -91,8 +91,8 @@ def social_db(db):
         Listen(ts=datetime(2019, 5, 2, 10, 0), user_id="bob", track_id="trk_sk", source=ListenSource.api.value),
         Listen(ts=datetime(2022, 11, 1, 10, 0), user_id="alice", track_id="trk_sk", source=ListenSource.export.value),
     ]
-    for l in listens:
-        db.add(l)
+    for listen in listens:
+        db.add(listen)
 
     db.commit()
     return db

@@ -232,7 +232,7 @@ def compute_award_snapshots():
     db = SessionLocal()
     started_at = datetime.now(timezone.utc)
     try:
-        users = get_active_users(db)
+        get_active_users(db)
         all_users = db.query(User).all()
         processed_groups = set()
         total_snapshots = 0

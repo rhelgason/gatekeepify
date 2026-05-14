@@ -10,12 +10,14 @@ from spotipy.exceptions import SpotifyException
 from spotipy.oauth2 import SpotifyOauthError
 
 from sqlalchemy import text
+from sqlalchemy.orm import Session
 
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings, validate_settings
 from app.database import Base, SessionLocal, engine, get_db
 from app.routers import auth, awards, backfill, discover, friends, gatekeep, search, stats
+from app.models import User
 from app.routers.auth import get_admin_user, get_current_user
 from app.services.audit import log_action
 
@@ -178,7 +180,7 @@ def health():
 
 
 @app.post("/admin/trigger-poll")
-def trigger_poll(user: "User" = Depends(get_admin_user), db: "Session" = Depends(get_db)):
+def trigger_poll(user: User = Depends(get_admin_user), db: Session = Depends(get_db)):
     from app.tasks import poll_recent_listens
     poll_recent_listens.delay()
     log_action(db, "admin.trigger_poll", user_id=user.user_id)
@@ -186,7 +188,7 @@ def trigger_poll(user: "User" = Depends(get_admin_user), db: "Session" = Depends
 
 
 @app.post("/admin/trigger-backfill")
-def trigger_backfill(user: "User" = Depends(get_admin_user), db: "Session" = Depends(get_db)):
+def trigger_backfill(user: User = Depends(get_admin_user), db: Session = Depends(get_db)):
     from app.tasks import backfill_track_metadata
     backfill_track_metadata.delay()
     log_action(db, "admin.trigger_backfill", user_id=user.user_id)
@@ -194,7 +196,7 @@ def trigger_backfill(user: "User" = Depends(get_admin_user), db: "Session" = Dep
 
 
 @app.post("/admin/trigger-awards")
-def trigger_awards(user: "User" = Depends(get_admin_user), db: "Session" = Depends(get_db)):
+def trigger_awards(user: User = Depends(get_admin_user), db: Session = Depends(get_db)):
     from app.tasks import compute_award_snapshots
     compute_award_snapshots.delay()
     log_action(db, "admin.trigger_awards", user_id=user.user_id)
@@ -204,8 +206,8 @@ def trigger_awards(user: "User" = Depends(get_admin_user), db: "Session" = Depen
 @app.post("/track-event")
 def track_event(
     event: dict,
-    user: "User" = Depends(get_current_user),
-    db: "Session" = Depends(get_db),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
 ):
     from app.services.audit import log_action
     action = event.get("action", "frontend.unknown")
@@ -223,8 +225,8 @@ def track_event(
 @app.get("/admin/trust-score")
 def trust_score(
     target_user_id: str = None,
-    user: "User" = Depends(get_admin_user),
-    db: "Session" = Depends(get_db),
+    user: User = Depends(get_admin_user),
+    db: Session = Depends(get_db),
 ):
     from app.services.anomaly import analyze_user_export
     uid = target_user_id or user.user_id
@@ -235,8 +237,8 @@ def trust_score(
 
 @app.post("/admin/force-logout-all")
 def force_logout_all(
-    user: "User" = Depends(get_admin_user),
-    db: "Session" = Depends(get_db),
+    user: User = Depends(get_admin_user),
+    db: Session = Depends(get_db),
 ):
     from datetime import datetime, timezone
     from app.models import User as UserModel
@@ -250,8 +252,8 @@ def force_logout_all(
 @app.post("/admin/force-logout/{target_user_id}")
 def force_logout_user(
     target_user_id: str,
-    user: "User" = Depends(get_admin_user),
-    db: "Session" = Depends(get_db),
+    user: User = Depends(get_admin_user),
+    db: Session = Depends(get_db),
 ):
     from datetime import datetime, timezone
     from app.models import User as UserModel

@@ -77,7 +77,7 @@ class TestAuditFromEndpoints:
             zf.writestr("Streaming_History_Audio_0.json", json.dumps(listens))
         buf.seek(0)
 
-        with patch("app.celery_app.celery_app.send_task") as mock_send:
+        with patch("app.celery_app.celery_app.send_task"):
             client.post(
                 "/backfill/upload",
                 headers=auth_headers,
