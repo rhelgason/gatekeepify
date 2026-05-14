@@ -7,7 +7,7 @@ from typing import List, Optional
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.models import Artist, AuditLog, Listen, ListenSource, Track, TrackArtist
+from app.models import Artist, AuditLog, Friendship, Listen, ListenSource, Track, TrackArtist, User
 
 
 def generate_activity_feed(
@@ -49,6 +49,8 @@ def generate_activity_feed(
             crown_events = [e for e in crown_events if e["user_id"] != uid] + kept
 
     events.extend(crown_events)
+    events.extend(_detect_new_users(db, since))
+    events.extend(_detect_new_friendships(db, user_ids, since))
 
     events.sort(key=lambda e: e["ts"], reverse=True)
     return events[:limit]
@@ -416,8 +418,66 @@ def _detect_uploads(db: Session, user_id: str, since: datetime) -> List[dict]:
     return events
 
 
+def _detect_new_users(db: Session, since: datetime) -> List[dict]:
+    rows = db.execute(
+        select(User.user_id, User.user_name, User.created_at)
+        .where(User.created_at >= since)
+        .order_by(User.created_at.desc())
+    ).all()
+
+    events = []
+    for row in rows:
+        ts = row.created_at if isinstance(row.created_at, datetime) else datetime.fromisoformat(str(row.created_at))
+        name = row.user_name or row.user_id
+        quip = _new_user_quip(name)
+        events.append({
+            "type": "user_joined",
+            "ts": ts.isoformat(),
+            "user_id": row.user_id,
+            "user_name": name,
+            "artist_id": None,
+            "artist_name": None,
+            "message": quip,
+            "stat": None,
+            "emoji": "👋",
+        })
+    return events
+
+
+def _detect_new_friendships(db: Session, user_ids: List[str], since: datetime) -> List[dict]:
+    rows = db.execute(
+        select(Friendship.user_id_1, Friendship.user_id_2, Friendship.created_at)
+        .where(
+            Friendship.created_at >= since,
+            Friendship.user_id_1 < Friendship.user_id_2,
+        )
+        .order_by(Friendship.created_at.desc())
+    ).all()
+
+    events = []
+    user_id_set = set(user_ids)
+    for row in rows:
+        if row.user_id_1 not in user_id_set and row.user_id_2 not in user_id_set:
+            continue
+        ts = row.created_at if isinstance(row.created_at, datetime) else datetime.fromisoformat(str(row.created_at))
+        name1 = _get_user_name(db, row.user_id_1)
+        name2 = _get_user_name(db, row.user_id_2)
+        quip = _friendship_quip(name1, name2)
+        events.append({
+            "type": "new_friendship",
+            "ts": ts.isoformat(),
+            "user_id": row.user_id_1,
+            "user_name": name1,
+            "artist_id": None,
+            "artist_name": None,
+            "message": quip,
+            "stat": None,
+            "emoji": "🤝",
+        })
+    return events
+
+
 def _get_user_name(db: Session, user_id: str) -> str:
-    from app.models import User
     user = db.query(User).filter(User.user_id == user_id).first()
     return user.user_name if user else user_id
 
@@ -529,3 +589,28 @@ def _streak_broken_quip(user: str, streak_days: int) -> str:
         f"{user}'s {streak_days}-day streak just flatlined. The silence is deafening.",
     ]
     return _pick(quips, "streak", user, str(streak_days))
+
+
+def _new_user_quip(user: str) -> str:
+    quips = [
+        f"{user} just joined Gatekeepify. The competition just got stiffer.",
+        f"New challenger approaching: {user} has entered the arena.",
+        f"{user} just signed up. Time to prove your taste is better than theirs.",
+        f"Welcome {user} to the platform. Add them before they gatekeep you.",
+        f"{user} is here. Another person to argue about music with.",
+        f"Fresh blood: {user} just joined. Send that friend request.",
+        f"{user} just showed up. The leaderboard is about to change.",
+    ]
+    return _pick(quips, "joined", user)
+
+
+def _friendship_quip(user1: str, user2: str) -> str:
+    quips = [
+        f"{user1} and {user2} are now friends. The gatekeeping begins.",
+        f"{user1} and {user2} linked up. Crowns are about to be contested.",
+        f"New rivalry unlocked: {user1} vs {user2}.",
+        f"{user1} and {user2} are now comparing listening histories. This should be fun.",
+        f"{user1} added {user2}. Let the judgment commence.",
+        f"{user1} and {user2} are friends now. Someone's about to find out they're basic.",
+    ]
+    return _pick(quips, "friendship", user1, user2)

@@ -213,7 +213,7 @@ export default function Feed() {
                 {feed.map((event, i) => (
                   <Link
                     key={`${event.type}-${event.user_id}-${event.ts}-${i}`}
-                    href={event.artist_id ? `/artist/${event.artist_id}` : event.type === "data_uploaded" ? "/upload" : "/feed"}
+                    href={event.artist_id ? `/artist/${event.artist_id}` : event.type === "data_uploaded" ? "/upload" : event.type === "user_joined" ? "/friends" : "/feed"}
                     className="card-hover p-4 block animate-slide-up"
                     style={{ animationDelay: `${i * 0.03}s` }}
                   >

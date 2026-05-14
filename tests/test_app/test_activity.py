@@ -12,6 +12,7 @@ from app.models import (
     TrackArtist,
     User,
 )
+from app.services.activity import _new_user_quip, _friendship_quip
 from app.services.activity import (
     _pick,
     generate_activity_feed,
@@ -229,3 +230,43 @@ class TestGenerateActivityFeed:
         if len(events) >= 2:
             for i in range(len(events) - 1):
                 assert events[i]["ts"] >= events[i + 1]["ts"]
+
+    def test_new_user_joined_detected(self, db):
+        now = datetime.now(timezone.utc)
+        user = User(user_id="new_guy", user_name="New Guy", created_at=now - timedelta(hours=1))
+        db.add(user)
+        db.commit()
+
+        events = generate_activity_feed(db, ["new_guy"], limit=50, days=7)
+        joined_events = [e for e in events if e["type"] == "user_joined"]
+        assert len(joined_events) == 1
+        assert joined_events[0]["user_name"] == "New Guy"
+
+    def test_new_user_not_shown_if_old(self, db, test_user):
+        events = generate_activity_feed(db, [test_user.user_id], limit=50, days=7)
+        joined_events = [e for e in events if e["type"] == "user_joined"]
+        assert len(joined_events) == 0
+
+    def test_new_friendship_detected(self, db, test_user):
+        now = datetime.now(timezone.utc)
+        user2 = User(user_id="friend_new", user_name="Friend New", created_at=now - timedelta(days=30))
+        db.add(user2)
+        db.add(Friendship(user_id_1=test_user.user_id, user_id_2="friend_new", created_at=now - timedelta(hours=2)))
+        db.add(Friendship(user_id_1="friend_new", user_id_2=test_user.user_id, created_at=now - timedelta(hours=2)))
+        db.commit()
+
+        events = generate_activity_feed(db, [test_user.user_id, "friend_new"], limit=50, days=7)
+        friend_events = [e for e in events if e["type"] == "new_friendship"]
+        assert len(friend_events) == 1
+
+    def test_friendship_deduplicated(self, db, test_user):
+        now = datetime.now(timezone.utc)
+        user2 = User(user_id="dedup_friend", user_name="Dedup Friend", created_at=now - timedelta(days=30))
+        db.add(user2)
+        db.add(Friendship(user_id_1=test_user.user_id, user_id_2="dedup_friend", created_at=now - timedelta(hours=1)))
+        db.add(Friendship(user_id_1="dedup_friend", user_id_2=test_user.user_id, created_at=now - timedelta(hours=1)))
+        db.commit()
+
+        events = generate_activity_feed(db, [test_user.user_id, "dedup_friend"], limit=50, days=7)
+        friend_events = [e for e in events if e["type"] == "new_friendship"]
+        assert len(friend_events) == 1
