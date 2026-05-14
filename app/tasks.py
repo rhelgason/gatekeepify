@@ -440,6 +440,7 @@ def process_backfill_upload(job_id: int, user_id: str, encoded_content: str):
     except Exception as e:
         logger.error(f"Backfill upload task failed for job {job_id}: {e}")
         try:
+            db.rollback()
             job = db.query(JobRun).filter(JobRun.id == job_id).first()
             if job:
                 job.status = "error"
