@@ -72,7 +72,7 @@ export const api = {
     return request<{ auth_url: string }>(`/auth/login${params}`);
   },
 
-  getMe: () => request<{ user_id: string; user_name: string; email: string }>(
+  getMe: () => request<{ user_id: string; user_name: string; email: string; created_at: string | null }>(
     "/auth/me"
   ),
 
