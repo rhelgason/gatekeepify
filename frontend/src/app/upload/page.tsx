@@ -50,9 +50,21 @@ export default function Upload() {
 
   function startPolling() {
     if (pollRef.current) clearInterval(pollRef.current);
+    let noneCount = 0;
     pollRef.current = setInterval(async () => {
       try {
         const j = await api.getUploadStatus();
+        if (j.status === "none") {
+          noneCount++;
+          if (noneCount >= 3) {
+            setJob(null);
+            setError("Upload job was lost. Please try again.");
+            if (pollRef.current) clearInterval(pollRef.current);
+            pollRef.current = null;
+          }
+          return;
+        }
+        noneCount = 0;
         setJob(j);
         if (j.status === "completed" || j.status === "error") {
           if (pollRef.current) clearInterval(pollRef.current);
