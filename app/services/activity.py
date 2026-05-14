@@ -49,7 +49,7 @@ def generate_activity_feed(
             crown_events = [e for e in crown_events if e["user_id"] != uid] + kept
 
     events.extend(crown_events)
-    events.extend(_detect_new_users(db, since))
+    events.extend(_detect_new_users(db, user_ids, since))
     events.extend(_detect_new_friendships(db, user_ids, since))
 
     events.sort(key=lambda e: e["ts"], reverse=True)
@@ -418,15 +418,34 @@ def _detect_uploads(db: Session, user_id: str, since: datetime) -> List[dict]:
     return events
 
 
-def _detect_new_users(db: Session, since: datetime) -> List[dict]:
+def _detect_new_users(db: Session, user_ids: List[str], since: datetime) -> List[dict]:
     rows = db.execute(
         select(User.user_id, User.user_name, User.created_at)
         .where(User.created_at >= since)
         .order_by(User.created_at.desc())
     ).all()
 
+    viewer_set = set(user_ids)
+    viewer_friends = set()
+    for uid in user_ids:
+        friend_rows = db.execute(
+            select(Friendship.user_id_2).where(Friendship.user_id_1 == uid)
+        ).all()
+        for r in friend_rows:
+            viewer_friends.add(r[0])
+
     events = []
     for row in rows:
+        if row.user_id in viewer_set:
+            continue
+        new_user_friends = set(
+            r[0] for r in db.execute(
+                select(Friendship.user_id_2).where(Friendship.user_id_1 == row.user_id)
+            ).all()
+        )
+        has_mutual = bool(new_user_friends & viewer_friends) or bool(new_user_friends & viewer_set)
+        if not has_mutual:
+            continue
         ts = row.created_at if isinstance(row.created_at, datetime) else datetime.fromisoformat(str(row.created_at))
         name = row.user_name or row.user_id
         quip = _new_user_quip(name)

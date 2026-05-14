@@ -231,16 +231,31 @@ class TestGenerateActivityFeed:
             for i in range(len(events) - 1):
                 assert events[i]["ts"] >= events[i + 1]["ts"]
 
-    def test_new_user_joined_detected(self, db):
+    def test_new_user_joined_with_mutual_friend(self, db, test_user):
         now = datetime.now(timezone.utc)
-        user = User(user_id="new_guy", user_name="New Guy", created_at=now - timedelta(hours=1))
-        db.add(user)
+        mutual = User(user_id="mutual", user_name="Mutual", created_at=now - timedelta(days=30))
+        new_guy = User(user_id="new_guy", user_name="New Guy", created_at=now - timedelta(hours=1))
+        db.add_all([mutual, new_guy])
+        db.add(Friendship(user_id_1=test_user.user_id, user_id_2="mutual", created_at=now - timedelta(days=20)))
+        db.add(Friendship(user_id_1="mutual", user_id_2=test_user.user_id, created_at=now - timedelta(days=20)))
+        db.add(Friendship(user_id_1="new_guy", user_id_2="mutual", created_at=now - timedelta(hours=1)))
+        db.add(Friendship(user_id_1="mutual", user_id_2="new_guy", created_at=now - timedelta(hours=1)))
         db.commit()
 
-        events = generate_activity_feed(db, ["new_guy"], limit=50, days=7)
+        events = generate_activity_feed(db, [test_user.user_id, "mutual"], limit=50, days=7)
         joined_events = [e for e in events if e["type"] == "user_joined"]
         assert len(joined_events) == 1
         assert joined_events[0]["user_name"] == "New Guy"
+
+    def test_new_user_not_shown_without_mutual(self, db, test_user):
+        now = datetime.now(timezone.utc)
+        stranger = User(user_id="stranger", user_name="Stranger", created_at=now - timedelta(hours=1))
+        db.add(stranger)
+        db.commit()
+
+        events = generate_activity_feed(db, [test_user.user_id], limit=50, days=7)
+        joined_events = [e for e in events if e["type"] == "user_joined"]
+        assert len(joined_events) == 0
 
     def test_new_user_not_shown_if_old(self, db, test_user):
         events = generate_activity_feed(db, [test_user.user_id], limit=50, days=7)
