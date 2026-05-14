@@ -208,3 +208,4 @@ class JobRun(Base):
     completed_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     status: Mapped[str] = mapped_column(String(50))
     record_count: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    details: Mapped[Optional[str]] = mapped_column(Text, nullable=True)

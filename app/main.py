@@ -45,6 +45,7 @@ try:
     _add_column_if_missing(engine, "friend_invites", "to_user_id", "VARCHAR(255)")
     _add_column_if_missing(engine, "dim_all_users", "token_invalidated_at", "TIMESTAMP")
     _add_column_if_missing(engine, "dim_all_users", "is_admin", "BOOLEAN DEFAULT FALSE")
+    _add_column_if_missing(engine, "job_runs", "details", "TEXT")
 except Exception as e:
     logger.warning(f"Column migration skipped: {e}")
 

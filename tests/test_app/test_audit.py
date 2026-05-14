@@ -62,6 +62,7 @@ class TestAuditFromEndpoints:
     def test_backfill_upload_creates_audit_entry(self, client, seeded_db, auth_headers):
         import io
         import zipfile
+        from unittest.mock import patch, MagicMock
 
         listens = [
             {
@@ -76,20 +77,21 @@ class TestAuditFromEndpoints:
             zf.writestr("Streaming_History_Audio_0.json", json.dumps(listens))
         buf.seek(0)
 
-        client.post(
-            "/backfill/upload",
-            headers=auth_headers,
-            files={"file": ("data.zip", buf, "application/zip")},
-        )
+        with patch("app.celery_app.celery_app.send_task") as mock_send:
+            client.post(
+                "/backfill/upload",
+                headers=auth_headers,
+                files={"file": ("data.zip", buf, "application/zip")},
+            )
 
         entry = seeded_db.query(AuditLog).filter(
-            AuditLog.action == "backfill.upload"
+            AuditLog.action == "backfill.upload_started"
         ).first()
         assert entry is not None
         assert entry.user_id == "test_user_1"
         assert entry.status == "success"
         details = json.loads(entry.details)
-        assert details["total_accepted"] == 1
+        assert "job_id" in details
 
     def test_friend_invite_creates_audit_entry(self, client, seeded_db, auth_headers):
         client.post("/friends/invite", headers=auth_headers)

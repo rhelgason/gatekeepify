@@ -293,6 +293,163 @@ def compute_award_snapshots():
         db.close()
 
 
+@celery_app.task(name="app.tasks.process_backfill_upload")
+def process_backfill_upload(job_id: int, user_id: str, encoded_content: str):
+    import base64
+    import json
+
+    from app.models import JobRun, Track
+    from app.routers.backfill import (
+        _extract_json_from_zip,
+        _validate_and_process_listens,
+    )
+    from app.services.audit import log_action
+
+    db = SessionLocal()
+    try:
+        job = db.query(JobRun).filter(JobRun.id == job_id).first()
+        if not job:
+            logger.error(f"Backfill job {job_id} not found")
+            return
+
+        def _update_job(phase: str, progress: int, **extra):
+            details = json.loads(job.details) if job.details else {}
+            details.update({"phase": phase, "progress": progress, **extra})
+            job.details = json.dumps(details)
+            db.commit()
+
+        job.status = "running"
+        _update_job("extracting", 5)
+
+        content = base64.b64decode(encoded_content)
+        raw_listens = _extract_json_from_zip(content)
+
+        if not raw_listens:
+            job.status = "error"
+            job.completed_at = datetime.now(timezone.utc)
+            _update_job("error", 100, error="No streaming history files found in the ZIP")
+            log_action(db, "backfill.upload", user_id=user_id, status="error",
+                       details={"reason": "no_streaming_history_files"})
+            return
+
+        _update_job("validating", 15, total_listens=len(raw_listens))
+
+        user = db.query(User).filter(User.user_id == user_id).first()
+        if not user:
+            job.status = "error"
+            job.completed_at = datetime.now(timezone.utc)
+            _update_job("error", 100, error="User not found")
+            return
+
+        accepted, rejection_reasons = _validate_and_process_listens(
+            raw_listens, user, db
+        )
+
+        _update_job("inserting", 40, total_listens=len(raw_listens),
+                     accepted_count=len(accepted))
+
+        inserted = 0
+        batch_size = 500
+        for i in range(0, len(accepted), batch_size):
+            batch = accepted[i:i + batch_size]
+            for listen, track_name in batch:
+                from sqlalchemy import select as sa_select
+                existing = db.execute(
+                    sa_select(Listen).where(
+                        Listen.user_id == listen.user_id,
+                        Listen.track_id == listen.track_id,
+                        Listen.ts == listen.ts,
+                    )
+                ).first()
+                if existing:
+                    continue
+
+                existing_track = (
+                    db.query(Track).filter(Track.track_id == listen.track_id).first()
+                )
+                if not existing_track:
+                    db.merge(Track(track_id=listen.track_id, track_name=track_name))
+
+                db.add(listen)
+                inserted += 1
+            db.commit()
+
+            progress = 40 + int(35 * (i + len(batch)) / max(len(accepted), 1))
+            _update_job("inserting", min(progress, 75), inserted=inserted)
+
+        _update_job("enriching", 80, inserted=inserted)
+
+        MAX_IMMEDIATE_ENRICHMENT = 500
+        new_track_ids = list({
+            listen.track_id for listen, _ in accepted
+            if db.query(Track).filter(
+                Track.track_id == listen.track_id, Track.album_id.is_(None)
+            ).first()
+        })[:MAX_IMMEDIATE_ENRICHMENT]
+
+        enriched = 0
+        if new_track_ids:
+            try:
+                from spotipy.exceptions import SpotifyException as SpotifyExc
+                user_obj = db.query(User).filter(User.user_id == user_id).first()
+                if user_obj and user_obj.spotify_refresh_token:
+                    service = SpotifyService()
+                    refresh_token = decrypt_token(user_obj.spotify_refresh_token)
+                    token_info = service.refresh_access_token(refresh_token)
+                    access_token = token_info["access_token"]
+                    items = service.get_tracks(access_token, new_track_ids)
+                    if items:
+                        enriched = upsert_track_metadata(db, items)
+            except Exception as e:
+                logger.warning(f"Enrichment during backfill upload: {e}")
+
+        _update_job("analyzing", 95, enriched=enriched)
+
+        from app.services.anomaly import analyze_user_export
+        anomaly_result = analyze_user_export(db, user_id)
+        if anomaly_result["flags"]:
+            log_action(db, "backfill.anomaly_detected", user_id=user_id,
+                       status="warning", details=anomaly_result)
+
+        job.status = "completed"
+        job.completed_at = datetime.now(timezone.utc)
+        job.record_count = inserted
+        _update_job("done", 100,
+                    inserted=inserted,
+                    accepted=len(accepted),
+                    rejected=len(raw_listens) - len(accepted),
+                    rejection_reasons=rejection_reasons,
+                    enriched=enriched,
+                    trust_score=anomaly_result["score"])
+
+        log_action(db, "backfill.upload", user_id=user_id,
+                   details={
+                       "total_processed": len(raw_listens),
+                       "total_accepted": inserted,
+                       "total_rejected": len(raw_listens) - len(accepted),
+                       "rejection_reasons": rejection_reasons,
+                       "tracks_enriched_immediately": enriched,
+                       "trust_score": anomaly_result["score"],
+                   })
+        logger.info(f"Backfill upload complete for {user_id}: {inserted} inserted, {enriched} enriched")
+
+    except Exception as e:
+        logger.error(f"Backfill upload task failed for job {job_id}: {e}")
+        try:
+            job = db.query(JobRun).filter(JobRun.id == job_id).first()
+            if job:
+                job.status = "error"
+                job.completed_at = datetime.now(timezone.utc)
+                details = json.loads(job.details) if job.details else {}
+                details.update({"phase": "error", "progress": 0, "error": str(e)})
+                job.details = json.dumps(details)
+                db.commit()
+        except Exception:
+            pass
+    finally:
+        db.close()
+
+
 def _get_working_access_token(db, service: SpotifyService, users: list) -> str | None:
     for user in users:
         try:

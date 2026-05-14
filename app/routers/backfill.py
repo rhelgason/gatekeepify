@@ -1,7 +1,7 @@
 import io
 import json
 import zipfile
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile
@@ -9,7 +9,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import Album, Listen, ListenSource, Track, User
+from app.models import Album, JobRun, Listen, ListenSource, Track, User
 import logging
 
 from app.models import User as UserModel
@@ -29,6 +29,7 @@ FILE_SUFFIX = ".json"
 MIN_PLAY_TIME_MS = 30000
 TRACK_URI_PREFIX = "spotify:track:"
 MAX_UPLOAD_BYTES = 100 * 1024 * 1024  # 100 MB
+MAX_DECOMPRESSED_BYTES = 500 * 1024 * 1024  # 500 MB
 
 EXPECTED_EXPORT_FIELDS = {
     "ts",
@@ -55,11 +56,9 @@ EXTRA_EXPORT_FIELDS = {
 }
 
 
-def _extract_json_from_zip(upload: UploadFile) -> list[dict]:
-    content = upload.file.read(MAX_UPLOAD_BYTES + 1)
-    if len(content) > MAX_UPLOAD_BYTES:
-        raise HTTPException(status_code=400, detail="File too large (max 100 MB)")
+def _extract_json_from_zip(content: bytes) -> list[dict]:
     all_listens = []
+    total_decompressed = 0
     try:
         zf = zipfile.ZipFile(io.BytesIO(content))
     except zipfile.BadZipFile:
@@ -68,6 +67,10 @@ def _extract_json_from_zip(upload: UploadFile) -> list[dict]:
     for name in zf.namelist():
         basename = name.split("/")[-1]
         if basename.startswith(FILE_PREFIX) and basename.endswith(FILE_SUFFIX):
+            info = zf.getinfo(name)
+            total_decompressed += info.file_size
+            if total_decompressed > MAX_DECOMPRESSED_BYTES:
+                raise HTTPException(status_code=400, detail="Decompressed data too large (max 500 MB)")
             with zf.open(name) as f:
                 try:
                     data = json.load(f)
@@ -206,13 +209,12 @@ def _get_api_listen_range(
     return None
 
 
-@router.post("/upload", response_model=BackfillUploadResponse)
+@router.post("/upload")
 def upload_data_export(
     file: UploadFile,
     user: UserModel = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-
     if not file.filename or not file.filename.endswith(".zip"):
         log_action(
             db, "backfill.upload",
@@ -224,111 +226,63 @@ def upload_data_export(
             status_code=400, detail="Please upload a ZIP file"
         )
 
-    raw_listens = _extract_json_from_zip(file)
-    if not raw_listens:
-        log_action(
-            db, "backfill.upload",
-            user_id=user.user_id,
-            status="error",
-            details={"reason": "no_streaming_history_files"},
-        )
-        raise HTTPException(
-            status_code=400,
-            detail="No streaming history files found in the ZIP",
-        )
+    content = file.file.read(MAX_UPLOAD_BYTES + 1)
+    if len(content) > MAX_UPLOAD_BYTES:
+        raise HTTPException(status_code=400, detail="File too large (max 100 MB)")
 
-    accepted, rejection_reasons = _validate_and_process_listens(
-        raw_listens, user, db
-    )
+    import base64
+    encoded = base64.b64encode(content).decode()
 
-    user_obj = db.query(User).filter(User.user_id == user.user_id).first()
-    if user_obj:
-        db.merge(user_obj)
-
-    inserted = 0
-    for listen, track_name in accepted:
-        existing = db.execute(
-            select(Listen).where(
-                Listen.user_id == listen.user_id,
-                Listen.track_id == listen.track_id,
-                Listen.ts == listen.ts,
-            )
-        ).first()
-        if existing:
-            continue
-
-        existing_track = (
-            db.query(Track).filter(Track.track_id == listen.track_id).first()
-        )
-        if not existing_track:
-            db.merge(Track(track_id=listen.track_id, track_name=track_name))
-
-        db.add(listen)
-        inserted += 1
-
-    db.commit()
-
-    MAX_IMMEDIATE_ENRICHMENT = 500
-
-    new_track_ids = list({
-        listen.track_id for listen, _ in accepted
-        if db.query(Track).filter(
-            Track.track_id == listen.track_id, Track.album_id.is_(None)
-        ).first()
-    })[:MAX_IMMEDIATE_ENRICHMENT]
-
-    enriched = 0
-    if new_track_ids:
-        try:
-            from spotipy.exceptions import SpotifyException
-
-            user_obj = db.query(User).filter(User.user_id == user.user_id).first()
-            if user_obj and user_obj.spotify_refresh_token:
-                service = SpotifyService()
-                refresh_token = decrypt_token(user_obj.spotify_refresh_token)
-                token_info = service.refresh_access_token(refresh_token)
-                access_token = token_info["access_token"]
-                items = service.get_tracks(access_token, new_track_ids)
-                if items:
-                    enriched = upsert_track_metadata(db, items)
-                    logger.info(f"Enriched {enriched} tracks immediately after upload")
-        except SpotifyException as e:
-            if e.http_status == 429:
-                logger.warning(f"Rate limited during enrichment after {enriched} tracks, cron will finish the rest")
-            else:
-                logger.warning(f"Spotify error during enrichment: {e}")
-        except Exception as e:
-            logger.warning(f"Immediate enrichment failed, will backfill later: {e}")
-
-    from app.services.anomaly import analyze_user_export
-    anomaly_result = analyze_user_export(db, user.user_id)
-    if anomaly_result["flags"]:
-        log_action(
-            db, "backfill.anomaly_detected",
-            user_id=user.user_id,
-            status="warning",
-            details=anomaly_result,
-        )
-
-    log_action(
-        db, "backfill.upload",
+    job = JobRun(
+        job_name="backfill_upload",
         user_id=user.user_id,
-        details={
-            "total_processed": len(raw_listens),
-            "total_accepted": inserted,
-            "total_rejected": len(raw_listens) - len(accepted),
-            "rejection_reasons": rejection_reasons,
-            "tracks_enriched_immediately": enriched,
-            "trust_score": anomaly_result["score"],
-        },
+        started_at=datetime.now(timezone.utc),
+        status="pending",
+        details=json.dumps({"phase": "queued", "progress": 0, "filename": file.filename}),
     )
+    db.add(job)
+    db.commit()
+    db.refresh(job)
 
-    return BackfillUploadResponse(
-        total_listens_processed=len(raw_listens),
-        total_listens_accepted=inserted,
-        total_listens_rejected=len(raw_listens) - len(accepted),
-        rejection_reasons=rejection_reasons,
-    )
+    from app.celery_app import celery_app
+    celery_app.send_task("app.tasks.process_backfill_upload", args=[job.id, user.user_id, encoded])
+
+    log_action(db, "backfill.upload_started", user_id=user.user_id,
+               details={"job_id": job.id, "filename": file.filename, "size_bytes": len(content)})
+
+    return {"job_id": job.id, "status": "processing"}
+
+
+@router.get("/upload-status")
+def upload_job_status(
+    user: UserModel = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    job = db.execute(
+        select(JobRun)
+        .where(JobRun.user_id == user.user_id, JobRun.job_name == "backfill_upload")
+        .order_by(JobRun.started_at.desc())
+        .limit(1)
+    ).scalar_one_or_none()
+
+    if not job:
+        return {"status": "none"}
+
+    details = json.loads(job.details) if job.details else {}
+    return {
+        "job_id": job.id,
+        "status": job.status,
+        "started_at": job.started_at.isoformat() if job.started_at else None,
+        "completed_at": job.completed_at.isoformat() if job.completed_at else None,
+        "phase": details.get("phase", "unknown"),
+        "progress": details.get("progress", 0),
+        "total_listens": details.get("total_listens"),
+        "accepted": details.get("accepted"),
+        "rejected": details.get("rejected"),
+        "rejection_reasons": details.get("rejection_reasons"),
+        "enriched": details.get("enriched"),
+        "error": details.get("error"),
+    }
 
 
 @router.get("/status", response_model=BackfillStatusResponse)

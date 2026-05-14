@@ -105,6 +105,8 @@ export const api = {
 
   getBackfillStatus: () => request<any>("/backfill/status"),
 
+  getUploadStatus: () => request<any>("/backfill/upload-status"),
+
   getFriends: () => request<any[]>("/friends"),
 
   createInvite: () =>

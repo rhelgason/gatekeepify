@@ -1,8 +1,11 @@
 import io
 import json
 import zipfile
+from unittest.mock import patch, MagicMock
+from datetime import date
 
-from app.models import Listen, ListenSource, Track
+from app.models import Album, Listen, ListenSource, Track
+from app.routers.backfill import _extract_json_from_zip, _validate_and_process_listens
 
 
 def _make_zip(files: dict[str, list[dict]]) -> io.BytesIO:
@@ -12,6 +15,11 @@ def _make_zip(files: dict[str, list[dict]]) -> io.BytesIO:
             zf.writestr(name, json.dumps(data))
     buf.seek(0)
     return buf
+
+
+def _make_zip_bytes(files: dict[str, list[dict]]) -> bytes:
+    buf = _make_zip(files)
+    return buf.read()
 
 
 def _make_listen_json(
@@ -32,12 +40,10 @@ def _make_listen_json(
     return entry
 
 
-class TestBackfillUpload:
-    def test_upload_valid_zip(self, client, seeded_db, auth_headers):
-        listens = [
-            _make_listen_json("new_track_1", "New Track 1", "2024-01-01T10:00:00Z"),
-            _make_listen_json("new_track_2", "New Track 2", "2024-01-02T10:00:00Z"),
-        ]
+class TestUploadEndpoint:
+    @patch("app.celery_app.celery_app.send_task")
+    def test_upload_returns_job_id(self, mock_send, client, seeded_db, auth_headers):
+        listens = [_make_listen_json()]
         zip_buf = _make_zip({"Streaming_History_Audio_0.json": listens})
         resp = client.post(
             "/backfill/upload",
@@ -46,118 +52,9 @@ class TestBackfillUpload:
         )
         assert resp.status_code == 200
         data = resp.json()
-        assert data["total_listens_processed"] == 2
-        assert data["total_listens_accepted"] == 2
-        assert data["total_listens_rejected"] == 0
-
-    def test_upload_filters_short_listens(self, client, seeded_db, auth_headers):
-        listens = [
-            _make_listen_json(ms_played=5000),
-            _make_listen_json(track_id="valid", ms_played=60000),
-        ]
-        zip_buf = _make_zip({"Streaming_History_Audio_0.json": listens})
-        resp = client.post(
-            "/backfill/upload",
-            headers=auth_headers,
-            files={"file": ("data.zip", zip_buf, "application/zip")},
-        )
-        data = resp.json()
-        assert data["total_listens_accepted"] == 1
-        assert data["rejection_reasons"]["too_short"] == 1
-
-    def test_upload_filters_null_uri(self, client, seeded_db, auth_headers):
-        listens = [
-            {
-                "ts": "2024-01-01T10:00:00Z",
-                "ms_played": 60000,
-                "master_metadata_track_name": "Test",
-                "spotify_track_uri": None,
-            }
-        ]
-        zip_buf = _make_zip({"Streaming_History_Audio_0.json": listens})
-        resp = client.post(
-            "/backfill/upload",
-            headers=auth_headers,
-            files={"file": ("data.zip", zip_buf, "application/zip")},
-        )
-        data = resp.json()
-        assert data["total_listens_accepted"] == 0
-        assert data["rejection_reasons"]["no_track_uri"] == 1
-
-    def test_upload_ignores_non_audio_files(self, client, seeded_db, auth_headers):
-        audio_listens = [_make_listen_json()]
-        other_data = [{"some": "data"}]
-        zip_buf = _make_zip(
-            {
-                "Streaming_History_Audio_0.json": audio_listens,
-                "other_file.json": other_data,
-            }
-        )
-        resp = client.post(
-            "/backfill/upload",
-            headers=auth_headers,
-            files={"file": ("data.zip", zip_buf, "application/zip")},
-        )
-        data = resp.json()
-        assert data["total_listens_processed"] == 1
-
-    def test_upload_tags_source_as_export(self, client, seeded_db, auth_headers):
-        listens = [_make_listen_json("export_track", "Export Track")]
-        zip_buf = _make_zip({"Streaming_History_Audio_0.json": listens})
-        client.post(
-            "/backfill/upload",
-            headers=auth_headers,
-            files={"file": ("data.zip", zip_buf, "application/zip")},
-        )
-        result = (
-            seeded_db.query(Listen)
-            .filter(Listen.track_id == "export_track")
-            .first()
-        )
-        assert result is not None
-        assert result.source == ListenSource.export.value
-
-    def test_upload_stores_extra_metadata(self, client, seeded_db, auth_headers):
-        listens = [
-            _make_listen_json(
-                "meta_track",
-                "Meta Track",
-                extra_fields={"platform": "iOS", "shuffle": True, "skipped": False},
-            )
-        ]
-        zip_buf = _make_zip({"Streaming_History_Audio_0.json": listens})
-        client.post(
-            "/backfill/upload",
-            headers=auth_headers,
-            files={"file": ("data.zip", zip_buf, "application/zip")},
-        )
-        result = (
-            seeded_db.query(Listen)
-            .filter(Listen.track_id == "meta_track")
-            .first()
-        )
-        assert result is not None
-        meta = json.loads(result.export_metadata)
-        assert meta["platform"] == "iOS"
-        assert meta["shuffle"] is True
-
-    def test_upload_creates_skeleton_tracks(self, client, seeded_db, auth_headers):
-        listens = [_make_listen_json("brand_new_track", "Brand New")]
-        zip_buf = _make_zip({"Streaming_History_Audio_0.json": listens})
-        client.post(
-            "/backfill/upload",
-            headers=auth_headers,
-            files={"file": ("data.zip", zip_buf, "application/zip")},
-        )
-        track = (
-            seeded_db.query(Track)
-            .filter(Track.track_id == "brand_new_track")
-            .first()
-        )
-        assert track is not None
-        assert track.track_name == "Brand New"
-        assert track.album_id is None
-        assert track.duration_ms is None
+        assert "job_id" in data
+        assert data["status"] == "processing"
+        mock_send.assert_called_once()
 
     def test_upload_rejects_non_zip(self, client, seeded_db, auth_headers):
         resp = client.post(
@@ -167,70 +64,117 @@ class TestBackfillUpload:
         )
         assert resp.status_code == 400
 
-    def test_upload_deduplicates(self, client, seeded_db, auth_headers):
-        listens = [
-            _make_listen_json("dedup_track", "Dedup", "2024-01-01T10:00:00Z")
-        ]
-        zip_buf = _make_zip({"Streaming_History_Audio_0.json": listens})
 
-        resp1 = client.post(
-            "/backfill/upload",
-            headers=auth_headers,
-            files={"file": ("data.zip", zip_buf, "application/zip")},
-        )
-        assert resp1.json()["total_listens_accepted"] == 1
+class TestExtractJson:
+    def test_extracts_audio_files(self):
+        content = _make_zip_bytes({
+            "Streaming_History_Audio_0.json": [_make_listen_json()],
+            "other.json": [{"nope": True}],
+        })
+        result = _extract_json_from_zip(content)
+        assert len(result) == 1
 
-        zip_buf.seek(0)
-        resp2 = client.post(
-            "/backfill/upload",
-            headers=auth_headers,
-            files={"file": ("data.zip", zip_buf, "application/zip")},
-        )
-        assert resp2.json()["total_listens_accepted"] == 0
+    def test_ignores_non_audio_files(self):
+        content = _make_zip_bytes({"random_file.json": [{"a": 1}]})
+        result = _extract_json_from_zip(content)
+        assert len(result) == 0
+
+    def test_handles_nested_paths(self):
+        content = _make_zip_bytes({
+            "my_spotify_data/Streaming_History_Audio_0.json": [_make_listen_json()],
+        })
+        result = _extract_json_from_zip(content)
+        assert len(result) == 1
 
 
-class TestBackfillReleaseDate:
-    def test_rejects_listen_before_release_date(
-        self, client, seeded_db, auth_headers
-    ):
-        from datetime import date
+class TestValidateListens:
+    def test_accepts_valid_listen(self, seeded_db, test_user):
+        listens = [_make_listen_json("new_trk", "New", "2024-01-01T10:00:00Z")]
+        accepted, reasons = _validate_and_process_listens(listens, test_user, seeded_db)
+        assert len(accepted) == 1
+        assert len(reasons) == 0
 
-        from app.models import Album
+    def test_rejects_short_plays(self, seeded_db, test_user):
+        listens = [_make_listen_json(ms_played=5000)]
+        accepted, reasons = _validate_and_process_listens(listens, test_user, seeded_db)
+        assert len(accepted) == 0
+        assert reasons["too_short"] == 1
 
+    def test_rejects_null_uri(self, seeded_db, test_user):
+        listens = [{
+            "ts": "2024-01-01T10:00:00Z",
+            "ms_played": 60000,
+            "master_metadata_track_name": "Test",
+            "spotify_track_uri": None,
+        }]
+        accepted, reasons = _validate_and_process_listens(listens, test_user, seeded_db)
+        assert reasons["no_track_uri"] == 1
+
+    def test_rejects_invalid_uri_format(self, seeded_db, test_user):
+        listens = [{
+            "ts": "2024-01-01T10:00:00Z",
+            "ms_played": 60000,
+            "master_metadata_track_name": "Test",
+            "spotify_track_uri": "not:a:spotify:uri",
+        }]
+        accepted, reasons = _validate_and_process_listens(listens, test_user, seeded_db)
+        assert reasons["invalid_uri_format"] == 1
+
+    def test_rejects_before_release_date(self, seeded_db, test_user):
         album = seeded_db.query(Album).filter(Album.album_id == "album_1").first()
         album.release_date = date(2024, 6, 1)
         seeded_db.commit()
 
         listens = [_make_listen_json("track_1", "Paranoid Android", "2024-01-01T10:00:00Z")]
-        zip_buf = _make_zip({"Streaming_History_Audio_0.json": listens})
-        resp = client.post(
-            "/backfill/upload",
-            headers=auth_headers,
-            files={"file": ("data.zip", zip_buf, "application/zip")},
-        )
-        data = resp.json()
-        assert data["rejection_reasons"].get("before_release_date", 0) == 1
+        accepted, reasons = _validate_and_process_listens(listens, test_user, seeded_db)
+        assert reasons.get("before_release_date", 0) == 1
 
-    def test_accepts_listen_after_release_date(
-        self, client, seeded_db, auth_headers
-    ):
-        from datetime import date
-
-        from app.models import Album
-
+    def test_accepts_after_release_date(self, seeded_db, test_user):
         album = seeded_db.query(Album).filter(Album.album_id == "album_1").first()
         album.release_date = date(2024, 1, 1)
         seeded_db.commit()
 
         listens = [_make_listen_json("track_1", "Paranoid Android", "2024-06-15T10:00:00Z")]
+        accepted, reasons = _validate_and_process_listens(listens, test_user, seeded_db)
+        assert reasons.get("before_release_date", 0) == 0
+
+    def test_stores_extra_metadata(self, seeded_db, test_user):
+        listens = [_make_listen_json(
+            "meta_trk", "Meta", extra_fields={"platform": "iOS", "shuffle": True}
+        )]
+        accepted, _ = _validate_and_process_listens(listens, test_user, seeded_db)
+        assert len(accepted) == 1
+        listen, _ = accepted[0]
+        meta = json.loads(listen.export_metadata)
+        assert meta["platform"] == "iOS"
+
+    def test_tags_source_as_export(self, seeded_db, test_user):
+        listens = [_make_listen_json("src_trk", "Source")]
+        accepted, _ = _validate_and_process_listens(listens, test_user, seeded_db)
+        listen, _ = accepted[0]
+        assert listen.source == ListenSource.export.value
+
+
+class TestUploadStatus:
+    @patch("app.celery_app.celery_app.send_task")
+    def test_upload_status_after_upload(self, mock_send, client, seeded_db, auth_headers):
+        listens = [_make_listen_json()]
         zip_buf = _make_zip({"Streaming_History_Audio_0.json": listens})
-        resp = client.post(
+        client.post(
             "/backfill/upload",
             headers=auth_headers,
             files={"file": ("data.zip", zip_buf, "application/zip")},
         )
+        resp = client.get("/backfill/upload-status", headers=auth_headers)
+        assert resp.status_code == 200
         data = resp.json()
-        assert data["rejection_reasons"].get("before_release_date", 0) == 0
+        assert data["status"] == "pending"
+        assert data["phase"] == "queued"
+
+    def test_upload_status_no_job(self, client, seeded_db, auth_headers):
+        resp = client.get("/backfill/upload-status", headers=auth_headers)
+        assert resp.status_code == 200
+        assert resp.json()["status"] == "none"
 
 
 class TestBackfillStatus:
