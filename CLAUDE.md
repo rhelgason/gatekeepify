@@ -105,6 +105,8 @@ Copy `.env.example` to `.env`:
 - `POST /admin/trigger-backfill` -- manually trigger metadata backfill
 - `POST /admin/trigger-awards` -- manually trigger award computation
 - `GET /admin/trust-score?target_user_id=X` -- check anomaly detection results
+- `POST /admin/force-logout-all` -- invalidate all user tokens (force re-login)
+- `POST /admin/force-logout/{user_id}` -- invalidate a specific user's token
 
 ## Gamification System
 
