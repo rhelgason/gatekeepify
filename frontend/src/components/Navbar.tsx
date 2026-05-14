@@ -13,10 +13,12 @@ export default function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [pendingCount, setPendingCount] = useState(0);
+  const [user, setUser] = useState<{ user_id: string; user_name: string } | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!loggedIn) return;
+    api.getMe().then(u => setUser({ user_id: u.user_id, user_name: u.user_name })).catch(() => {});
     api.getPendingRequests().then(r => setPendingCount(r.length)).catch(() => {});
     const interval = setInterval(() => {
       api.getPendingRequests().then(r => setPendingCount(r.length)).catch(() => {});
@@ -51,6 +53,8 @@ export default function Navbar() {
     window.location.href = "/";
   };
 
+  const userInitial = user?.user_name?.[0]?.toUpperCase() || "?";
+
   return (
     <nav className="sticky top-0 z-50 backdrop-blur-xl bg-[#0a0a0a]/80 border-b border-white/5">
       <div className="mx-auto max-w-6xl flex items-center justify-between px-4 md:px-6 py-3 md:py-4">
@@ -83,15 +87,31 @@ export default function Navbar() {
           <div className="relative ml-2" ref={menuRef}>
             <button
               onClick={() => setMenuOpen(!menuOpen)}
-              className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-gray-400 hover:text-white hover:bg-white/15 transition-all duration-200"
+              className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-xs font-bold text-gray-400 hover:text-white hover:bg-white/15 transition-all duration-200"
             >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-                <circle cx="12" cy="7" r="4" />
-              </svg>
+              {userInitial}
             </button>
             {menuOpen && (
-              <div className="absolute right-0 mt-2 w-48 rounded-xl border border-white/10 bg-[#141414] shadow-xl overflow-hidden animate-fade-in">
+              <div className="absolute right-0 mt-2 w-52 rounded-xl border border-white/10 bg-[#141414] shadow-xl overflow-hidden animate-fade-in">
+                {user && (
+                  <>
+                    <div className="px-4 py-3 border-b border-white/5">
+                      <div className="text-sm font-medium text-white truncate">{user.user_name}</div>
+                      <div className="text-[10px] text-gray-600 truncate">{user.user_id}</div>
+                    </div>
+                  </>
+                )}
+                <Link
+                  href={user ? `/profile/${user.user_id}` : "/dashboard"}
+                  onClick={() => setMenuOpen(false)}
+                  className="flex items-center gap-3 px-4 py-3 text-sm text-gray-400 hover:text-white hover:bg-white/5 transition-all"
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                    <circle cx="12" cy="7" r="4" />
+                  </svg>
+                  Your Profile
+                </Link>
                 <Link
                   href="/upload"
                   onClick={() => setMenuOpen(false)}
@@ -140,6 +160,12 @@ export default function Navbar() {
       {mobileOpen && (
         <div className="md:hidden border-t border-white/5 bg-[#0a0a0a]/95 backdrop-blur-xl animate-slide-up">
           <div className="px-4 py-3 space-y-1">
+            {user && (
+              <div className="px-4 py-2 mb-1">
+                <div className="text-sm font-medium text-white">{user.user_name}</div>
+                <div className="text-[10px] text-gray-600">{user.user_id}</div>
+              </div>
+            )}
             {links.map((link) => (
               <Link
                 key={link.href}
@@ -160,6 +186,13 @@ export default function Navbar() {
               </Link>
             ))}
             <div className="border-t border-white/5 my-2" />
+            <Link
+              href={user ? `/profile/${user.user_id}` : "/dashboard"}
+              onClick={() => setMobileOpen(false)}
+              className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm text-gray-400 hover:text-white hover:bg-white/5 transition-all"
+            >
+              Your Profile
+            </Link>
             <Link
               href="/upload"
               onClick={() => setMobileOpen(false)}

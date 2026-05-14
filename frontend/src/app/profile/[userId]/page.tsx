@@ -20,6 +20,8 @@ export default function Profile() {
   const [genres, setGenres] = useState<any[]>([]);
   const [userName, setUserName] = useState("");
   const [compat, setCompat] = useState<any>(null);
+  const [isSelf, setIsSelf] = useState(false);
+  const [memberSince, setMemberSince] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -43,12 +45,26 @@ export default function Profile() {
   }, [period, userId, router]);
 
   useEffect(() => {
-    api.getFriends().then(friends => {
-      const friend = friends.find((f: any) => f.user_id === userId);
-      if (friend) setUserName(friend.user_name || friend.user_id);
-      else setUserName(userId);
+    api.getMe().then(me => {
+      if (me.user_id === userId) {
+        setIsSelf(true);
+        setUserName(me.user_name || me.user_id);
+        if (me.created_at) {
+          setMemberSince(new Date(me.created_at).toLocaleDateString("en-US", { month: "long", year: "numeric" }));
+        }
+      } else {
+        setIsSelf(false);
+        api.getFriends().then(friends => {
+          const friend = friends.find((f: any) => f.user_id === userId);
+          if (friend) setUserName(friend.user_name || friend.user_id);
+          else setUserName(userId);
+        });
+        api.getCompatibility(userId).then(setCompat).catch(() => {});
+      }
+    }).catch(() => {
+      setUserName(userId);
     });
-    api.getCompatibility(userId).then(setCompat).catch(() => {});
+    trackEvent("profile_viewed", { profile_user_id: userId });
   }, [userId]);
 
   const periods: { value: Period; label: string }[] = [
@@ -70,9 +86,11 @@ export default function Profile() {
 
   return (
     <div className="animate-fade-in">
-      <button onClick={() => router.back()} className="text-xs text-gray-600 hover:text-gray-400 transition-colors">
-        &larr; back
-      </button>
+      {!isSelf && (
+        <button onClick={() => router.back()} className="text-xs text-gray-600 hover:text-gray-400 transition-colors">
+          &larr; back
+        </button>
+      )}
 
       <div className="flex items-center gap-4 mt-4 mb-6">
         <div className="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center text-2xl text-gray-500">
@@ -80,11 +98,20 @@ export default function Profile() {
         </div>
         <div>
           <h1 className="text-3xl font-black">{userName}</h1>
-          <p className="text-gray-500 text-sm">Friend&apos;s listening stats</p>
+          <p className="text-gray-500 text-sm">
+            {isSelf ? (
+              <>
+                Your profile
+                {memberSince && <span className="text-gray-600"> &middot; Member since {memberSince}</span>}
+              </>
+            ) : (
+              "Friend’s listening stats"
+            )}
+          </p>
         </div>
       </div>
 
-      {compat && (
+      {!isSelf && compat && (
         <div className="card p-5 mb-8 animate-slide-up">
           <div className="flex flex-col sm:flex-row items-center gap-6">
             <div className="text-center flex-shrink-0">
@@ -148,7 +175,9 @@ export default function Profile() {
         <div className="card p-12 text-center">
           <p className="text-gray-400 text-lg mb-2">No listening data yet</p>
           <p className="text-gray-600 text-sm">
-            This friend hasn&apos;t accumulated enough data yet.
+            {isSelf
+              ? "Your listening data will appear here as we collect it."
+              : "This friend hasn’t accumulated enough data yet."}
           </p>
         </div>
       ) : (
