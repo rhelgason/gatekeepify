@@ -17,6 +17,8 @@ class SpotifyService:
             client_secret=settings.spotify_client_secret,
             redirect_uri=settings.spotify_redirect_uri,
             scope=settings.spotify_scopes,
+            cache_handler=spotipy.cache_handler.MemoryCacheHandler(),
+            open_browser=False,
         )
 
     def get_auth_url(self) -> str:
