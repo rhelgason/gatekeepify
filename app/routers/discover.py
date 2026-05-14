@@ -45,7 +45,7 @@ def _get_friend_compat_scores(db: Session, user_id: str, friend_ids: list) -> di
 
 @router.get("/friends-fresh-finds")
 def friends_fresh_finds(
-    days: int = 7,
+    days: int = Query(default=7, le=365),
     user: UserModel = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -258,7 +258,7 @@ def activity_feed(
     friend_ids = get_friend_ids(db, user.user_id)
     group_ids = [user.user_id] + friend_ids
 
-    events = generate_activity_feed(db, group_ids, limit=min(limit, 100), days=days)
+    events = generate_activity_feed(db, group_ids, limit=min(limit, 100), days=min(days, 365))
 
     log_action(db, "discover.feed_viewed", user_id=user.user_id,
                details={"events": len(events)})

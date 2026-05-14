@@ -58,6 +58,12 @@ def get_current_user(
     return user
 
 
+def get_admin_user(user: User = Depends(get_current_user)) -> User:
+    if not user.is_admin:
+        raise HTTPException(status_code=403, detail="Admin access required")
+    return user
+
+
 @router.get("/login", response_model=AuthUrlResponse)
 def login(return_url: str = Query(None)):
     service = SpotifyService()
@@ -131,7 +137,12 @@ def callback(code: str = Query(...), state: str = Query(None), db: Session = Dep
     if state:
         try:
             import base64
-            redirect_url = base64.urlsafe_b64decode(state.encode()).decode()
+            decoded = base64.urlsafe_b64decode(state.encode()).decode()
+            allowed_origins = {settings.frontend_url}
+            if decoded in allowed_origins or decoded.endswith(".vercel.app"):
+                redirect_url = decoded
+            else:
+                logger.warning(f"Rejected redirect to untrusted origin: {decoded}")
         except Exception:
             pass
     if not redirect_url:

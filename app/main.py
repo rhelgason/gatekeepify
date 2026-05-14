@@ -16,7 +16,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings, validate_settings
 from app.database import Base, SessionLocal, engine, get_db
 from app.routers import auth, awards, backfill, discover, friends, gatekeep, search, stats
-from app.routers.auth import get_current_user
+from app.routers.auth import get_admin_user, get_current_user
 from app.services.audit import log_action
 
 logging.basicConfig(
@@ -44,6 +44,7 @@ try:
     _add_column_if_missing(engine, "dim_all_artists", "image_url", "VARCHAR(512)")
     _add_column_if_missing(engine, "friend_invites", "to_user_id", "VARCHAR(255)")
     _add_column_if_missing(engine, "dim_all_users", "token_invalidated_at", "TIMESTAMP")
+    _add_column_if_missing(engine, "dim_all_users", "is_admin", "BOOLEAN DEFAULT FALSE")
 except Exception as e:
     logger.warning(f"Column migration skipped: {e}")
 
@@ -164,7 +165,7 @@ def health():
     try:
         db.execute(text("SELECT 1"))
     except Exception as e:
-        checks["database"] = f"error: {e}"
+        checks["database"] = "unavailable"
         logger.error(f"Health check database failure: {e}")
         return JSONResponse(
             status_code=503,
@@ -176,7 +177,7 @@ def health():
 
 
 @app.post("/admin/trigger-poll")
-def trigger_poll(user: "User" = Depends(get_current_user), db: "Session" = Depends(get_db)):
+def trigger_poll(user: "User" = Depends(get_admin_user), db: "Session" = Depends(get_db)):
     from app.tasks import poll_recent_listens
     poll_recent_listens.delay()
     log_action(db, "admin.trigger_poll", user_id=user.user_id)
@@ -184,7 +185,7 @@ def trigger_poll(user: "User" = Depends(get_current_user), db: "Session" = Depen
 
 
 @app.post("/admin/trigger-backfill")
-def trigger_backfill(user: "User" = Depends(get_current_user), db: "Session" = Depends(get_db)):
+def trigger_backfill(user: "User" = Depends(get_admin_user), db: "Session" = Depends(get_db)):
     from app.tasks import backfill_track_metadata
     backfill_track_metadata.delay()
     log_action(db, "admin.trigger_backfill", user_id=user.user_id)
@@ -192,7 +193,7 @@ def trigger_backfill(user: "User" = Depends(get_current_user), db: "Session" = D
 
 
 @app.post("/admin/trigger-awards")
-def trigger_awards(user: "User" = Depends(get_current_user), db: "Session" = Depends(get_db)):
+def trigger_awards(user: "User" = Depends(get_admin_user), db: "Session" = Depends(get_db)):
     from app.tasks import compute_award_snapshots
     compute_award_snapshots.delay()
     log_action(db, "admin.trigger_awards", user_id=user.user_id)
@@ -221,7 +222,7 @@ def track_event(
 @app.get("/admin/trust-score")
 def trust_score(
     target_user_id: str = None,
-    user: "User" = Depends(get_current_user),
+    user: "User" = Depends(get_admin_user),
     db: "Session" = Depends(get_db),
 ):
     from app.services.anomaly import analyze_user_export
@@ -233,7 +234,7 @@ def trust_score(
 
 @app.post("/admin/force-logout-all")
 def force_logout_all(
-    user: "User" = Depends(get_current_user),
+    user: "User" = Depends(get_admin_user),
     db: "Session" = Depends(get_db),
 ):
     from datetime import datetime, timezone
@@ -248,7 +249,7 @@ def force_logout_all(
 @app.post("/admin/force-logout/{target_user_id}")
 def force_logout_user(
     target_user_id: str,
-    user: "User" = Depends(get_current_user),
+    user: "User" = Depends(get_admin_user),
     db: "Session" = Depends(get_db),
 ):
     from datetime import datetime, timezone

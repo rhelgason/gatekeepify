@@ -26,12 +26,18 @@ settings = Settings()
 def validate_settings():
     import sys
 
+    is_production = "sqlite" not in settings.database_url
+
     if settings.jwt_secret == "dev-secret-change-in-production":
+        if is_production:
+            raise RuntimeError("FATAL: JWT_SECRET must be set in production. Refusing to start with default secret.")
         print(
             "WARNING: Using default JWT secret. Set JWT_SECRET env var before deploying.",
             file=sys.stderr,
         )
     if not settings.encryption_key:
+        if is_production:
+            raise RuntimeError("FATAL: ENCRYPTION_KEY must be set in production. Refusing to start without encryption.")
         print(
             "WARNING: ENCRYPTION_KEY not set. Spotify refresh tokens will be stored unencrypted.",
             file=sys.stderr,
