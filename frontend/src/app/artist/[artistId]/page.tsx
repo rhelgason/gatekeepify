@@ -220,25 +220,39 @@ export default function ArtistPage() {
                       </text>
                     ) : null;
                   })}
-                  {/* Lines + points */}
+                  {/* Smooth lines */}
                   {datasets.map((ds, di) => {
                     const points = allMonths.map((month, i) => {
                       const entry = ds.months.find((m: any) => m.month === month);
                       return { x: getX(i), y: getY(entry?.listen_count || 0), val: entry?.listen_count || 0, month };
                     });
-                    const pathD = points.map((p, i) => `${i === 0 ? "M" : "L"} ${p.x} ${p.y}`).join(" ");
+                    const smoothPath = (pts: typeof points) => {
+                      if (pts.length < 2) return `M ${pts[0]?.x || 0} ${pts[0]?.y || 0}`;
+                      let d = `M ${pts[0].x} ${pts[0].y}`;
+                      for (let i = 0; i < pts.length - 1; i++) {
+                        const p0 = pts[Math.max(i - 1, 0)];
+                        const p1 = pts[i];
+                        const p2 = pts[i + 1];
+                        const p3 = pts[Math.min(i + 2, pts.length - 1)];
+                        const t = 0.3;
+                        const cp1x = p1.x + (p2.x - p0.x) * t;
+                        const cp1y = p1.y + (p2.y - p0.y) * t;
+                        const cp2x = p2.x - (p3.x - p1.x) * t;
+                        const cp2y = p2.y - (p3.y - p1.y) * t;
+                        d += ` C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${p2.x} ${p2.y}`;
+                      }
+                      return d;
+                    };
+                    const pathD = smoothPath(points);
                     const areaD = pathD + ` L ${points[points.length - 1].x} ${padT + chartH} L ${points[0].x} ${padT + chartH} Z`;
                     return (
                       <g key={di}>
-                        <path d={areaD} fill={ds.color} opacity="0.08" />
-                        <path d={pathD} fill="none" stroke={ds.color} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+                        <path d={areaD} fill={ds.color} opacity="0.06" />
+                        <path d={pathD} fill="none" stroke={ds.color} strokeWidth="2" strokeLinecap="round" />
                         {points.map((p, i) => (
-                          <g key={i}>
-                            <circle cx={p.x} cy={p.y} r="4" fill={ds.color} opacity="0.9" />
-                            <circle cx={p.x} cy={p.y} r="14" fill="transparent" className="cursor-pointer">
-                              <title>{formatMonth(p.month)}: {p.val.toLocaleString()} listens</title>
-                            </circle>
-                          </g>
+                          <circle key={i} cx={p.x} cy={p.y} r="12" fill="transparent" className="cursor-pointer">
+                            <title>{formatMonth(p.month)}: {p.val.toLocaleString()} listens</title>
+                          </circle>
                         ))}
                       </g>
                     );
