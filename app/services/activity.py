@@ -162,6 +162,7 @@ def _detect_new_obsessions(db: Session, user_id: str, since: datetime) -> List[d
 
 def _detect_milestones(db: Session, user_id: str) -> List[dict]:
     milestones = [1000, 500, 100]
+    since = datetime.now(timezone.utc) - timedelta(days=7)
 
     rows = db.execute(
         select(TrackArtist.artist_id, Artist.artist_name, func.count().label("cnt"))
@@ -178,25 +179,39 @@ def _detect_milestones(db: Session, user_id: str) -> List[dict]:
     for row in rows:
         for m in milestones:
             if row.cnt >= m:
-                last_listen = db.execute(
+                prior_count = db.execute(
+                    select(func.count())
+                    .select_from(Listen)
+                    .join(TrackArtist, Listen.track_id == TrackArtist.track_id)
+                    .where(
+                        Listen.user_id == user_id,
+                        TrackArtist.artist_id == row.artist_id,
+                        Listen.ts < since,
+                    )
+                ).scalar() or 0
+
+                if prior_count >= m:
+                    break
+
+                last_api_listen = db.execute(
                     select(func.max(Listen.ts))
                     .join(TrackArtist, Listen.track_id == TrackArtist.track_id)
-                    .where(Listen.user_id == user_id, TrackArtist.artist_id == row.artist_id,
-                           Listen.source == ListenSource.api.value)
+                    .where(
+                        Listen.user_id == user_id,
+                        TrackArtist.artist_id == row.artist_id,
+                        Listen.source == ListenSource.api.value,
+                        Listen.ts >= since,
+                    )
                 ).scalar()
 
-                if last_listen:
-                    week_ago = datetime.now(timezone.utc) - timedelta(days=7)
-                    ts = last_listen if isinstance(last_listen, datetime) else datetime.fromisoformat(str(last_listen))
-                    if ts.tzinfo is None:
-                        ts = ts.replace(tzinfo=timezone.utc)
-                    if ts < week_ago:
-                        break
+                if not last_api_listen:
+                    break
 
+                ts = last_api_listen if isinstance(last_api_listen, datetime) else datetime.fromisoformat(str(last_api_listen))
                 quip = _milestone_quip(user_name, row.artist_name, m)
                 events.append({
                     "type": "milestone",
-                    "ts": last_listen.isoformat() if isinstance(last_listen, datetime) else str(last_listen),
+                    "ts": ts.isoformat(),
                     "user_id": user_id,
                     "user_name": user_name,
                     "artist_id": row.artist_id,
