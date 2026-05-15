@@ -191,5 +191,6 @@ def get_me(user: User = Depends(get_current_user), db: Session = Depends(get_db)
         user_id=user.user_id,
         user_name=user.user_name,
         email=user.email,
+        image_url=user.image_url,
         created_at=user.created_at,
     )
