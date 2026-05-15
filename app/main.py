@@ -46,6 +46,7 @@ try:
     _add_column_if_missing(engine, "dim_all_artists", "image_url", "VARCHAR(512)")
     _add_column_if_missing(engine, "friend_invites", "to_user_id", "VARCHAR(255)")
     _add_column_if_missing(engine, "dim_all_users", "token_invalidated_at", "TIMESTAMP")
+    _add_column_if_missing(engine, "dim_all_listens", "ms_played", "INTEGER")
     _add_column_if_missing(engine, "dim_all_users", "image_url", "VARCHAR(512)")
     _add_column_if_missing(engine, "dim_all_users", "is_admin", "BOOLEAN DEFAULT FALSE")
     _add_column_if_missing(engine, "job_runs", "details", "TEXT")

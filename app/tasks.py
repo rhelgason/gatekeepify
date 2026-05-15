@@ -376,6 +376,7 @@ def process_backfill_upload(job_id: int, user_id: str):
                     "user_id": listen.user_id,
                     "track_id": listen.track_id,
                     "source": listen.source,
+                    "ms_played": listen.ms_played,
                     "export_metadata": listen.export_metadata,
                 })
             if listen_rows:

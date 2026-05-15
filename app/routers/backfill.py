@@ -188,6 +188,7 @@ def _validate_and_process_listens(
             user_id=user.user_id,
             track_id=track_id,
             source=ListenSource.export.value,
+            ms_played=ms_played,
             export_metadata=json.dumps(extra_meta) if extra_meta else None,
         )
         track_name = listen_json.get("master_metadata_track_name")

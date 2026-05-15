@@ -210,8 +210,15 @@ def _get_top_genres(
 def _get_total_minutes(
     db: Session, user_id: str, since: Optional[datetime], until: Optional[datetime] = None
 ) -> int:
+    from sqlalchemy import case
+    ms_expr = func.sum(
+        case(
+            (Listen.ms_played.isnot(None), Listen.ms_played),
+            else_=func.coalesce(Track.duration_ms, 0),
+        )
+    )
     stmt = (
-        select(func.sum(Track.duration_ms))
+        select(ms_expr)
         .select_from(Listen)
         .join(Track, Listen.track_id == Track.track_id)
         .where(Listen.user_id == user_id)

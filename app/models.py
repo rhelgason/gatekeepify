@@ -114,6 +114,7 @@ class Listen(Base):
         String(255), ForeignKey("dim_all_tracks.track_id"), primary_key=True
     )
     source: Mapped[str] = mapped_column(String(10), default=ListenSource.api.value)
+    ms_played: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     export_metadata: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     user: Mapped["User"] = relationship()
