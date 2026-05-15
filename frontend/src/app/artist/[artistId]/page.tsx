@@ -448,15 +448,6 @@ export default function ArtistPage() {
                       <span className="font-bold text-lg">
                         {entry.user_name || entry.user_id}
                       </span>
-                      <span
-                        className={`ml-3 ${
-                          entry.first_listen_source === "api"
-                            ? "badge-verified"
-                            : "badge-self-reported"
-                        }`}
-                      >
-                        {entry.first_listen_source === "api" ? "verified" : "self-reported"}
-                      </span>
                     </div>
                   </div>
                   <div className="text-right">
@@ -466,9 +457,6 @@ export default function ArtistPage() {
                     </div>
                     <div className="text-xs text-gray-500">
                       First: {new Date(entry.first_listen).toLocaleDateString("en-US", { month: "short", year: "numeric" })}
-                      {entry.verified_listens > 0 && entry.verified_listens < entry.total_listens && (
-                        <> &middot; {entry.verified_listens} verified</>
-                      )}
                     </div>
                   </div>
                 </div>
