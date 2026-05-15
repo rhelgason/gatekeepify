@@ -55,22 +55,31 @@ except Exception as e:
 try:
     from app.models import JobRun
     from datetime import datetime, timezone
+    import json as _json
     _startup_db = SessionLocal()
     orphaned = _startup_db.query(JobRun).filter(
         JobRun.job_name == "backfill_upload",
         JobRun.status.in_(["pending", "running"]),
     ).all()
     for j in orphaned:
-        j.status = "error"
-        j.completed_at = datetime.now(timezone.utc)
-        import json as _json
         details = _json.loads(j.details) if j.details else {}
-        details.pop("listen_data", None)
-        details.update({"phase": "error", "error": "Server restarted during processing"})
-        j.details = _json.dumps(details)
-    if orphaned:
-        _startup_db.commit()
-        logger.info(f"Marked {len(orphaned)} orphaned upload jobs as failed")
+        has_listen_data = "listen_data" in details
+        if has_listen_data:
+            j.status = "pending"
+            details.update({"phase": "resuming", "progress": 0})
+            j.details = _json.dumps(details)
+            _startup_db.commit()
+            from app.celery_app import celery_app
+            celery_app.send_task("app.tasks.process_backfill_upload", args=[j.id, j.user_id])
+            logger.info(f"Resuming interrupted upload job {j.id} for user {j.user_id}")
+        else:
+            j.status = "error"
+            j.completed_at = datetime.now(timezone.utc)
+            details.pop("listen_data", None)
+            details.update({"phase": "error", "error": "Server restarted during processing"})
+            j.details = _json.dumps(details)
+            _startup_db.commit()
+            logger.info(f"Marked orphaned upload job {j.id} as failed (no data to resume)")
     _startup_db.close()
 except Exception as e:
     logger.warning(f"Orphaned job cleanup skipped: {e}")

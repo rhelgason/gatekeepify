@@ -288,6 +288,13 @@ def upload_job_status(
     if not job:
         return {"status": "none"}
 
+    if job.status in ("error", "completed") and job.completed_at:
+        completed = job.completed_at
+        if completed.tzinfo is None:
+            completed = completed.replace(tzinfo=timezone.utc)
+        if (datetime.now(timezone.utc) - completed).total_seconds() > 86400:
+            return {"status": "none"}
+
     JOB_TIMEOUT_MINUTES = 120
     if job.status in ("pending", "running") and job.started_at:
         started = job.started_at
