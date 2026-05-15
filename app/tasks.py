@@ -209,6 +209,7 @@ def backfill_track_metadata():
         logger.info(f"Backfilled metadata for {count} tracks")
     except Exception as e:
         logger.error(f"Failed to backfill track metadata: {e}")
+        db.rollback()
         log_job_run(
             db,
             "backfill_track_metadata",
@@ -406,7 +407,8 @@ def process_backfill_upload(job_id: int, user_id: str):
                     client = service.get_client(access_token)
 
                     BATCH_SIZE = 50
-                    for i in range(0, total_to_enrich, BATCH_SIZE):
+                    i = 0
+                    while i < total_to_enrich:
                         db.refresh(job)
                         if job.status == "error":
                             logger.info(f"Backfill job {job_id} cancelled during enrichment")
@@ -420,29 +422,45 @@ def process_backfill_upload(job_id: int, user_id: str):
                                 service._enrich_with_genres(client, items)
                                 enriched += upsert_track_metadata(db, items)
                             rate_limit_strikes = 0
+                            i += BATCH_SIZE
                         except SpotifyExc as e:
                             if e.http_status == 429:
                                 retry_after = int(e.headers.get("Retry-After", 5)) if hasattr(e, "headers") and e.headers else 5
                                 logger.warning(f"Rate limited during enrichment, waiting {retry_after}s")
                                 rate_limit_strikes += 1
                                 if rate_limit_strikes >= 5:
-                                    logger.warning(f"Too many rate limits, stopping enrichment at {enriched}/{total_to_enrich}")
+                                    logger.warning(f"Too many rate limits, stopping at {enriched}/{total_to_enrich}")
                                     break
                                 time.sleep(retry_after)
-                                continue
+                            elif e.http_status in (401, 403):
+                                logger.info("Token expired during enrichment, refreshing")
+                                try:
+                                    token_info = service.refresh_access_token(refresh_token)
+                                    access_token = token_info["access_token"]
+                                    client = service.get_client(access_token)
+                                except Exception:
+                                    logger.warning("Token refresh failed, stopping enrichment")
+                                    break
                             else:
                                 logger.warning(f"Spotify error during enrichment batch: {e}")
-                                continue
+                                i += BATCH_SIZE
                         except Exception as e:
                             logger.warning(f"Error during enrichment batch: {e}")
                             db.rollback()
-                            continue
+                            i += BATCH_SIZE
 
-                        progress = 80 + int(15 * (i + len(batch)) / total_to_enrich)
+                        progress = 80 + int(15 * min(i, total_to_enrich) / total_to_enrich)
                         _update_job("enriching", min(progress, 95),
                                     enrich_total=total_to_enrich, enrich_done=enriched)
             except Exception as e:
                 logger.warning(f"Enrichment setup failed: {e}")
+
+        if enriched > 0:
+            from app.services.ingestion import retroactively_validate_export_listens
+            enriched_ids = set(all_unenriched[:min(i, total_to_enrich)])
+            removed = retroactively_validate_export_listens(db, enriched_ids)
+            if removed:
+                logger.info(f"Removed {removed} pre-release listens after enrichment")
 
         _update_job("analyzing", 95, enriched=enriched,
                     enrich_total=total_to_enrich, enrich_done=enriched)

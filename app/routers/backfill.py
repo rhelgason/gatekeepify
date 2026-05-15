@@ -297,11 +297,12 @@ def upload_job_status(
             job.status = "error"
             job.completed_at = datetime.now(timezone.utc)
             details = json.loads(job.details) if job.details else {}
-            details.update({"phase": "error", "error": "Job timed out after 30 minutes"})
+            details.update({"phase": "error", "error": f"Job timed out after {JOB_TIMEOUT_MINUTES} minutes"})
             job.details = json.dumps(details)
             db.commit()
 
     details = json.loads(job.details) if job.details else {}
+    details.pop("listen_data", None)
     return {
         "job_id": job.id,
         "status": job.status,
