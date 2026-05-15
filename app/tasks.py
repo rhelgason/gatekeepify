@@ -383,10 +383,18 @@ def process_backfill_upload(job_id: int, user_id: str):
                 dialect = db.bind.dialect.name if db.bind else "sqlite"
                 if dialect == "postgresql":
                     stmt = pg_dialect.insert(Listen.__table__).values(listen_rows)
-                    stmt = stmt.on_conflict_do_nothing(index_elements=["ts", "user_id", "track_id"])
+                    stmt = stmt.on_conflict_do_update(
+                        index_elements=["ts", "user_id", "track_id"],
+                        set_={"ms_played": stmt.excluded.ms_played},
+                        where=Listen.__table__.c.ms_played.is_(None),
+                    )
                 else:
                     stmt = sqlite_dialect.insert(Listen.__table__).values(listen_rows)
-                    stmt = stmt.on_conflict_do_nothing(index_elements=["ts", "user_id", "track_id"])
+                    stmt = stmt.on_conflict_do_update(
+                        index_elements=["ts", "user_id", "track_id"],
+                        set_={"ms_played": stmt.excluded.ms_played},
+                        where=Listen.__table__.c.ms_played.is_(None),
+                    )
                 result = db.execute(stmt)
                 inserted += result.rowcount
             db.commit()
