@@ -262,6 +262,9 @@ export default function Upload() {
               <p className="text-xs text-gray-600 mt-1">
                 {job.total_listens.toLocaleString()} listens found
                 {job.inserted != null && ` · ${job.inserted.toLocaleString()} inserted so far`}
+                {job.phase === "enriching" && job.enrich_total != null && (
+                  <> · Enriching {(job.enrich_done || 0).toLocaleString()} / {job.enrich_total.toLocaleString()} tracks</>
+                )}
               </p>
             )}
             <button

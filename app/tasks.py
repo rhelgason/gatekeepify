@@ -384,19 +384,18 @@ def process_backfill_upload(job_id: int, user_id: str):
             progress = 40 + int(35 * (i + len(batch)) / max(len(accepted), 1))
             _update_job("inserting", min(progress, 75), inserted=inserted)
 
-        _update_job("enriching", 80, inserted=inserted)
+        from app.services.ingestion import get_tracks_missing_metadata
+        all_unenriched = list(get_tracks_missing_metadata(db, limit=100000))
+        total_to_enrich = len(all_unenriched)
 
-        MAX_IMMEDIATE_ENRICHMENT = 500
-        new_track_ids = list({
-            listen.track_id for listen, _ in accepted
-            if db.query(Track).filter(
-                Track.track_id == listen.track_id, Track.album_id.is_(None)
-            ).first()
-        })[:MAX_IMMEDIATE_ENRICHMENT]
+        _update_job("enriching", 80, inserted=inserted,
+                    enrich_total=total_to_enrich, enrich_done=0)
 
         enriched = 0
-        if new_track_ids:
+        rate_limit_strikes = 0
+        if total_to_enrich > 0:
             try:
+                import time
                 from spotipy.exceptions import SpotifyException as SpotifyExc
                 user_obj = db.query(User).filter(User.user_id == user_id).first()
                 if user_obj and user_obj.spotify_refresh_token:
@@ -404,13 +403,48 @@ def process_backfill_upload(job_id: int, user_id: str):
                     refresh_token = decrypt_token(user_obj.spotify_refresh_token)
                     token_info = service.refresh_access_token(refresh_token)
                     access_token = token_info["access_token"]
-                    items = service.get_tracks(access_token, new_track_ids)
-                    if items:
-                        enriched = upsert_track_metadata(db, items)
-            except Exception as e:
-                logger.warning(f"Enrichment during backfill upload: {e}")
+                    client = service.get_client(access_token)
 
-        _update_job("analyzing", 95, enriched=enriched)
+                    BATCH_SIZE = 50
+                    for i in range(0, total_to_enrich, BATCH_SIZE):
+                        db.refresh(job)
+                        if job.status == "error":
+                            logger.info(f"Backfill job {job_id} cancelled during enrichment")
+                            return
+
+                        batch = all_unenriched[i:i + BATCH_SIZE]
+                        try:
+                            result = client.tracks(batch)
+                            if result and result.get("tracks"):
+                                items = [{"track": t} for t in result["tracks"] if t]
+                                service._enrich_with_genres(client, items)
+                                enriched += upsert_track_metadata(db, items)
+                            rate_limit_strikes = 0
+                        except SpotifyExc as e:
+                            if e.http_status == 429:
+                                retry_after = int(e.headers.get("Retry-After", 5)) if hasattr(e, "headers") and e.headers else 5
+                                logger.warning(f"Rate limited during enrichment, waiting {retry_after}s")
+                                rate_limit_strikes += 1
+                                if rate_limit_strikes >= 5:
+                                    logger.warning(f"Too many rate limits, stopping enrichment at {enriched}/{total_to_enrich}")
+                                    break
+                                time.sleep(retry_after)
+                                continue
+                            else:
+                                logger.warning(f"Spotify error during enrichment batch: {e}")
+                                continue
+                        except Exception as e:
+                            logger.warning(f"Error during enrichment batch: {e}")
+                            continue
+
+                        progress = 80 + int(15 * (i + len(batch)) / total_to_enrich)
+                        _update_job("enriching", min(progress, 95),
+                                    enrich_total=total_to_enrich, enrich_done=enriched)
+            except Exception as e:
+                logger.warning(f"Enrichment setup failed: {e}")
+
+        _update_job("analyzing", 95, enriched=enriched,
+                    enrich_total=total_to_enrich, enrich_done=enriched)
 
         from app.services.anomaly import analyze_user_export
         anomaly_result = analyze_user_export(db, user_id)

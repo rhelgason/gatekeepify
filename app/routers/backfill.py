@@ -314,6 +314,8 @@ def upload_job_status(
         "rejected": details.get("rejected"),
         "rejection_reasons": details.get("rejection_reasons"),
         "enriched": details.get("enriched"),
+        "enrich_total": details.get("enrich_total"),
+        "enrich_done": details.get("enrich_done"),
         "error": details.get("error"),
     }
 
