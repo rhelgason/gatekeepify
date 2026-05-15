@@ -294,15 +294,11 @@ def compute_award_snapshots():
 
 
 @celery_app.task(name="app.tasks.process_backfill_upload")
-def process_backfill_upload(job_id: int, user_id: str, encoded_content: str):
-    import base64
+def process_backfill_upload(job_id: int, user_id: str):
     import json
 
     from app.models import JobRun, Track
-    from app.routers.backfill import (
-        _extract_json_from_zip,
-        _validate_and_process_listens,
-    )
+    from app.routers.backfill import _validate_and_process_listens
     from app.services.audit import log_action
 
     db = SessionLocal()
@@ -314,22 +310,20 @@ def process_backfill_upload(job_id: int, user_id: str, encoded_content: str):
 
         def _update_job(phase: str, progress: int, **extra):
             details = json.loads(job.details) if job.details else {}
+            details.pop("listen_data", None)
             details.update({"phase": phase, "progress": progress, **extra})
             job.details = json.dumps(details)
             db.commit()
 
         job.status = "running"
-        _update_job("extracting", 5)
 
-        content = base64.b64decode(encoded_content)
-        raw_listens = _extract_json_from_zip(content)
+        details = json.loads(job.details) if job.details else {}
+        raw_listens = details.get("listen_data", [])
 
         if not raw_listens:
             job.status = "error"
             job.completed_at = datetime.now(timezone.utc)
-            _update_job("error", 100, error="No streaming history files found in the ZIP")
-            log_action(db, "backfill.upload", user_id=user_id, status="error",
-                       details={"reason": "no_streaming_history_files"})
+            _update_job("error", 100, error="No listen data found in job")
             return
 
         _update_job("validating", 15, total_listens=len(raw_listens))

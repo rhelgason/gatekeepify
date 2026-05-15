@@ -241,22 +241,31 @@ def upload_data_export(
     if len(content) > MAX_UPLOAD_BYTES:
         raise HTTPException(status_code=400, detail="File too large (max 100 MB)")
 
-    import base64
-    encoded = base64.b64encode(content).decode()
+    raw_listens = _extract_json_from_zip(content)
+    if not raw_listens:
+        log_action(db, "backfill.upload", user_id=user.user_id, status="error",
+                   details={"reason": "no_streaming_history_files"})
+        raise HTTPException(status_code=400, detail="No streaming history files found in the ZIP")
 
     job = JobRun(
         job_name="backfill_upload",
         user_id=user.user_id,
         started_at=datetime.now(timezone.utc),
         status="pending",
-        details=json.dumps({"phase": "queued", "progress": 0, "filename": file.filename}),
+        details=json.dumps({
+            "phase": "queued",
+            "progress": 0,
+            "filename": file.filename,
+            "total_listens": len(raw_listens),
+            "listen_data": raw_listens,
+        }),
     )
     db.add(job)
     db.commit()
     db.refresh(job)
 
     from app.celery_app import celery_app
-    celery_app.send_task("app.tasks.process_backfill_upload", args=[job.id, user.user_id, encoded])
+    celery_app.send_task("app.tasks.process_backfill_upload", args=[job.id, user.user_id])
 
     log_action(db, "backfill.upload_started", user_id=user.user_id,
                details={"job_id": job.id, "filename": file.filename, "size_bytes": len(content)})
@@ -279,7 +288,7 @@ def upload_job_status(
     if not job:
         return {"status": "none"}
 
-    JOB_TIMEOUT_MINUTES = 30
+    JOB_TIMEOUT_MINUTES = 120
     if job.status in ("pending", "running") and job.started_at:
         started = job.started_at
         if started.tzinfo is None:
