@@ -244,9 +244,13 @@ export default function Friends() {
               className="card-hover flex justify-between items-center px-5 py-4"
             >
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center text-sm text-gray-500">
-                  {(f.user_name || f.user_id)[0]?.toUpperCase()}
-                </div>
+                {f.image_url ? (
+                  <img src={f.image_url} alt="" className="w-10 h-10 rounded-full object-cover" />
+                ) : (
+                  <div className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center text-sm text-gray-500">
+                    {(f.user_name || f.user_id)[0]?.toUpperCase()}
+                  </div>
+                )}
                 <div>
                   <span className="font-medium block">{f.user_name || f.user_id}</span>
                   <span className="text-gray-600 text-xs">

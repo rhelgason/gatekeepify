@@ -93,6 +93,7 @@ class UserResponse(BaseModel):
     user_id: str
     user_name: Optional[str] = None
     email: Optional[str] = None
+    image_url: Optional[str] = None
     created_at: Optional[datetime] = None
 
     model_config = {"from_attributes": True}
@@ -128,6 +129,7 @@ class BackfillStatusResponse(BaseModel):
 class FriendResponse(BaseModel):
     user_id: str
     user_name: Optional[str] = None
+    image_url: Optional[str] = None
     friends_since: datetime
 
 

@@ -229,9 +229,13 @@ export default function Trophies() {
                 href={`/trophies/head-to-head?friend=${f.user_id}`}
                 className="card-hover px-4 py-3 flex items-center gap-3"
               >
-                <div className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-sm text-gray-500">
-                  {(f.user_name || f.user_id)[0]?.toUpperCase()}
-                </div>
+                {f.image_url ? (
+                  <img src={f.image_url} alt="" className="w-8 h-8 rounded-full object-cover" />
+                ) : (
+                  <div className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-sm text-gray-500">
+                    {(f.user_name || f.user_id)[0]?.toUpperCase()}
+                  </div>
+                )}
                 <span className="text-sm font-medium flex-1">{f.user_name || f.user_id}</span>
                 <span className="text-gray-600 text-xs">Compare →</span>
               </Link>

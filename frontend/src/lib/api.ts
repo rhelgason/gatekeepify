@@ -75,7 +75,7 @@ export const api = {
     return request<{ auth_url: string }>(`/auth/login${qs ? `?${qs}` : ""}`);
   },
 
-  getMe: () => request<{ user_id: string; user_name: string; email: string; created_at: string | null }>(
+  getMe: () => request<{ user_id: string; user_name: string; email: string; image_url: string | null; created_at: string | null }>(
     "/auth/me"
   ),
 

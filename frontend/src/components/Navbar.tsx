@@ -13,12 +13,12 @@ export default function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [pendingCount, setPendingCount] = useState(0);
-  const [user, setUser] = useState<{ user_id: string; user_name: string } | null>(null);
+  const [user, setUser] = useState<{ user_id: string; user_name: string; image_url: string | null } | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!loggedIn) return;
-    api.getMe().then(u => setUser({ user_id: u.user_id, user_name: u.user_name })).catch(() => {});
+    api.getMe().then(u => setUser({ user_id: u.user_id, user_name: u.user_name, image_url: u.image_url })).catch(() => {});
     api.getPendingRequests().then(r => setPendingCount(r.length)).catch(() => {});
     const interval = setInterval(() => {
       api.getPendingRequests().then(r => setPendingCount(r.length)).catch(() => {});
@@ -87,9 +87,13 @@ export default function Navbar() {
           <div className="relative ml-2" ref={menuRef}>
             <button
               onClick={() => setMenuOpen(!menuOpen)}
-              className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-xs font-bold text-gray-400 hover:text-white hover:bg-white/15 transition-all duration-200"
+              className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-xs font-bold text-gray-400 hover:text-white hover:bg-white/15 transition-all duration-200 overflow-hidden"
             >
-              {userInitial}
+              {user?.image_url ? (
+                <img src={user.image_url} alt="" className="w-full h-full object-cover" />
+              ) : (
+                userInitial
+              )}
             </button>
             {menuOpen && (
               <div className="absolute right-0 mt-2 w-52 rounded-xl border border-white/10 bg-[#141414] shadow-xl overflow-hidden animate-fade-in">

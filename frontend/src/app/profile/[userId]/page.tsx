@@ -19,6 +19,7 @@ export default function Profile() {
   const [artists, setArtists] = useState<any[]>([]);
   const [genres, setGenres] = useState<any[]>([]);
   const [userName, setUserName] = useState("");
+  const [userImage, setUserImage] = useState<string | null>(null);
   const [compat, setCompat] = useState<any>(null);
   const [compatLoading, setCompatLoading] = useState(false);
   const [isSelf, setIsSelf] = useState(false);
@@ -50,6 +51,7 @@ export default function Profile() {
       if (me.user_id === userId) {
         setIsSelf(true);
         setUserName(me.user_name || me.user_id);
+        setUserImage(me.image_url);
         if (me.created_at) {
           setMemberSince(new Date(me.created_at).toLocaleDateString("en-US", { month: "long", year: "numeric" }));
         }
@@ -57,8 +59,12 @@ export default function Profile() {
         setIsSelf(false);
         api.getFriends().then(friends => {
           const friend = friends.find((f: any) => f.user_id === userId);
-          if (friend) setUserName(friend.user_name || friend.user_id);
-          else setUserName(userId);
+          if (friend) {
+            setUserName(friend.user_name || friend.user_id);
+            setUserImage(friend.image_url);
+          } else {
+            setUserName(userId);
+          }
         });
         setCompatLoading(true);
         api.getCompatibility(userId).then(setCompat).catch(() => {}).finally(() => setCompatLoading(false));
@@ -95,9 +101,13 @@ export default function Profile() {
       )}
 
       <div className="flex items-center gap-4 mt-4 mb-6">
-        <div className="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center text-2xl text-gray-500">
-          {userName[0]?.toUpperCase() || "?"}
-        </div>
+        {userImage ? (
+          <img src={userImage} alt="" className="w-16 h-16 rounded-full object-cover" />
+        ) : (
+          <div className="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center text-2xl text-gray-500">
+            {userName[0]?.toUpperCase() || "?"}
+          </div>
+        )}
         <div>
           <h1 className="text-3xl font-black">{userName}</h1>
           <p className="text-gray-500 text-sm">

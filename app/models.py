@@ -96,6 +96,7 @@ class User(Base):
     spotify_refresh_token: Mapped[Optional[str]] = mapped_column(
         String(1024), nullable=True
     )
+    image_url: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
     created_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     last_poll_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     token_invalidated_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)

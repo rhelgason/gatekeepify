@@ -37,7 +37,7 @@ def list_friends(
 ):
     clamped = max(1, min(limit, MAX_LIMIT))
     stmt = (
-        select(Friendship.user_id_2, User.user_name, Friendship.created_at)
+        select(Friendship.user_id_2, User.user_name, User.image_url, Friendship.created_at)
         .join(User, Friendship.user_id_2 == User.user_id)
         .where(Friendship.user_id_1 == user.user_id)
         .order_by(Friendship.created_at.desc())
@@ -51,7 +51,8 @@ def list_friends(
         FriendResponse(
             user_id=row[0],
             user_name=row[1],
-            friends_since=row[2],
+            image_url=row[2],
+            friends_since=row[3],
         )
         for row in rows
     ]

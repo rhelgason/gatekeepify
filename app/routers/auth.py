@@ -100,12 +100,15 @@ def callback(code: str = Query(...), state: str = Query(None), db: Session = Dep
 
     display_name = spotify_user.get("display_name", "")
     email = spotify_user.get("email")
+    images = spotify_user.get("images", [])
+    profile_image = images[0]["url"] if images else None
 
     is_new = False
     user = db.query(User).filter(User.user_id == user_id).first()
     if user:
         user.user_name = display_name
         user.email = email
+        user.image_url = profile_image
         if refresh_token:
             user.spotify_refresh_token = encrypt_token(refresh_token)
     else:
@@ -114,6 +117,7 @@ def callback(code: str = Query(...), state: str = Query(None), db: Session = Dep
             user_id=user_id,
             user_name=display_name,
             email=email,
+            image_url=profile_image,
             spotify_refresh_token=encrypt_token(refresh_token),
             created_at=datetime.now(timezone.utc),
         )
