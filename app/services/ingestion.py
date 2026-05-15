@@ -198,12 +198,12 @@ def retroactively_validate_export_listens(
     return removed
 
 
-def get_tracks_missing_metadata(db: Session, limit: int = 50) -> Set[str]:
+def get_tracks_missing_metadata(db: Session, limit: int = 200) -> Set[str]:
     stmt = (
         select(Listen.track_id, func.count().label("cnt"))
-        .outerjoin(Track, Listen.track_id == Track.track_id)
+        .join(Track, Listen.track_id == Track.track_id)
         .where(
-            (Track.track_name.is_(None)) | (Track.track_id.is_(None))
+            (Track.duration_ms.is_(None)) | (Track.album_id.is_(None))
         )
         .group_by(Listen.track_id)
         .order_by(func.count().desc())

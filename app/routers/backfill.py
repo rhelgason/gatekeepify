@@ -359,8 +359,11 @@ def backfill_status(
     missing_meta = db.execute(
         select(func.count(func.distinct(Listen.track_id)))
         .select_from(Listen)
-        .outerjoin(Track, Listen.track_id == Track.track_id)
-        .where(Listen.user_id == user.user_id, Track.track_name.is_(None))
+        .join(Track, Listen.track_id == Track.track_id)
+        .where(
+            Listen.user_id == user.user_id,
+            (Track.duration_ms.is_(None)) | (Track.album_id.is_(None)),
+        )
     ).scalar() or 0
 
     total_listens = db.execute(

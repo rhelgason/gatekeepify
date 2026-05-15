@@ -296,7 +296,8 @@ class TestBackfillTrackMetadataTask:
         db = Session()
 
         db.add(User(user_id="u1", user_name="User", spotify_refresh_token="tok"))
-        db.add(Track(track_id="trk_1", track_name="Has Name"))
+        db.add(Album(album_id="alb_1", album_name="Album"))
+        db.add(Track(track_id="trk_1", track_name="Has Name", duration_ms=200000, album_id="alb_1"))
         db.add(
             Listen(
                 ts=datetime(2024, 1, 1),
