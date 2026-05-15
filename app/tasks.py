@@ -294,7 +294,7 @@ def compute_award_snapshots():
         db.close()
 
 
-@celery_app.task(name="app.tasks.process_backfill_upload")
+@celery_app.task(name="app.tasks.process_backfill_upload", acks_late=True, reject_on_worker_lost=True)
 def process_backfill_upload(job_id: int, user_id: str):
     import json
 
@@ -362,24 +362,32 @@ def process_backfill_upload(job_id: int, user_id: str):
                         db.merge(Track(track_id=listen.track_id, track_name=track_name))
             db.flush()
 
+            from sqlalchemy.dialects import sqlite as sqlite_dialect
+            from sqlalchemy.dialects import postgresql as pg_dialect
             seen_listens = set()
+            listen_rows = []
             for listen, track_name in batch:
                 listen_key = (listen.user_id, listen.track_id, str(listen.ts))
                 if listen_key in seen_listens:
                     continue
                 seen_listens.add(listen_key)
-                from sqlalchemy import select as sa_select
-                existing = db.execute(
-                    sa_select(Listen).where(
-                        Listen.user_id == listen.user_id,
-                        Listen.track_id == listen.track_id,
-                        Listen.ts == listen.ts,
-                    )
-                ).first()
-                if existing:
-                    continue
-                db.add(listen)
-                inserted += 1
+                listen_rows.append({
+                    "ts": listen.ts,
+                    "user_id": listen.user_id,
+                    "track_id": listen.track_id,
+                    "source": listen.source,
+                    "export_metadata": listen.export_metadata,
+                })
+            if listen_rows:
+                dialect = db.bind.dialect.name if db.bind else "sqlite"
+                if dialect == "postgresql":
+                    stmt = pg_dialect.insert(Listen.__table__).values(listen_rows)
+                    stmt = stmt.on_conflict_do_nothing(index_elements=["ts", "user_id", "track_id"])
+                else:
+                    stmt = sqlite_dialect.insert(Listen.__table__).values(listen_rows)
+                    stmt = stmt.on_conflict_do_nothing(index_elements=["ts", "user_id", "track_id"])
+                result = db.execute(stmt)
+                inserted += result.rowcount
             db.commit()
 
             progress = 40 + int(35 * (i + len(batch)) / max(len(accepted), 1))

@@ -52,6 +52,29 @@ try:
 except Exception as e:
     logger.warning(f"Column migration skipped: {e}")
 
+try:
+    from app.models import JobRun
+    from datetime import datetime, timezone
+    _startup_db = SessionLocal()
+    orphaned = _startup_db.query(JobRun).filter(
+        JobRun.job_name == "backfill_upload",
+        JobRun.status.in_(["pending", "running"]),
+    ).all()
+    for j in orphaned:
+        j.status = "error"
+        j.completed_at = datetime.now(timezone.utc)
+        import json as _json
+        details = _json.loads(j.details) if j.details else {}
+        details.pop("listen_data", None)
+        details.update({"phase": "error", "error": "Server restarted during processing"})
+        j.details = _json.dumps(details)
+    if orphaned:
+        _startup_db.commit()
+        logger.info(f"Marked {len(orphaned)} orphaned upload jobs as failed")
+    _startup_db.close()
+except Exception as e:
+    logger.warning(f"Orphaned job cleanup skipped: {e}")
+
 app = FastAPI(
     title="Gatekeepify",
     description="Prove you listened first.",

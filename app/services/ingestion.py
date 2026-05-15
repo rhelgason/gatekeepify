@@ -78,8 +78,11 @@ def upsert_track_metadata(db: Session, track_items: List[dict]) -> int:
         track_data = item.get("track", {})
         if not track_data or not track_data.get("id"):
             continue
-        _upsert_track_and_relations(db, track_data, seen_albums, seen_artists)
-        updated += 1
+        try:
+            _upsert_track_and_relations(db, track_data, seen_albums, seen_artists)
+            updated += 1
+        except Exception:
+            db.rollback()
     db.commit()
     return updated
 
