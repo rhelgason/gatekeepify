@@ -147,46 +147,59 @@ export default function Upload() {
           <div className="h-4 w-48 mx-auto bg-white/5 rounded animate-pulse" />
         </div>
       ) : !isProcessing && (
-        <div
-          onDragOver={(e) => {
-            e.preventDefault();
-            setDragging(true);
-          }}
-          onDragLeave={() => setDragging(false)}
-          onDrop={handleDrop}
-          onClick={() => fileInput.current?.click()}
-          className={`card cursor-pointer p-16 text-center transition-all duration-200 ${
-            dragging
-              ? "border-[var(--green)] bg-[var(--green-dim)] scale-[1.01]"
-              : "hover:border-white/10 hover:bg-[#1a1a1a]"
-          }`}
-        >
-          <input
-            ref={fileInput}
-            type="file"
-            accept=".zip"
-            className="hidden"
-            onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])}
-          />
-          {uploading ? (
-            <div>
-              <div className="text-3xl mb-3 animate-pulse">📦</div>
-              <p className="text-gray-400">Uploading file to server...</p>
-              <p className="text-orange-400 text-xs mt-2">Do not navigate away until upload completes.</p>
-            </div>
-          ) : (
-            <div>
-              <div className="text-3xl mb-3">📁</div>
-              <p className="text-gray-300 font-medium mb-1">
-                Drop your ZIP file here, or click to browse
+        <div className="card overflow-hidden">
+          <div
+            onDragOver={(e) => {
+              e.preventDefault();
+              setDragging(true);
+            }}
+            onDragLeave={() => setDragging(false)}
+            onDrop={handleDrop}
+            onClick={() => fileInput.current?.click()}
+            className={`cursor-pointer p-16 text-center transition-all duration-200 ${
+              dragging
+                ? "bg-[var(--green-dim)]"
+                : "hover:bg-[#1a1a1a]"
+            }`}
+          >
+            <input
+              ref={fileInput}
+              type="file"
+              accept=".zip"
+              className="hidden"
+              onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])}
+            />
+            {uploading ? (
+              <div>
+                <div className="text-3xl mb-3 animate-pulse">📦</div>
+                <p className="text-gray-400">Uploading file to server...</p>
+                <p className="text-orange-400 text-xs mt-2">Do not navigate away until upload completes.</p>
+              </div>
+            ) : (
+              <div>
+                <div className="text-3xl mb-3">📁</div>
+                <p className="text-gray-300 font-medium mb-1">
+                  Drop your ZIP file here, or click to browse
+                </p>
+                <p className="text-gray-600 text-sm">Max 100 MB</p>
+              </div>
+            )}
+          </div>
+          {(error || isFailed) && (
+            <div className="border-t border-white/5 px-6 py-4 flex items-center justify-between">
+              <p className="text-red-400 text-sm">
+                {error || job?.error || "Upload failed. Please try again."}
               </p>
-              <p className="text-gray-600 text-sm">Max 100 MB</p>
+              <button
+                onClick={(e) => { e.stopPropagation(); setError(""); setJob(null); }}
+                className="text-gray-600 hover:text-gray-400 text-xs ml-3 flex-shrink-0"
+              >
+                Dismiss
+              </button>
             </div>
           )}
         </div>
       )}
-
-      {error && <p className="text-red-400 mt-4">{error}</p>}
 
       <div className="card mt-6 p-6">
         <h2 className="text-sm font-bold uppercase tracking-widest text-gray-500 mb-3">
@@ -279,21 +292,6 @@ export default function Upload() {
           </div>
         )}
 
-        {isFailed && (
-          <div className="border-t border-white/5 pt-4 animate-slide-up">
-            <div className="flex items-center justify-between">
-              <p className="text-red-400 text-sm">
-                Last upload failed: {job.error || "An unexpected error occurred."}
-              </p>
-              <button
-                onClick={() => setJob(null)}
-                className="text-gray-600 hover:text-gray-400 text-xs ml-3 flex-shrink-0"
-              >
-                Dismiss
-              </button>
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );
