@@ -288,7 +288,7 @@ def upload_job_status(
     if not job:
         return {"status": "none"}
 
-    if job.status in ("error", "completed") and job.completed_at:
+    if job.status == "error" and job.completed_at:
         completed = job.completed_at
         if completed.tzinfo is None:
             completed = completed.replace(tzinfo=timezone.utc)
