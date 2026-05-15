@@ -21,6 +21,7 @@ export default function ArtistPage() {
   const [challenge, setChallenge] = useState<any>(null);
   const [copied, setCopied] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [hoveredPoint, setHoveredPoint] = useState<{ idx: number } | null>(null);
 
   useEffect(() => {
     if (!isLoggedIn()) {
@@ -180,9 +181,23 @@ export default function ArtistPage() {
             return `${months[parseInt(mo) - 1]} '${y.slice(2)}`;
           }
 
+          function niceYTicks(maxVal: number): number[] {
+            if (maxVal <= 0) return [0];
+            const raw = maxVal / 4;
+            const mag = Math.pow(10, Math.floor(Math.log10(raw)));
+            const nice = [1, 2, 2.5, 5, 10].find(n => n * mag >= raw)! * mag;
+            const ticks: number[] = [];
+            for (let v = 0; v <= maxVal + nice * 0.01; v += nice) {
+              ticks.push(Math.round(v));
+            }
+            return ticks;
+          }
+
           function renderLineChart(datasets: { label: string; months: any[]; color: string }[], footnote?: string) {
             const allMonths = Array.from(new Set(datasets.flatMap(d => d.months.map((m: any) => m.month)))).sort();
-            const maxVal = Math.max(...datasets.flatMap(d => d.months.map((m: any) => m.listen_count)), 1);
+            const rawMax = Math.max(...datasets.flatMap(d => d.months.map((m: any) => m.listen_count)), 1);
+            const yTicks = niceYTicks(rawMax);
+            const maxVal = yTicks[yTicks.length - 1] || 1;
 
             const W = 650, H = 160, padL = 45, padR = 10, padT = 15, padB = 25;
             const chartW = W - padL - padR, chartH = H - padT - padB;
@@ -194,12 +209,18 @@ export default function ArtistPage() {
               return padT + chartH - (val / maxVal) * chartH;
             }
 
-            const yTicks = [0, Math.round(maxVal / 2), maxVal];
+            const allPoints = datasets.map(ds =>
+              allMonths.map((month, i) => {
+                const entry = ds.months.find((m: any) => m.month === month);
+                return { x: getX(i), y: getY(entry?.listen_count || 0), val: entry?.listen_count || 0, month };
+              })
+            );
 
             return (
-              <div className="card p-6">
-                <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-44" preserveAspectRatio="xMidYMid meet">
-                  {/* Y axis labels + grid */}
+              <div className="card p-6 relative">
+                <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-44" preserveAspectRatio="xMidYMid meet"
+                  onMouseLeave={() => setHoveredPoint(null)}
+                >
                   {yTicks.map(val => (
                     <g key={val}>
                       <line x1={padL} x2={W - padR} y1={getY(val)} y2={getY(val)}
@@ -210,7 +231,6 @@ export default function ArtistPage() {
                       </text>
                     </g>
                   ))}
-                  {/* X axis labels */}
                   {allMonths.map((month, i) => {
                     const showLabel = allMonths.length <= 12 || i % Math.ceil(allMonths.length / 8) === 0 || i === allMonths.length - 1;
                     return showLabel ? (
@@ -220,12 +240,8 @@ export default function ArtistPage() {
                       </text>
                     ) : null;
                   })}
-                  {/* Smooth lines */}
                   {datasets.map((ds, di) => {
-                    const points = allMonths.map((month, i) => {
-                      const entry = ds.months.find((m: any) => m.month === month);
-                      return { x: getX(i), y: getY(entry?.listen_count || 0), val: entry?.listen_count || 0, month };
-                    });
+                    const points = allPoints[di];
                     const smoothPath = (pts: typeof points) => {
                       if (pts.length < 2) return `M ${pts[0]?.x || 0} ${pts[0]?.y || 0}`;
                       let d = `M ${pts[0].x} ${pts[0].y}`;
@@ -249,15 +265,53 @@ export default function ArtistPage() {
                       <g key={di}>
                         <path d={areaD} fill={ds.color} opacity="0.06" />
                         <path d={pathD} fill="none" stroke={ds.color} strokeWidth="2" strokeLinecap="round" />
-                        {points.map((p, i) => (
-                          <circle key={i} cx={p.x} cy={p.y} r="12" fill="transparent" className="cursor-pointer">
-                            <title>{formatMonth(p.month)}: {p.val.toLocaleString()} listens</title>
-                          </circle>
-                        ))}
                       </g>
                     );
                   })}
+                  {hoveredPoint && (
+                    <>
+                      <line x1={getX(hoveredPoint.idx)} x2={getX(hoveredPoint.idx)}
+                        y1={padT} y2={padT + chartH}
+                        stroke="rgba(255,255,255,0.15)" strokeWidth="1" strokeDasharray="3,3" />
+                      {allPoints.map((points, di) => (
+                        <circle key={di} cx={points[hoveredPoint.idx].x} cy={points[hoveredPoint.idx].y}
+                          r="4" fill={datasets[di].color} />
+                      ))}
+                    </>
+                  )}
+                  {allMonths.map((_, i) => (
+                    <rect key={i}
+                      x={getX(i) - (chartW / allMonths.length) / 2}
+                      y={padT} width={chartW / allMonths.length} height={chartH}
+                      fill="transparent"
+                      onMouseEnter={() => setHoveredPoint({ idx: i })}
+                    />
+                  ))}
                 </svg>
+                {hoveredPoint && (() => {
+                  const idx = hoveredPoint.idx;
+                  const month = allMonths[idx];
+                  const xPct = (getX(idx) / W) * 100;
+                  return (
+                    <div
+                      className="absolute pointer-events-none z-10 rounded-lg bg-[#1a1a1a] border border-white/10 shadow-xl px-3 py-2 text-xs"
+                      style={{
+                        left: `${Math.min(Math.max(xPct, 10), 90)}%`,
+                        top: "0.5rem",
+                        transform: "translateX(-50%)",
+                      }}
+                    >
+                      <div className="font-bold text-white mb-1">{formatMonth(month)}</div>
+                      {datasets.map((ds, di) => (
+                        <div key={di} className="flex items-center gap-2">
+                          <div className="w-2 h-2 rounded-full" style={{ backgroundColor: ds.color }} />
+                          <span className="text-gray-400">{ds.label}:</span>
+                          <span className="text-white font-medium">{allPoints[di][idx].val.toLocaleString()}</span>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })()}
                 {datasets.length > 1 && (
                   <div className="flex gap-4 mt-3 pt-3 border-t border-white/5">
                     {datasets.map((ds, i) => (
