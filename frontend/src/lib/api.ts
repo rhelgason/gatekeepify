@@ -107,6 +107,8 @@ export const api = {
 
   getUploadStatus: () => request<any>("/backfill/upload-status"),
 
+  cancelUpload: () => request<any>("/backfill/cancel-upload", { method: "POST" }),
+
   getFriends: () => request<any[]>("/friends"),
 
   createInvite: () =>

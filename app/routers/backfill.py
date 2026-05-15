@@ -226,6 +226,17 @@ def upload_data_export(
             status_code=400, detail="Please upload a ZIP file"
         )
 
+    active_job = db.execute(
+        select(JobRun)
+        .where(
+            JobRun.user_id == user.user_id,
+            JobRun.job_name == "backfill_upload",
+            JobRun.status.in_(["pending", "running"]),
+        )
+    ).scalar_one_or_none()
+    if active_job:
+        raise HTTPException(status_code=409, detail="An upload is already being processed")
+
     content = file.file.read(MAX_UPLOAD_BYTES + 1)
     if len(content) > MAX_UPLOAD_BYTES:
         raise HTTPException(status_code=400, detail="File too large (max 100 MB)")
@@ -268,6 +279,19 @@ def upload_job_status(
     if not job:
         return {"status": "none"}
 
+    JOB_TIMEOUT_MINUTES = 30
+    if job.status in ("pending", "running") and job.started_at:
+        started = job.started_at
+        if started.tzinfo is None:
+            started = started.replace(tzinfo=timezone.utc)
+        if (datetime.now(timezone.utc) - started).total_seconds() > JOB_TIMEOUT_MINUTES * 60:
+            job.status = "error"
+            job.completed_at = datetime.now(timezone.utc)
+            details = json.loads(job.details) if job.details else {}
+            details.update({"phase": "error", "error": "Job timed out after 30 minutes"})
+            job.details = json.dumps(details)
+            db.commit()
+
     details = json.loads(job.details) if job.details else {}
     return {
         "job_id": job.id,
@@ -283,6 +307,38 @@ def upload_job_status(
         "enriched": details.get("enriched"),
         "error": details.get("error"),
     }
+
+
+@router.post("/cancel-upload")
+def cancel_upload(
+    user: UserModel = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    job = db.execute(
+        select(JobRun)
+        .where(
+            JobRun.user_id == user.user_id,
+            JobRun.job_name == "backfill_upload",
+            JobRun.status.in_(["pending", "running"]),
+        )
+        .order_by(JobRun.started_at.desc())
+        .limit(1)
+    ).scalar_one_or_none()
+
+    if not job:
+        raise HTTPException(status_code=404, detail="No active upload to cancel")
+
+    job.status = "error"
+    job.completed_at = datetime.now(timezone.utc)
+    details = json.loads(job.details) if job.details else {}
+    details.update({"phase": "error", "error": "Cancelled by user"})
+    job.details = json.dumps(details)
+    db.commit()
+
+    log_action(db, "backfill.upload_cancelled", user_id=user.user_id,
+               details={"job_id": job.id})
+
+    return {"status": "cancelled", "job_id": job.id}
 
 
 @router.get("/status", response_model=BackfillStatusResponse)

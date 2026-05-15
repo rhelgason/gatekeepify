@@ -351,6 +351,10 @@ def process_backfill_upload(job_id: int, user_id: str, encoded_content: str):
         inserted = 0
         batch_size = 500
         for i in range(0, len(accepted), batch_size):
+            db.refresh(job)
+            if job.status == "error":
+                logger.info(f"Backfill job {job_id} was cancelled, stopping")
+                return
             batch = accepted[i:i + batch_size]
             seen_tracks = set()
             for listen, track_name in batch:
@@ -363,7 +367,12 @@ def process_backfill_upload(job_id: int, user_id: str, encoded_content: str):
                         db.merge(Track(track_id=listen.track_id, track_name=track_name))
             db.flush()
 
+            seen_listens = set()
             for listen, track_name in batch:
+                listen_key = (listen.user_id, listen.track_id, str(listen.ts))
+                if listen_key in seen_listens:
+                    continue
+                seen_listens.add(listen_key)
                 from sqlalchemy import select as sa_select
                 existing = db.execute(
                     sa_select(Listen).where(

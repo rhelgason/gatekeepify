@@ -264,6 +264,19 @@ export default function Upload() {
                 {job.inserted != null && ` · ${job.inserted.toLocaleString()} inserted so far`}
               </p>
             )}
+            <button
+              onClick={async () => {
+                try {
+                  await api.cancelUpload();
+                  setJob(null);
+                  if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
+                  api.getBackfillStatus().then(setStatus);
+                } catch {}
+              }}
+              className="text-gray-600 hover:text-red-400 text-xs mt-3 transition-colors"
+            >
+              Cancel upload
+            </button>
           </div>
         )}
 
