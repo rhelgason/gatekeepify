@@ -72,11 +72,13 @@ def upsert_from_recent_listens(
 
 def upsert_track_metadata(db: Session, track_items: List[dict]) -> int:
     updated = 0
+    seen_albums: set = set()
+    seen_artists: set = set()
     for item in track_items:
         track_data = item.get("track", {})
         if not track_data or not track_data.get("id"):
             continue
-        _upsert_track_and_relations(db, track_data)
+        _upsert_track_and_relations(db, track_data, seen_albums, seen_artists)
         updated += 1
     db.commit()
     return updated
@@ -92,10 +94,19 @@ def _get_best_image(images: list) -> Optional[str]:
     return images[0].get("url")
 
 
-def _upsert_track_and_relations(db: Session, track_data: dict) -> None:
+def _upsert_track_and_relations(
+    db: Session, track_data: dict,
+    seen_albums: set = None, seen_artists: set = None,
+) -> None:
+    if seen_albums is None:
+        seen_albums = set()
+    if seen_artists is None:
+        seen_artists = set()
+
     album_data = track_data.get("album") or {}
 
-    if album_data.get("id"):
+    if album_data.get("id") and album_data["id"] not in seen_albums:
+        seen_albums.add(album_data["id"])
         db.merge(
             Album(
                 album_id=album_data["id"],
@@ -121,15 +132,16 @@ def _upsert_track_and_relations(db: Session, track_data: dict) -> None:
     for artist_data in track_data.get("artists", []):
         if not artist_data.get("id"):
             continue
-        db.merge(
-            Artist(
-                artist_id=artist_data["id"],
-                artist_name=artist_data.get("name"),
-                image_url=_get_best_image(artist_data.get("images", [])),
+        if artist_data["id"] not in seen_artists:
+            seen_artists.add(artist_data["id"])
+            db.merge(
+                Artist(
+                    artist_id=artist_data["id"],
+                    artist_name=artist_data.get("name"),
+                    image_url=_get_best_image(artist_data.get("images", [])),
+                )
             )
-        )
 
-    # Entities must exist before relations that reference them
     db.flush()
 
     for artist_data in track_data.get("artists", []):

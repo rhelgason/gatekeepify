@@ -435,6 +435,7 @@ def process_backfill_upload(job_id: int, user_id: str):
                                 continue
                         except Exception as e:
                             logger.warning(f"Error during enrichment batch: {e}")
+                            db.rollback()
                             continue
 
                         progress = 80 + int(15 * (i + len(batch)) / total_to_enrich)
