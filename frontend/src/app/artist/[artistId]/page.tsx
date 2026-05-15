@@ -186,8 +186,9 @@ export default function ArtistPage() {
             const raw = maxVal / 4;
             const mag = Math.pow(10, Math.floor(Math.log10(raw)));
             const nice = [1, 2, 2.5, 5, 10].find(n => n * mag >= raw)! * mag;
+            const ceil = Math.ceil(maxVal / nice) * nice;
             const ticks: number[] = [];
-            for (let v = 0; v <= maxVal + nice * 0.01; v += nice) {
+            for (let v = 0; v <= ceil; v += nice) {
               ticks.push(Math.round(v));
             }
             return ticks;
