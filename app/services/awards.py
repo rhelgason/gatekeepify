@@ -350,16 +350,6 @@ def compute_patient_zero(db: Session, group_ids: List[str]) -> List[dict]:
 
 
 def compute_completionist(db: Session, group_ids: List[str]) -> List[dict]:
-    total_tracks_stmt = (
-        select(TrackArtist.artist_id, func.count(TrackArtist.track_id).label("total"))
-        .group_by(TrackArtist.artist_id)
-        .having(func.count(TrackArtist.track_id) >= 5)
-    )
-    total_tracks = {r[0]: r[1] for r in db.execute(total_tracks_stmt).all()}
-
-    if not total_tracks:
-        return []
-
     best_per_user: dict = {}
     for uid in group_ids:
         user_tracks_stmt = (
@@ -371,17 +361,15 @@ def compute_completionist(db: Session, group_ids: List[str]) -> List[dict]:
             .select_from(Listen)
             .join(TrackArtist, Listen.track_id == TrackArtist.track_id)
             .join(Artist, TrackArtist.artist_id == Artist.artist_id)
-            .where(Listen.user_id == uid, TrackArtist.artist_id.in_(list(total_tracks.keys())))
+            .where(Listen.user_id == uid)
             .group_by(TrackArtist.artist_id, Artist.artist_name)
         )
         for row in db.execute(user_tracks_stmt).all():
-            total = total_tracks.get(row.artist_id, 1)
-            ratio = row.unique_tracks / total * 100
-            if uid not in best_per_user or ratio > best_per_user[uid]["stat_value"]:
+            if uid not in best_per_user or row.unique_tracks > best_per_user[uid]["stat_value"]:
                 best_per_user[uid] = {
                     "user_id": uid,
-                    "stat_value": round(ratio, 1),
-                    "stat_detail": f"Heard {row.unique_tracks} of {total} {row.artist_name} tracks ({round(ratio)}%)",
+                    "stat_value": float(row.unique_tracks),
+                    "stat_detail": f"{row.unique_tracks} tracks by {row.artist_name}",
                     "entity_id": row.artist_id,
                     "entity_name": row.artist_name,
                 }

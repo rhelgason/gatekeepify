@@ -188,12 +188,11 @@ class TestComputeStreak:
 
 
 class TestComputeCompletionist:
-    def test_computes_ratio(self, award_db):
+    def test_computes_unique_tracks(self, award_db):
         results = compute_completionist(award_db, ["alice", "bob", "charlie"])
-        # art1 has 4 tracks (t1,t2,t4,t5), alice listened to all 4
         if results:
             assert results[0]["stat_value"] > 0
-            assert "%" in results[0]["stat_detail"]
+            assert "tracks by" in results[0]["stat_detail"]
 
 
 class TestComputeHypebeast:
