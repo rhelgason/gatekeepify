@@ -256,7 +256,15 @@ export default function Upload() {
             </div>
             <div className="flex justify-between text-xs text-gray-500">
               <span>{PHASE_LABELS[job.phase] || job.phase}</span>
-              <span>{job.progress || 0}%</span>
+              <span>
+                {job.progress || 0}%
+                {job.progress > 5 && job.started_at && (() => {
+                  const elapsed = (Date.now() - new Date(job.started_at).getTime()) / 1000;
+                  const remaining = Math.round(elapsed * (100 - job.progress) / job.progress);
+                  if (remaining < 60) return ` · ~${remaining}s remaining`;
+                  return ` · ~${Math.round(remaining / 60)} min remaining`;
+                })()}
+              </span>
             </div>
             {job.total_listens && (
               <p className="text-xs text-gray-600 mt-1">
