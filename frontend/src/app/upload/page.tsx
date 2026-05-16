@@ -262,7 +262,10 @@ export default function Upload() {
                   const elapsed = (Date.now() - new Date(job.started_at).getTime()) / 1000;
                   const remaining = Math.round(elapsed * (100 - job.progress) / job.progress);
                   if (remaining < 60) return ` · ~${remaining}s remaining`;
-                  return ` · ~${Math.round(remaining / 60)} min remaining`;
+                  if (remaining < 3600) return ` · ~${Math.round(remaining / 60)} min remaining`;
+                  const h = Math.floor(remaining / 3600);
+                  const m = Math.round((remaining % 3600) / 60);
+                  return ` · ~${h}h ${m}m remaining`;
                 })()}
               </span>
             </div>
