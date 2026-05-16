@@ -109,6 +109,7 @@ def get_trophies(
                 stat_detail=user_entry.get("stat_detail") if user_entry else None,
                 entity_id=user_entry.get("entity_id") if user_entry else None,
                 entity_name=user_entry.get("entity_name") if user_entry else None,
+                extra={k: v for k, v in user_entry.items() if k.endswith("_detail") and k != "stat_detail"} if user_entry else None,
                 held=held,
                 tier=defn["tier"],
             )

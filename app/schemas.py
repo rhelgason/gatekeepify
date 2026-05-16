@@ -242,6 +242,7 @@ class AwardEntry(BaseModel):
     stat_detail: Optional[str] = None
     entity_id: Optional[str] = None
     entity_name: Optional[str] = None
+    extra: Optional[dict] = None
     held: bool
     tier: str
 

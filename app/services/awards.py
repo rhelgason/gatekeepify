@@ -310,23 +310,37 @@ def compute_patient_zero(db: Session, group_ids: List[str]) -> List[dict]:
         ts = row.first_listen if isinstance(row.first_listen, datetime) else datetime.fromisoformat(str(row.first_listen))
         artist_entries[row.artist_id].append((row.user_id, ts))
 
-    infections: dict = defaultdict(lambda: {"artists": 0, "friends": set()})
-    for entries in artist_entries.values():
+    artist_names = {}
+    artist_ids_needed = set(artist_entries.keys())
+    if artist_ids_needed:
+        for a in db.execute(select(Artist.artist_id, Artist.artist_name).where(Artist.artist_id.in_(artist_ids_needed))).all():
+            artist_names[a.artist_id] = a.artist_name
+
+    infections: dict = defaultdict(lambda: {"artists": 0, "friends": set(), "detail": []})
+    for artist_id, entries in artist_entries.items():
         if len(entries) < 2:
             continue
         entries.sort(key=lambda x: x[1])
         winner = entries[0][0]
+        infected_count = len(entries) - 1
         for uid, _ in entries[1:]:
             infections[winner]["friends"].add(uid)
         infections[winner]["artists"] += 1
+        infections[winner]["detail"].append({
+            "artist_name": artist_names.get(artist_id, artist_id),
+            "artist_id": artist_id,
+            "friend_count": infected_count,
+        })
 
     results = []
     for uid, data in infections.items():
         friend_count = len(data["friends"])
+        detail = sorted(data["detail"], key=lambda d: -d["friend_count"])[:10]
         results.append({
             "user_id": uid,
             "stat_value": float(friend_count),
             "stat_detail": f"Infected {friend_count} friends across {data['artists']} artists",
+            "infections_detail": detail,
         })
 
     results.sort(key=lambda r: -r["stat_value"])

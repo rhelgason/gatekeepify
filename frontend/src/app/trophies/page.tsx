@@ -185,9 +185,9 @@ export default function Trophies() {
                         </svg>
                       </button>
 
-                      {isExpanded && lb.length > 0 && (
+                      {isExpanded && (
                         <div className="ml-4 mr-4 border-l border-white/5 pl-4 py-2 space-y-1 animate-slide-up">
-                          {lb.map((entry: any) => (
+                          {lb.length > 0 && lb.map((entry: any) => (
                             <div
                               key={entry.user_id}
                               className={`flex items-center justify-between py-2 px-3 rounded-lg text-sm ${
@@ -205,6 +205,17 @@ export default function Trophies() {
                               <span className="text-gray-500 text-xs">{entry.stat_detail}</span>
                             </div>
                           ))}
+                          {a.award_id === "patient_zero" && a.extra?.infections_detail && (
+                            <div className="mt-3 pt-3 border-t border-white/5">
+                              <p className="text-xs text-gray-500 mb-2">Artists you spread:</p>
+                              {a.extra.infections_detail.map((d: any) => (
+                                <div key={d.artist_id} className="flex justify-between py-1 text-xs">
+                                  <span className="text-gray-300">{d.artist_name}</span>
+                                  <span className="text-gray-500">{d.friend_count} {d.friend_count === 1 ? "friend" : "friends"}</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
