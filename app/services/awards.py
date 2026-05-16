@@ -467,10 +467,18 @@ def compute_streak(db: Session, group_ids: List[str]) -> List[dict]:
             else:
                 current = 1
 
+        today = datetime.now(timezone.utc).date()
+        last_day = days[-1]
+        if last_day >= today - timedelta(days=1):
+            current_streak = current
+        else:
+            current_streak = 0
+
         results.append({
             "user_id": uid,
             "stat_value": float(max_streak),
             "stat_detail": f"Longest streak: {max_streak} days",
+            "current_streak": current_streak,
         })
 
     results.sort(key=lambda r: -r["stat_value"])

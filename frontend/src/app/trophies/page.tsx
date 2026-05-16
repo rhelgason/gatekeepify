@@ -132,6 +132,19 @@ export default function Trophies() {
         <p className="text-gray-600 text-xs mt-2">
           {heldAwards.length} of {awards.length} held
         </p>
+        {(() => {
+          const streakAward = awards.find((a: any) => a.award_id === "streak");
+          const currentStreak = streakAward?.extra?.current_streak;
+          if (currentStreak != null && currentStreak > 0) {
+            return (
+              <div className="mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-full bg-orange-500/10 border border-orange-500/20">
+                <span className="text-orange-400 text-sm font-bold">⚡ {currentStreak}-day streak</span>
+                <span className="text-gray-500 text-xs">Keep it going!</span>
+              </div>
+            );
+          }
+          return null;
+        })()}
       </div>
 
       {/* Awards by Tier */}
