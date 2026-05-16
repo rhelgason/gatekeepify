@@ -182,12 +182,12 @@ export default function Trophies() {
                             {a.award_name}
                           </div>
                           <div className="text-xs text-gray-600 truncate">{a.description}</div>
-                          {a.held && a.stat_detail && (
+                          {a.rank > 0 && a.stat_detail && (
                             <div className="text-xs text-gray-400 mt-1">{a.stat_detail}</div>
                           )}
                         </div>
-                        {a.held && (
-                          <span className={`text-sm font-black flex-shrink-0 ${meta.color}`}>#{a.rank}</span>
+                        {a.rank > 0 && (
+                          <span className={`text-sm font-black flex-shrink-0 ${a.held ? meta.color : "text-gray-600"}`}>#{a.rank}</span>
                         )}
                         <svg
                           width="14" height="14" viewBox="0 0 24 24" fill="none"
