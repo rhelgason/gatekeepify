@@ -297,10 +297,15 @@ def compute_award_snapshots():
 @celery_app.task(name="app.tasks.process_backfill_upload", acks_late=True, reject_on_worker_lost=True)
 def process_backfill_upload(job_id: int, user_id: str):
     import json
+    import time
 
     from app.models import JobRun, Track
     from app.routers.backfill import _validate_and_process_listens
     from app.services.audit import log_action
+    from app.services.ingestion import get_tracks_missing_metadata, retroactively_validate_export_listens
+    from sqlalchemy.dialects import sqlite as sqlite_dialect
+    from sqlalchemy.dialects import postgresql as pg_dialect
+    from spotipy.exceptions import SpotifyException as SpotifyExc
 
     db = SessionLocal()
     try:
@@ -309,205 +314,175 @@ def process_backfill_upload(job_id: int, user_id: str):
             logger.error(f"Backfill job {job_id} not found")
             return
 
-        def _update_job(phase: str, progress: int, **extra):
-            details = json.loads(job.details) if job.details else {}
-            details.pop("listen_data", None)
-            details.update({"phase": phase, "progress": progress, **extra})
-            job.details = json.dumps(details)
+        def _update_job(phase, progress, **extra):
+            det = json.loads(job.details) if job.details else {}
+            det.pop("listen_data", None)
+            det.update({"phase": phase, "progress": progress, **extra})
+            job.details = json.dumps(det)
             db.commit()
 
         job.status = "running"
-
         details = json.loads(job.details) if job.details else {}
         raw_listens = details.get("listen_data", [])
+        prev_phase = details.get("phase", "")
+        resuming = not raw_listens and prev_phase in ("resuming", "enriching", "analyzing", "inserting")
 
-        if not raw_listens:
+        if not raw_listens and not resuming:
             job.status = "error"
             job.completed_at = datetime.now(timezone.utc)
             _update_job("error", 100, error="No listen data found in job")
             return
 
-        _update_job("validating", 15, total_listens=len(raw_listens))
-
-        user = db.query(User).filter(User.user_id == user_id).first()
-        if not user:
+        user_obj = db.query(User).filter(User.user_id == user_id).first()
+        if not user_obj:
             job.status = "error"
             job.completed_at = datetime.now(timezone.utc)
             _update_job("error", 100, error="User not found")
             return
 
-        accepted, rejection_reasons = _validate_and_process_listens(
-            raw_listens, user, db
-        )
+        inserted = details.get("inserted", 0)
+        rejection_reasons = details.get("rejection_reasons", {})
+        total_processed = details.get("total_listens", 0)
+        total_accepted = inserted
 
-        _update_job("inserting", 40, total_listens=len(raw_listens),
-                     accepted_count=len(accepted))
+        # --- Phase 1: Validate and insert listens ---
+        if not resuming:
+            _update_job("validating", 15, total_listens=len(raw_listens))
+            accepted, rejection_reasons = _validate_and_process_listens(raw_listens, user_obj, db)
+            total_processed = len(raw_listens)
+            total_accepted = len(accepted)
+            _update_job("inserting", 40, total_listens=total_processed, accepted_count=total_accepted)
 
-        inserted = 0
-        batch_size = 500
-        for i in range(0, len(accepted), batch_size):
-            db.refresh(job)
-            if job.status == "error":
-                logger.info(f"Backfill job {job_id} was cancelled, stopping")
-                return
-            batch = accepted[i:i + batch_size]
-            seen_tracks = set()
-            for listen, track_name in batch:
-                if listen.track_id not in seen_tracks:
-                    seen_tracks.add(listen.track_id)
-                    existing_track = (
-                        db.query(Track).filter(Track.track_id == listen.track_id).first()
-                    )
-                    if not existing_track:
-                        db.merge(Track(track_id=listen.track_id, track_name=track_name))
-            db.flush()
+            inserted = 0
+            batch_size = 500
+            for bi in range(0, len(accepted), batch_size):
+                db.refresh(job)
+                if job.status == "error":
+                    logger.info(f"Backfill job {job_id} was cancelled, stopping")
+                    return
+                batch = accepted[bi:bi + batch_size]
+                seen_tracks = set()
+                for listen, track_name in batch:
+                    if listen.track_id not in seen_tracks:
+                        seen_tracks.add(listen.track_id)
+                        if not db.query(Track).filter(Track.track_id == listen.track_id).first():
+                            db.merge(Track(track_id=listen.track_id, track_name=track_name))
+                db.flush()
 
-            from sqlalchemy.dialects import sqlite as sqlite_dialect
-            from sqlalchemy.dialects import postgresql as pg_dialect
-            seen_listens = set()
-            listen_rows = []
-            for listen, track_name in batch:
-                listen_key = (listen.user_id, listen.track_id, str(listen.ts))
-                if listen_key in seen_listens:
-                    continue
-                seen_listens.add(listen_key)
-                listen_rows.append({
-                    "ts": listen.ts,
-                    "user_id": listen.user_id,
-                    "track_id": listen.track_id,
-                    "source": listen.source,
-                    "ms_played": listen.ms_played,
-                    "export_metadata": listen.export_metadata,
-                })
-            if listen_rows:
-                dialect = db.bind.dialect.name if db.bind else "sqlite"
-                if dialect == "postgresql":
-                    stmt = pg_dialect.insert(Listen.__table__).values(listen_rows)
+                seen_listens = set()
+                listen_rows = []
+                for listen, track_name in batch:
+                    lk = (listen.user_id, listen.track_id, str(listen.ts))
+                    if lk in seen_listens:
+                        continue
+                    seen_listens.add(lk)
+                    listen_rows.append({
+                        "ts": listen.ts, "user_id": listen.user_id,
+                        "track_id": listen.track_id, "source": listen.source,
+                        "ms_played": listen.ms_played, "export_metadata": listen.export_metadata,
+                    })
+                if listen_rows:
+                    dialect = db.bind.dialect.name if db.bind else "sqlite"
+                    tbl = Listen.__table__
+                    if dialect == "postgresql":
+                        stmt = pg_dialect.insert(tbl).values(listen_rows)
+                    else:
+                        stmt = sqlite_dialect.insert(tbl).values(listen_rows)
                     stmt = stmt.on_conflict_do_update(
                         index_elements=["ts", "user_id", "track_id"],
                         set_={"ms_played": stmt.excluded.ms_played},
-                        where=Listen.__table__.c.ms_played.is_(None),
+                        where=tbl.c.ms_played.is_(None),
                     )
-                else:
-                    stmt = sqlite_dialect.insert(Listen.__table__).values(listen_rows)
-                    stmt = stmt.on_conflict_do_update(
-                        index_elements=["ts", "user_id", "track_id"],
-                        set_={"ms_played": stmt.excluded.ms_played},
-                        where=Listen.__table__.c.ms_played.is_(None),
-                    )
-                result = db.execute(stmt)
-                inserted += result.rowcount
-            db.commit()
+                    result = db.execute(stmt)
+                    inserted += result.rowcount
+                db.commit()
+                progress = 40 + int(35 * (bi + len(batch)) / max(total_accepted, 1))
+                _update_job("inserting", min(progress, 75), inserted=inserted)
 
-            progress = 40 + int(35 * (i + len(batch)) / max(len(accepted), 1))
-            _update_job("inserting", min(progress, 75), inserted=inserted)
-
-        from app.services.ingestion import get_tracks_missing_metadata
+        # --- Phase 2: Enrich track metadata ---
         all_unenriched = list(get_tracks_missing_metadata(db, limit=100000))
         total_to_enrich = len(all_unenriched)
-
-        _update_job("enriching", 80, inserted=inserted,
-                    enrich_total=total_to_enrich, enrich_done=0)
+        _update_job("enriching", 80, inserted=inserted, enrich_total=total_to_enrich, enrich_done=0)
 
         enriched = 0
+        enrich_idx = 0
         rate_limit_strikes = 0
-        if total_to_enrich > 0:
+        if total_to_enrich > 0 and user_obj.spotify_refresh_token:
             try:
-                import time
-                from spotipy.exceptions import SpotifyException as SpotifyExc
-                user_obj = db.query(User).filter(User.user_id == user_id).first()
-                if user_obj and user_obj.spotify_refresh_token:
-                    service = SpotifyService()
-                    refresh_token = decrypt_token(user_obj.spotify_refresh_token)
-                    token_info = service.refresh_access_token(refresh_token)
-                    access_token = token_info["access_token"]
-                    client = service.get_client(access_token)
+                service = SpotifyService()
+                refresh_token = decrypt_token(user_obj.spotify_refresh_token)
+                token_info = service.refresh_access_token(refresh_token)
+                client = service.get_client(token_info["access_token"])
 
-                    BATCH_SIZE = 50
-                    i = 0
-                    while i < total_to_enrich:
-                        db.refresh(job)
-                        if job.status == "error":
-                            logger.info(f"Backfill job {job_id} cancelled during enrichment")
-                            return
-
-                        batch = all_unenriched[i:i + BATCH_SIZE]
-                        try:
-                            result = client.tracks(batch)
-                            if result and result.get("tracks"):
-                                items = [{"track": t} for t in result["tracks"] if t]
-                                service._enrich_with_genres(client, items)
-                                enriched += upsert_track_metadata(db, items)
-                            rate_limit_strikes = 0
-                            i += BATCH_SIZE
-                        except SpotifyExc as e:
-                            if e.http_status == 429:
-                                retry_after = int(e.headers.get("Retry-After", 5)) if hasattr(e, "headers") and e.headers else 5
-                                logger.warning(f"Rate limited during enrichment, waiting {retry_after}s")
-                                rate_limit_strikes += 1
-                                if rate_limit_strikes >= 5:
-                                    logger.warning(f"Too many rate limits, stopping at {enriched}/{total_to_enrich}")
-                                    break
-                                time.sleep(retry_after)
-                            elif e.http_status in (401, 403):
-                                logger.info("Token expired during enrichment, refreshing")
-                                try:
-                                    token_info = service.refresh_access_token(refresh_token)
-                                    access_token = token_info["access_token"]
-                                    client = service.get_client(access_token)
-                                except Exception:
-                                    logger.warning("Token refresh failed, stopping enrichment")
-                                    break
-                            else:
-                                logger.warning(f"Spotify error during enrichment batch: {e}")
-                                i += BATCH_SIZE
-                        except Exception as e:
-                            logger.warning(f"Error during enrichment batch: {e}")
-                            db.rollback()
-                            i += BATCH_SIZE
-
-                        progress = 80 + int(15 * min(i, total_to_enrich) / total_to_enrich)
-                        _update_job("enriching", min(progress, 95),
-                                    enrich_total=total_to_enrich, enrich_done=enriched)
+                while enrich_idx < total_to_enrich:
+                    db.refresh(job)
+                    if job.status == "error":
+                        logger.info(f"Backfill job {job_id} cancelled during enrichment")
+                        return
+                    batch = all_unenriched[enrich_idx:enrich_idx + 50]
+                    try:
+                        res = client.tracks(batch)
+                        if res and res.get("tracks"):
+                            items = [{"track": t} for t in res["tracks"] if t]
+                            service._enrich_with_genres(client, items)
+                            enriched += upsert_track_metadata(db, items)
+                        rate_limit_strikes = 0
+                        enrich_idx += 50
+                    except SpotifyExc as e:
+                        if e.http_status == 429:
+                            retry_after = int(e.headers.get("Retry-After", 5)) if hasattr(e, "headers") and e.headers else 5
+                            rate_limit_strikes += 1
+                            if rate_limit_strikes >= 5:
+                                logger.warning(f"Too many rate limits, stopping at {enriched}/{total_to_enrich}")
+                                break
+                            time.sleep(retry_after)
+                        elif e.http_status in (401, 403):
+                            try:
+                                token_info = service.refresh_access_token(refresh_token)
+                                client = service.get_client(token_info["access_token"])
+                            except Exception:
+                                logger.warning("Token refresh failed, stopping enrichment")
+                                break
+                        else:
+                            enrich_idx += 50
+                    except Exception as e:
+                        logger.warning(f"Error during enrichment batch: {e}")
+                        db.rollback()
+                        enrich_idx += 50
+                    progress = 80 + int(15 * min(enrich_idx, total_to_enrich) / total_to_enrich)
+                    _update_job("enriching", min(progress, 95), enrich_total=total_to_enrich, enrich_done=enriched)
             except Exception as e:
                 logger.warning(f"Enrichment setup failed: {e}")
 
+        # --- Phase 3: Retroactive validation ---
         if enriched > 0:
-            from app.services.ingestion import retroactively_validate_export_listens
-            enriched_ids = set(all_unenriched[:min(i, total_to_enrich)])
+            enriched_ids = set(all_unenriched[:min(enrich_idx, total_to_enrich)])
             removed = retroactively_validate_export_listens(db, enriched_ids)
             if removed:
                 logger.info(f"Removed {removed} pre-release listens after enrichment")
 
-        _update_job("analyzing", 95, enriched=enriched,
-                    enrich_total=total_to_enrich, enrich_done=enriched)
-
+        # --- Phase 4: Anomaly detection ---
+        _update_job("analyzing", 95, enriched=enriched, enrich_total=total_to_enrich, enrich_done=enriched)
         from app.services.anomaly import analyze_user_export
         anomaly_result = analyze_user_export(db, user_id)
         if anomaly_result["flags"]:
             log_action(db, "backfill.anomaly_detected", user_id=user_id,
                        status="warning", details=anomaly_result)
 
+        # --- Done ---
         job.status = "completed"
         job.completed_at = datetime.now(timezone.utc)
         job.record_count = inserted
+        rejected = total_processed - total_accepted if total_processed else 0
         _update_job("done", 100,
-                    inserted=inserted,
-                    accepted=len(accepted),
-                    rejected=len(raw_listens) - len(accepted),
-                    rejection_reasons=rejection_reasons,
-                    enriched=enriched,
+                    inserted=inserted, accepted=total_accepted, rejected=rejected,
+                    rejection_reasons=rejection_reasons, enriched=enriched,
                     trust_score=anomaly_result["score"])
 
         log_action(db, "backfill.upload", user_id=user_id,
-                   details={
-                       "total_processed": len(raw_listens),
-                       "total_accepted": inserted,
-                       "total_rejected": len(raw_listens) - len(accepted),
-                       "rejection_reasons": rejection_reasons,
-                       "tracks_enriched_immediately": enriched,
-                       "trust_score": anomaly_result["score"],
-                   })
+                   details={"total_processed": total_processed, "total_accepted": inserted,
+                            "total_rejected": rejected, "rejection_reasons": rejection_reasons,
+                            "tracks_enriched": enriched, "trust_score": anomaly_result["score"]})
         logger.info(f"Backfill upload complete for {user_id}: {inserted} inserted, {enriched} enriched")
 
     except Exception as e:
@@ -518,9 +493,9 @@ def process_backfill_upload(job_id: int, user_id: str):
             if job:
                 job.status = "error"
                 job.completed_at = datetime.now(timezone.utc)
-                details = json.loads(job.details) if job.details else {}
-                details.update({"phase": "error", "progress": 0, "error": str(e)})
-                job.details = json.dumps(details)
+                det = json.loads(job.details) if job.details else {}
+                det.update({"phase": "error", "progress": 0, "error": str(e)})
+                job.details = json.dumps(det)
                 db.commit()
         except Exception:
             pass

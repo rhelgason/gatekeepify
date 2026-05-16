@@ -74,19 +74,14 @@ try:
             from app.celery_app import celery_app
             celery_app.send_task("app.tasks.process_backfill_upload", args=[j.id, j.user_id])
             logger.info(f"Resuming interrupted upload job {j.id} for user {j.user_id}")
-        elif phase in ("enriching", "analyzing"):
-            j.status = "completed"
-            j.completed_at = datetime.now(timezone.utc)
-            inserted = details.get("inserted", 0)
-            enriched = details.get("enrich_done", details.get("enriched", 0))
-            details.update({
-                "phase": "done", "progress": 100,
-                "accepted": inserted, "rejected": 0,
-                "enriched": enriched,
-            })
+        elif phase in ("enriching", "analyzing", "inserting"):
+            j.status = "pending"
+            details.update({"phase": "resuming", "progress": details.get("progress", 80)})
             j.details = _json.dumps(details)
             _startup_db.commit()
-            logger.info(f"Marked enrichment-phase job {j.id} as completed (cron continues enrichment)")
+            from app.celery_app import celery_app
+            celery_app.send_task("app.tasks.process_backfill_upload", args=[j.id, j.user_id])
+            logger.info(f"Resuming interrupted upload job {j.id} (was in {phase} phase)")
         else:
             j.status = "error"
             j.completed_at = datetime.now(timezone.utc)
