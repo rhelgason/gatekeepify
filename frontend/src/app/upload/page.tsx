@@ -293,26 +293,16 @@ export default function Upload() {
 
         {isDone && (
           <div className="border-t border-white/5 pt-4 animate-slide-up">
-            <p className="text-[var(--green)] font-bold text-sm mb-3">Last upload complete</p>
-            <div className="grid grid-cols-3 gap-3 text-center text-xs">
-              <div>
-                <div className="font-bold text-sm">{(job.total_listens || 0).toLocaleString()}</div>
-                <div className="text-gray-600">Processed</div>
-              </div>
-              <div>
-                <div className="font-bold text-sm text-[var(--green)]">{(job.accepted || 0).toLocaleString()}</div>
-                <div className="text-gray-600">Accepted</div>
-              </div>
-              <div>
-                <div className="font-bold text-sm text-red-400">{(job.rejected || 0).toLocaleString()}</div>
-                <div className="text-gray-600">Rejected</div>
-              </div>
-            </div>
-            {job.rejection_reasons && Object.keys(job.rejection_reasons).length > 0 && (
-              <div className="mt-3 text-xs text-gray-600 bg-white/5 rounded-lg p-2">
-                Rejections: {Object.entries(job.rejection_reasons).map(([k, v]) => `${k}: ${v}`).join(", ")}
-              </div>
-            )}
+            <p className="text-[var(--green)] font-bold text-sm mb-3">Upload Complete</p>
+            <p className="text-gray-300 text-sm">
+              {(job.accepted || 0).toLocaleString()} listens added
+              {job.enriched != null && <> &middot; {(job.enriched || 0).toLocaleString()} tracks enriched</>}
+              {job.started_at && job.completed_at && (() => {
+                const runtime = Math.round((new Date(job.completed_at).getTime() - new Date(job.started_at).getTime()) / 1000);
+                if (runtime < 60) return <> &middot; Processed in {runtime}s</>;
+                return <> &middot; Processed in {Math.round(runtime / 60)} min</>;
+              })()}
+            </p>
           </div>
         )}
 
