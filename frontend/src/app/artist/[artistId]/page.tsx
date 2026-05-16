@@ -252,10 +252,11 @@ export default function ArtistPage() {
                         const p2 = pts[i + 1];
                         const p3 = pts[Math.min(i + 2, pts.length - 1)];
                         const t = 0.3;
+                        const yFloor = getY(0);
                         const cp1x = p1.x + (p2.x - p0.x) * t;
-                        const cp1y = p1.y + (p2.y - p0.y) * t;
+                        const cp1y = Math.min(p1.y + (p2.y - p0.y) * t, yFloor);
                         const cp2x = p2.x - (p3.x - p1.x) * t;
-                        const cp2y = p2.y - (p3.y - p1.y) * t;
+                        const cp2y = Math.min(p2.y - (p3.y - p1.y) * t, yFloor);
                         d += ` C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${p2.x} ${p2.y}`;
                       }
                       return d;
