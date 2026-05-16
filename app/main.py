@@ -65,6 +65,7 @@ try:
     for j in orphaned:
         details = _json.loads(j.details) if j.details else {}
         has_listen_data = "listen_data" in details
+        phase = details.get("phase", "")
         if has_listen_data:
             j.status = "pending"
             details.update({"phase": "resuming", "progress": 0})
@@ -73,6 +74,19 @@ try:
             from app.celery_app import celery_app
             celery_app.send_task("app.tasks.process_backfill_upload", args=[j.id, j.user_id])
             logger.info(f"Resuming interrupted upload job {j.id} for user {j.user_id}")
+        elif phase in ("enriching", "analyzing"):
+            j.status = "completed"
+            j.completed_at = datetime.now(timezone.utc)
+            inserted = details.get("inserted", 0)
+            enriched = details.get("enrich_done", details.get("enriched", 0))
+            details.update({
+                "phase": "done", "progress": 100,
+                "accepted": inserted, "rejected": 0,
+                "enriched": enriched,
+            })
+            j.details = _json.dumps(details)
+            _startup_db.commit()
+            logger.info(f"Marked enrichment-phase job {j.id} as completed (cron continues enrichment)")
         else:
             j.status = "error"
             j.completed_at = datetime.now(timezone.utc)
