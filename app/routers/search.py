@@ -42,7 +42,7 @@ def search_artists(
     db: Session = Depends(get_db),
 ):
     clamped = max(1, min(limit, MAX_RESULTS))
-    pattern = f"%{_escape_like(q)}%"
+    words = q.strip().split()
 
     stmt = (
         select(
@@ -57,7 +57,7 @@ def search_artists(
             (TrackArtist.track_id == Listen.track_id)
             & (Listen.user_id == user.user_id),
         )
-        .where(Artist.artist_name.ilike(pattern))
+        .where(*[Artist.artist_name.ilike(f"%{_escape_like(w)}%") for w in words])
         .group_by(Artist.artist_id, Artist.artist_name)
         .order_by(func.count(Listen.track_id).desc(), Artist.artist_name.asc())
         .limit(clamped)

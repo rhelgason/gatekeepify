@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { isLoggedIn } from "@/lib/auth";
 import { api } from "@/lib/api";
@@ -26,6 +26,8 @@ function GatekeepContent() {
     if (preselected) router.replace(`/artist/${preselected}`);
   }, [preselected, router]);
 
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   useEffect(() => {
     if (prefillQuery) {
       setSearching(true);
@@ -33,15 +35,25 @@ function GatekeepContent() {
     }
   }, [prefillQuery]);
 
-  async function handleSearch() {
-    if (!query.trim()) return;
+  useEffect(() => {
+    if (!query.trim() || query === prefillQuery) return;
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      handleSearch(query.trim());
+    }, 300);
+    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
+  }, [query]);
+
+  async function handleSearch(q?: string) {
+    const searchQuery = q || query.trim();
+    if (!searchQuery) return;
     setSearching(true);
     setSpotifyResults([]);
-    trackEvent("gatekeep_search", { query: query.trim() });
-    const data = await api.searchArtists(query);
+    trackEvent("gatekeep_search", { query: searchQuery });
+    const data = await api.searchArtists(searchQuery);
     setResults(data);
     if (data.length < 3) {
-      const spotify = await api.searchSpotifyArtists(query).catch(() => []);
+      const spotify = await api.searchSpotifyArtists(searchQuery).catch(() => []);
       const existingIds = new Set(data.map((a: any) => a.artist_id));
       setSpotifyResults(spotify.filter((a: any) => !existingIds.has(a.artist_id)));
     }
@@ -55,22 +67,17 @@ function GatekeepContent() {
         Search for an artist to see who in your friend group listened first.
       </p>
 
-      <div className="flex gap-2 mb-8">
+      <div className="relative mb-8">
         <input
           type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && handleSearch()}
           placeholder="Search for an artist..."
-          className="flex-1 bg-white/5 border border-white/10 rounded-full px-6 py-3 text-gray-100 placeholder-gray-600 focus:border-[var(--green)] focus:outline-none focus:ring-1 focus:ring-[var(--green)] transition-all"
+          className="w-full bg-white/5 border border-white/10 rounded-full px-6 py-3 text-gray-100 placeholder-gray-600 focus:border-[var(--green)] focus:outline-none focus:ring-1 focus:ring-[var(--green)] transition-all"
         />
-        <button
-          onClick={handleSearch}
-          disabled={searching}
-          className="btn-primary"
-        >
-          {searching ? "..." : "Search"}
-        </button>
+        {searching && (
+          <div className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 text-sm animate-pulse">searching...</div>
+        )}
       </div>
 
       {results.length > 0 && (

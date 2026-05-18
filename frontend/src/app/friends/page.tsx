@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { isLoggedIn } from "@/lib/auth";
 import { api, ApiError } from "@/lib/api";
@@ -59,11 +59,23 @@ export default function Friends() {
     setInviteCode(data.invite_code);
   }
 
-  async function handleSearchUsers() {
-    if (!userQuery.trim()) return;
+  const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (!userQuery.trim()) { setUserResults([]); return; }
+    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+    searchDebounceRef.current = setTimeout(() => {
+      handleSearchUsers(userQuery.trim());
+    }, 300);
+    return () => { if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current); };
+  }, [userQuery]);
+
+  async function handleSearchUsers(q?: string) {
+    const searchQuery = q || userQuery.trim();
+    if (!searchQuery) return;
     setSearching(true);
-    trackEvent("friend_search", { query: userQuery.trim() });
-    const data = await api.searchUsers(userQuery);
+    trackEvent("friend_search", { query: searchQuery });
+    const data = await api.searchUsers(searchQuery);
     setUserResults(data);
     setSearching(false);
   }
@@ -144,22 +156,17 @@ export default function Friends() {
         <h2 className="text-sm font-bold uppercase tracking-widest text-gray-500 mb-4">
           Find Friends
         </h2>
-        <div className="flex gap-2 mb-4">
+        <div className="relative mb-4">
           <input
             type="text"
             value={userQuery}
             onChange={(e) => setUserQuery(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && handleSearchUsers()}
             placeholder="Search by name..."
-            className="flex-1 bg-white/5 border border-white/10 rounded-full px-6 py-3 text-gray-100 placeholder-gray-600 focus:border-[var(--green)] focus:outline-none text-sm transition-all"
+            className="w-full bg-white/5 border border-white/10 rounded-full px-6 py-3 text-gray-100 placeholder-gray-600 focus:border-[var(--green)] focus:outline-none text-sm transition-all"
           />
-          <button
-            onClick={handleSearchUsers}
-            disabled={searching}
-            className="btn-primary text-sm"
-          >
-            {searching ? "..." : "Search"}
-          </button>
+          {searching && (
+            <div className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 text-xs animate-pulse">searching...</div>
+          )}
         </div>
         {userResults.length > 0 && (
           <div className="space-y-2 animate-slide-up">

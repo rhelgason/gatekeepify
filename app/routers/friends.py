@@ -195,12 +195,13 @@ def search_users(
     db: Session = Depends(get_db),
 ):
     existing_friend_ids = set(get_friend_ids(db, user.user_id))
-    pattern = f"%{q}%"
+    words = q.strip().split()
+    word_filters = [User.user_name.ilike(f"%{w}%") for w in words]
 
     users = db.execute(
-        select(User.user_id, User.user_name)
+        select(User.user_id, User.user_name, User.image_url)
         .where(
-            User.user_name.ilike(pattern),
+            *word_filters,
             User.user_id != user.user_id,
         )
         .limit(10)
