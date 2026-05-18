@@ -68,7 +68,7 @@ def get_trophies(
     db: Session = Depends(get_db),
 ):
     friend_ids = get_friend_ids(db, user.user_id)
-    group_ids = [user.user_id] + friend_ids
+    group_ids = list(dict.fromkeys([user.user_id] + friend_ids))
     group_hash = get_friend_group_hash(group_ids)
 
     live = _compute_on_the_fly(db, group_ids)
@@ -137,7 +137,7 @@ def head_to_head(
     if friend_id not in friend_ids:
         raise HTTPException(status_code=403, detail="Not friends with this user")
 
-    group_ids = [user.user_id] + friend_ids
+    group_ids = list(dict.fromkeys([user.user_id] + friend_ids))
     group_hash = get_friend_group_hash(group_ids)
 
     live = _compute_on_the_fly(db, group_ids)
