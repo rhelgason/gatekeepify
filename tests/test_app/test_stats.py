@@ -158,7 +158,7 @@ class TestTimeline:
 
 
 class TestTargetUserStats:
-    def test_cannot_view_non_friend_stats(self, client, seeded_db, auth_headers):
+    def test_can_view_any_user_stats(self, client, seeded_db, auth_headers):
         seeded_db.add(User(user_id="stranger", user_name="Stranger"))
         seeded_db.commit()
         resp = client.get(
@@ -166,7 +166,7 @@ class TestTargetUserStats:
             params={"period": "all", "target_user_id": "stranger"},
             headers=auth_headers,
         )
-        assert resp.status_code == 403
+        assert resp.status_code == 200
 
     def test_can_view_own_stats_with_target(self, client, seeded_db, auth_headers):
         resp = client.get(

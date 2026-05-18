@@ -245,14 +245,10 @@ def _resolve_target_user(
 ) -> str:
     if not target_user_id or target_user_id == requester.user_id:
         return requester.user_id
-    friend_ids = [
-        r[0] for r in db.execute(
-            select(Friendship.user_id_2).where(Friendship.user_id_1 == requester.user_id)
-        ).all()
-    ]
-    if target_user_id not in friend_ids:
+    target = db.query(User).filter(User.user_id == target_user_id).first()
+    if not target:
         from fastapi import HTTPException
-        raise HTTPException(status_code=403, detail="You can only view friends' stats")
+        raise HTTPException(status_code=404, detail="User not found")
     return target_user_id
 
 

@@ -270,6 +270,15 @@ export default function Feed() {
                           <span className="text-xs text-gray-600">
                             {new Date(event.ts).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
                           </span>
+                          {event.user_name && (
+                            <Link
+                              href={`/profile/${event.user_id}`}
+                              onClick={(e) => e.stopPropagation()}
+                              className="text-xs text-gray-400 hover:text-white transition-colors"
+                            >
+                              {event.user_name}
+                            </Link>
+                          )}
                           {event.stat && (
                             <span className="text-xs text-gray-500">{event.stat}</span>
                           )}

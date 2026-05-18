@@ -23,6 +23,8 @@ export default function Profile() {
   const [compat, setCompat] = useState<any>(null);
   const [compatLoading, setCompatLoading] = useState(false);
   const [isSelf, setIsSelf] = useState(false);
+  const [isFriend, setIsFriend] = useState(false);
+  const [requestSent, setRequestSent] = useState(false);
   const [memberSince, setMemberSince] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -60,14 +62,16 @@ export default function Profile() {
         api.getFriends().then(friends => {
           const friend = friends.find((f: any) => f.user_id === userId);
           if (friend) {
+            setIsFriend(true);
             setUserName(friend.user_name || friend.user_id);
             setUserImage(friend.image_url);
+            setCompatLoading(true);
+            api.getCompatibility(userId).then(setCompat).catch(() => {}).finally(() => setCompatLoading(false));
           } else {
+            setIsFriend(false);
             setUserName(userId);
           }
         });
-        setCompatLoading(true);
-        api.getCompatibility(userId).then(setCompat).catch(() => {}).finally(() => setCompatLoading(false));
       }
     }).catch(() => {
       setUserName(userId);
@@ -123,7 +127,26 @@ export default function Profile() {
         </div>
       </div>
 
-      {!isSelf && (
+      {!isSelf && !isFriend && (
+        <div className="card p-5 mb-8 flex items-center justify-between">
+          <p className="text-gray-400 text-sm">You&apos;re not friends yet.</p>
+          <button
+            onClick={async () => {
+              try {
+                await api.sendFriendRequest(userId);
+                trackEvent("friend_request_sent", { to_user: userId });
+                setRequestSent(true);
+              } catch {}
+            }}
+            disabled={requestSent}
+            className={requestSent ? "text-gray-600 text-sm" : "btn-primary text-sm"}
+          >
+            {requestSent ? "Request Sent" : "Add Friend"}
+          </button>
+        </div>
+      )}
+
+      {!isSelf && isFriend && (
         <div className="card p-5 mb-8">
           {compatLoading || !compat ? (
             <div className="flex flex-col sm:flex-row items-center gap-6">
