@@ -45,6 +45,7 @@ class Track(Base):
     duration_ms: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     is_local: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True)
     image_url: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
+    enrich_attempts: Mapped[int] = mapped_column(Integer, default=0)
 
     album: Mapped[Optional["Album"]] = relationship(back_populates="tracks")
     artists: Mapped[List["Artist"]] = relationship(

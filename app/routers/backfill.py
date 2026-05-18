@@ -374,6 +374,7 @@ def backfill_status(
         .where(
             Listen.user_id == user.user_id,
             (Track.duration_ms.is_(None)) | (Track.album_id.is_(None)),
+            func.coalesce(Track.enrich_attempts, 0) < 5,
         )
     ).scalar() or 0
 

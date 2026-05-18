@@ -188,8 +188,19 @@ def backfill_track_metadata():
 
         items = service.get_tracks(access_token, list(missing))
         count = 0
+        enriched_ids = set()
         if items:
             count = upsert_track_metadata(db, items)
+            enriched_ids = {item["track"]["id"] for item in items if item.get("track", {}).get("id")}
+        failed_ids = missing - enriched_ids
+        if failed_ids:
+            from app.models import Track
+            db.execute(
+                Track.__table__.update()
+                .where(Track.__table__.c.track_id.in_(failed_ids))
+                .values(enrich_attempts=func.coalesce(Track.__table__.c.enrich_attempts, 0) + 1)
+            )
+            db.commit()
 
         removed = retroactively_validate_export_listens(db, missing)
         if removed:

@@ -47,6 +47,7 @@ try:
     _add_column_if_missing(engine, "friend_invites", "to_user_id", "VARCHAR(255)")
     _add_column_if_missing(engine, "dim_all_users", "token_invalidated_at", "TIMESTAMP")
     _add_column_if_missing(engine, "dim_all_listens", "ms_played", "INTEGER")
+    _add_column_if_missing(engine, "dim_all_tracks", "enrich_attempts", "INTEGER DEFAULT 0")
     _add_column_if_missing(engine, "dim_all_users", "image_url", "VARCHAR(512)")
     _add_column_if_missing(engine, "dim_all_users", "is_admin", "BOOLEAN DEFAULT FALSE")
     _add_column_if_missing(engine, "job_runs", "details", "TEXT")
@@ -82,6 +83,14 @@ try:
             from app.celery_app import celery_app
             celery_app.send_task("app.tasks.process_backfill_upload", args=[j.id, j.user_id])
             logger.info(f"Resuming interrupted upload job {j.id} (was in {phase} phase)")
+        elif details.get("inserted", 0) > 0:
+            j.status = "completed"
+            j.completed_at = datetime.now(timezone.utc)
+            details.update({"phase": "done", "progress": 100})
+            j.details = _json.dumps(details)
+            _startup_db.commit()
+            logger.info(f"Marked interrupted job {j.id} as completed ({details.get('inserted', 0)} listens already inserted)")
+            continue
         else:
             j.status = "error"
             j.completed_at = datetime.now(timezone.utc)

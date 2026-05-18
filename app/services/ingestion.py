@@ -213,12 +213,16 @@ def retroactively_validate_export_listens(
     return removed
 
 
+MAX_ENRICH_ATTEMPTS = 5
+
+
 def get_tracks_missing_metadata(db: Session, limit: int = 200) -> Set[str]:
     stmt = (
         select(Listen.track_id, func.count().label("cnt"))
         .join(Track, Listen.track_id == Track.track_id)
         .where(
-            (Track.duration_ms.is_(None)) | (Track.album_id.is_(None))
+            ((Track.duration_ms.is_(None)) | (Track.album_id.is_(None)))
+            & (func.coalesce(Track.enrich_attempts, 0) < MAX_ENRICH_ATTEMPTS)
         )
         .group_by(Listen.track_id)
         .order_by(func.count().desc())
