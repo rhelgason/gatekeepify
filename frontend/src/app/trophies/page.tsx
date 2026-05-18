@@ -107,7 +107,8 @@ export default function Trophies() {
     <div className="animate-fade-in max-w-2xl mx-auto">
       {/* Hero */}
       <div className="text-center mb-10">
-        <h1 className="text-3xl font-black mb-2">Trophy Case</h1>
+        <h1 className="text-3xl font-black mb-1">Trophy Case</h1>
+        <p className="text-gray-600 text-xs mb-2">Ranked among your friends</p>
         {title ? (
           <p className="text-gray-400 text-sm">
             Your title:{" "}
