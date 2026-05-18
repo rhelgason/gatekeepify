@@ -16,7 +16,7 @@ const TIER_META: Record<string, { label: string; color: string; bg: string }> = 
 
 const AWARD_EMOJI: Record<string, string> = {
   crown: "👑", archaeologist: "🦴", trendsetter: "🔥", patient_zero: "🦠",
-  obsessive: "🔁", completionist: "✅", night_owl: "🦉",
+  obsessive: "🔁", completionist: "✅",
   genre_snob: "🎭", time_traveler: "⏳", basic: "🫠",
   streak: "⚡", hypebeast: "📈",
 };

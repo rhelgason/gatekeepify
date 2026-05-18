@@ -25,7 +25,7 @@ from app.services.awards import (
 
 router = APIRouter(prefix="/gatekeep/awards", tags=["awards"])
 
-ON_THE_FLY_AWARDS = {"crown", "trendsetter", "obsessive", "night_owl", "basic"}
+ON_THE_FLY_AWARDS = {"crown", "trendsetter", "obsessive", "basic"}
 CACHED_AWARDS = {"archaeologist", "patient_zero", "completionist", "genre_snob", "time_traveler", "streak", "hypebeast"}
 
 

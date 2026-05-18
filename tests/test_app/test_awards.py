@@ -22,7 +22,6 @@ from app.services.awards import (
     compute_crown,
     compute_genre_snob,
     compute_hypebeast,
-    compute_night_owl,
     compute_obsessive,
     compute_patient_zero,
     compute_streak,
@@ -154,13 +153,6 @@ class TestComputePatientZero:
         assert "Infected" in results[0]["stat_detail"]
 
 
-class TestComputeNightOwl:
-    def test_detects_night_listens(self, award_db):
-        results = compute_night_owl(award_db, ["alice", "bob", "charlie"])
-        alice = next((r for r in results if r["user_id"] == "alice"), None)
-        assert alice is not None
-        assert alice["stat_value"] > 0  # Alice has 2am and 3am listens
-
 
 class TestComputeGenreSnob:
     def test_finds_exclusive_genres(self, award_db):
@@ -236,7 +228,7 @@ class TestTrophiesEndpoint:
         data = resp.json()
         assert "user_awards" in data
         assert "leaderboards" in data
-        assert len(data["user_awards"]) == 12
+        assert len(data["user_awards"]) == 11
 
     def test_trophies_requires_auth(self, client, award_db):
         resp = client.get("/gatekeep/awards/trophies")
@@ -249,7 +241,7 @@ class TestHeadToHeadEndpoint:
         assert resp.status_code == 200
         data = resp.json()
         assert "comparisons" in data
-        assert len(data["comparisons"]) == 12
+        assert len(data["comparisons"]) == 11
         assert "you" in data
         assert "friend" in data
 

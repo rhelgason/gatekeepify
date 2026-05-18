@@ -48,12 +48,7 @@ AWARD_DEFINITIONS = {
         "description": "Heard every track. Yes, the B-sides.",
         "tier": "devotion",
     },
-    "night_owl": {
-        "name": "The Night Owl",
-        "description": "Apparently doesn't sleep.",
-        "tier": "devotion",
-    },
-    "genre_snob": {
+"genre_snob": {
         "name": "The Genre Snob",
         "description": "Listens to genres nobody else has heard of.",
         "tier": "taste",
@@ -168,34 +163,6 @@ def compute_obsessive(db: Session, group_ids: List[str]) -> List[dict]:
         for i, r in enumerate(sorted_users)
     ]
 
-
-def compute_night_owl(db: Session, group_ids: List[str]) -> List[dict]:
-    rows = db.execute(
-        select(Listen.user_id, Listen.ts).where(Listen.user_id.in_(group_ids))
-    ).all()
-
-    user_counts: dict = defaultdict(lambda: {"total": 0, "night": 0})
-    for row in rows:
-        ts = row.ts if isinstance(row.ts, datetime) else datetime.fromisoformat(str(row.ts))
-        hour = ts.hour
-        user_counts[row.user_id]["total"] += 1
-        if 0 <= hour < 5:
-            user_counts[row.user_id]["night"] += 1
-
-    results = []
-    for uid, counts in user_counts.items():
-        if counts["total"] > 0:
-            pct = round(counts["night"] / counts["total"] * 100, 1)
-            results.append({
-                "user_id": uid,
-                "stat_value": pct,
-                "stat_detail": f"{pct}% of listens between midnight and 5am",
-            })
-
-    results.sort(key=lambda r: -r["stat_value"])
-    for i, r in enumerate(results):
-        r["rank"] = i + 1
-    return results
 
 
 def compute_basic(db: Session, group_ids: List[str]) -> List[dict]:
@@ -523,7 +490,6 @@ def compute_hypebeast(db: Session, group_ids: List[str]) -> List[dict]:
 ALL_COMPUTE_FUNCTIONS = {
     "crown": compute_crown,
     "obsessive": compute_obsessive,
-    "night_owl": compute_night_owl,
     "basic": compute_basic,
     "archaeologist": compute_archaeologist,
     "trendsetter": compute_crown,
