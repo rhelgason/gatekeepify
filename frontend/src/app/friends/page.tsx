@@ -201,33 +201,25 @@ export default function Friends() {
       {/* Invite Link */}
       <section className="mb-10">
         <div className="card p-6">
-          <h2 className="font-bold text-lg mb-4">Invite a Friend</h2>
-          <p className="text-gray-500 text-sm mb-3">
-            Share a link -- they click it, sign in, and you&apos;re friends instantly
+          <h2 className="font-bold text-lg mb-3">Invite a Friend</h2>
+          <p className="text-gray-500 text-sm mb-4">
+            One click to copy an invite link with a message. Send it to anyone.
           </p>
-          <button onClick={handleCreateInvite} className="btn-primary w-full">
-            Generate Invite Link
+          <button
+            onClick={async () => {
+              trackEvent("invite_generated");
+              const data = await api.createInvite();
+              const link = `${window.location.origin}/invite/${data.invite_code}`;
+              const message = `Come prove your music taste on Gatekeepify: ${link}`;
+              await navigator.clipboard.writeText(message);
+              trackEvent("invite_link_copied");
+              setCopied(true);
+              setTimeout(() => setCopied(false), 3000);
+            }}
+            className="btn-primary w-full"
+          >
+            {copied ? "Copied to clipboard!" : "Copy Invite Link"}
           </button>
-          {inviteCode && (
-            <div className="mt-4">
-              <div className="flex items-center gap-2 bg-white/5 rounded-xl p-3">
-                <code className="font-mono text-[var(--green)] text-xs flex-1 truncate">
-                  {typeof window !== "undefined" ? `${window.location.origin}/invite/${inviteCode}` : inviteCode}
-                </code>
-                <button
-                  onClick={() => {
-                    navigator.clipboard.writeText(`${window.location.origin}/invite/${inviteCode}`);
-                    trackEvent("invite_link_copied");
-                    setCopied(true);
-                    setTimeout(() => setCopied(false), 2000);
-                  }}
-                  className="btn-secondary text-xs py-1.5 px-4"
-                >
-                  {copied ? "Copied!" : "Copy"}
-                </button>
-              </div>
-            </div>
-          )}
         </div>
       </section>
 
