@@ -154,8 +154,28 @@ Navbar: 5 tabs (Home, Feed, Gatekeep, Trophies, Friends) + user menu dropdown (Y
 
 ### PWA & Mobile
 - PWA manifest enables "Add to Home Screen" on mobile (standalone display, dark theme)
-- Capacitor config ready for future iOS/Android builds (`frontend/capacitor.config.ts`)
-- To initialize native projects: `cd frontend && npm install @capacitor/core @capacitor/cli && npx cap init && npx cap add ios && npx cap add android`
+- Capacitor ready for future iOS/Android builds (config not checked in to avoid build failures)
+- To set up native projects locally:
+```bash
+cd frontend
+npm install @capacitor/core @capacitor/cli
+npx cap init --name Gatekeepify --id app.gatekeepify --web-dir out
+npx cap add ios      # requires Xcode
+npx cap add android  # requires Android Studio
+```
+- Create `frontend/capacitor.config.ts`:
+```ts
+import type { CapacitorConfig } from "@capacitor/cli";
+const config: CapacitorConfig = {
+  appId: "app.gatekeepify",
+  appName: "Gatekeepify",
+  webDir: "out",
+  server: { androidScheme: "https" },
+};
+export default config;
+```
+- Build for mobile: `next build && npx cap sync && npx cap open ios` (or `android`)
+- Add `ios/`, `android/`, and `capacitor.config.ts` to `.gitignore`
 
 ### Share Cards
 - Client-side Canvas API generates 1080x1080 PNG share cards
