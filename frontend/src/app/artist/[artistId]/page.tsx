@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { isLoggedIn } from "@/lib/auth";
 import { api } from "@/lib/api";
@@ -24,13 +24,28 @@ export default function ArtistPage() {
   const [loading, setLoading] = useState(true);
   const [hoveredPoint, setHoveredPoint] = useState<{ idx: number } | null>(null);
 
+  const loadArtist = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [d, c, t] = await Promise.all([
+        api.getArtistDetail(artistId).catch(() => null),
+        api.gatekeepArtist(artistId).catch(() => null),
+        api.getTimeline(artistId, "personal").catch(() => null),
+      ]);
+      setDetail(d);
+      setComparison(c);
+      setTimeline(t);
+    } catch {}
+    setLoading(false);
+  }, [artistId]);
+
   useEffect(() => {
     if (!isLoggedIn()) {
       router.replace("/");
       return;
     }
     loadArtist();
-  }, [artistId, router]);
+  }, [artistId, router, loadArtist]);
 
   useEffect(() => {
     if (artistId && !loading) {
@@ -45,21 +60,6 @@ export default function ArtistPage() {
       }
     }
   }, [artistId, timelineMode, loading, detail?.artist_name]);
-
-  async function loadArtist() {
-    setLoading(true);
-    try {
-      const [d, c, t] = await Promise.all([
-        api.getArtistDetail(artistId).catch(() => null),
-        api.gatekeepArtist(artistId).catch(() => null),
-        api.getTimeline(artistId, timelineMode).catch(() => null),
-      ]);
-      setDetail(d);
-      setComparison(c);
-      setTimeline(t);
-    } catch {}
-    setLoading(false);
-  }
 
   async function handleChallenge() {
     trackEvent("challenge_created", { artist_id: artistId }, "artist", artistId);
