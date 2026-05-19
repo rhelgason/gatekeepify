@@ -34,10 +34,13 @@ The product is intentionally performative and annoying. That's the point.
 - `app/services/compatibility.py` -- Jaccard similarity for taste compatibility, shared by friends + discover
 - `app/services/audit.py` -- `log_action()` writes to audit_log table + stdout
 - `app/celery_app.py` -- Celery config + beat schedule (3 periodic tasks)
-- `app/tasks.py` -- Batched polling, metadata backfill, award snapshots
+- `app/tasks.py` -- Batched polling, metadata backfill, award snapshots, async upload processing
 - `frontend/src/lib/api.ts` -- API client with 30s cache, Bearer token injection
 - `frontend/src/lib/track.ts` -- Frontend event tracking (fire-and-forget to /track-event)
-- `frontend/src/components/Navbar.tsx` -- Responsive nav with hamburger + friend request badge
+- `frontend/src/lib/shareCard.ts` -- Canvas-based share card PNG generation
+- `frontend/src/lib/share.ts` -- Web Share API with download fallback
+- `frontend/src/components/Navbar.tsx` -- Responsive nav with hamburger + friend request badge + user menu
+- `frontend/src/components/ShareButton.tsx` -- Reusable share card trigger
 - `frontend/src/components/BackfillBanner.tsx` -- Persistent nudge until user uploads data export
 
 ### Database Schema
@@ -56,7 +59,7 @@ The product is intentionally performative and annoying. That's the point.
 - `job_runs` (id PK, job_name, user_id, started_at, completed_at, status, record_count)
 
 ### Test Suite
-232 tests, no external services needed:
+228 tests, no external services needed:
 ```bash
 source env/bin/activate
 python -m pytest tests/test_app/ -v
@@ -93,7 +96,7 @@ Copy `.env.example` to `.env`:
 
 **Railway** (backend): auto-deploys from `main`. Dockerfile + supervisord runs web + worker + beat.
 **Vercel** (frontend): auto-deploys from `main`. Root directory set to `frontend`.
-**CI**: GitHub Actions runs 232 tests on every push to `main`.
+**CI**: GitHub Actions runs 228 tests on every push to `main`. CI includes backend (ruff lint + pytest + health check), frontend (ESLint + tsc + next build), and security (pip-audit + npm audit, non-blocking).
 
 ### Celery Beat Schedule
 - `poll_recent_listens` -- every 15 min, batches up to 500 users per cycle
@@ -110,13 +113,15 @@ Copy `.env.example` to `.env`:
 
 ## Gamification System
 
-12 awards across 4 tiers:
+11 awards across 4 tiers:
 - **Discovery:** Crown, Archaeologist, Trendsetter, Patient Zero
-- **Devotion:** Obsessive, Completionist, Night Owl
+- **Devotion:** Obsessive, Completionist
 - **Taste:** Genre Snob, Time Traveler, The Basic (anti-award)
 - **Dynamic:** Streak, Hypebeast
 
-Simple awards (Crown, Obsessive, Night Owl, Basic, Trendsetter) computed on-the-fly.
+Night Owl was removed (UTC timestamps made it inaccurate without user timezone data).
+
+Simple awards (Crown, Obsessive, Basic, Trendsetter) computed on-the-fly.
 Complex awards cached in `award_snapshots` via Celery task every 6 hours.
 
 ## Data Integrity
@@ -131,23 +136,35 @@ Complex awards cached in `award_snapshots` via Celery task every 6 hours.
 
 ## Frontend Pages
 
-Navbar: 5 tabs (Home, Feed, Gatekeep, Trophies, Friends) + user menu dropdown (Upload Data, Sign Out).
+Navbar: 5 tabs (Home, Feed, Gatekeep, Trophies, Friends) + user menu dropdown (Your Profile, Upload Data, Sign Out).
 
-- `/` -- Landing page with Spotify sign-in
-- `/dashboard` -- Home: Recent stats (period selector) + Wrapped (year selector) as a togglable view mode. Supports `?view=wrapped` query param.
-- `/feed` -- Combined Feed + Discover: two-column layout on desktop (Discover recommendations left, Activity stream right), stacked on mobile
-- `/gatekeep` -- Search artists (DB + Spotify fallthrough)
-- `/artist/[id]` -- Artist detail: hero, SVG line chart timeline (personal/friends/global), Last.fm stats, gatekeep comparison, challenge
-- `/trophies` -- Trophy case: awards grouped by tier (Discovery, Devotion, Taste, Dynamic), expandable inline leaderboards, head-to-head CTA
+- `/` -- Landing page with Spotify sign-in. Passes invite code through OAuth state param.
+- `/dashboard` -- Home: Recent stats (period selector) + Wrapped (year selector) as a togglable view mode. Supports `?view=wrapped` query param. Share button on Wrapped hero.
+- `/feed` -- Combined Feed + Discover: two-column layout on desktop (Discover recommendations left, Activity stream right), stacked on mobile. Clickable usernames link to profiles. Share buttons on shareable events.
+- `/gatekeep` -- Live debounced artist search (300ms) with word splitting. DB + Spotify fallthrough.
+- `/artist/[id]` -- Artist detail: hero with share button, smooth bezier line chart timeline (personal/friends/global), Last.fm stats, gatekeep comparison, challenge
+- `/trophies` -- Trophy case: 11 awards grouped by tier, expandable inline leaderboards, current streak pill, head-to-head CTA. "Ranked among your friends" subtitle.
 - `/trophies/head-to-head?friend=X` -- Side-by-side comparison with visual bars
-- `/friends` -- User search, direct requests, invite link generation, pending requests
-- `/profile/[userId]` -- View a friend's stats
-- `/upload` -- Drag-and-drop ZIP upload with progress (accessible via user menu, not a nav tab)
-- `/invite/[code]` -- Auto-accept invite (stores code through OAuth redirect via localStorage)
-- `/auth/callback` -- OAuth callback, checks for pending invite
-- `/wrapped` -- Redirects to `/dashboard?view=wrapped`
-- `/discover` -- Redirects to `/feed`
-- `/leaderboard` -- Redirects to `/trophies`
+- `/friends` -- Live debounced user search, one-click invite link with pre-filled message, pending requests with instant navbar badge update
+- `/profile/[userId]` -- View any user's stats (not just friends). Shows "You both listen to..." overlap. Add Friend button for non-friends. Spotify profile pictures.
+- `/upload` -- Async background upload with progress bar, time estimate, cancel button. Enriches all tracks during upload. Resumable on server restart.
+- `/invite/[code]` -- Auto-accept invite. Code carried through OAuth state param (survives cross-domain redirects). Custom OG meta for link previews.
+- `/auth/callback` -- OAuth callback, checks for invite in URL params + localStorage fallback
+- `/wrapped`, `/discover`, `/leaderboard` -- Redirects
+
+### PWA & Mobile
+- PWA manifest enables "Add to Home Screen" on mobile (standalone display, dark theme)
+- Capacitor config ready for future iOS/Android builds (`frontend/capacitor.config.ts`)
+- To initialize native projects: `cd frontend && npm install @capacitor/core @capacitor/cli && npx cap init && npx cap add ios && npx cap add android`
+
+### Share Cards
+- Client-side Canvas API generates 1080x1080 PNG share cards
+- Dark gradient background, artist image, bold stat, Gatekeepify branding
+- Web Share API on mobile (native share sheet), PNG download on desktop
+- Share buttons on: artist hero, Wrapped card, shareable feed events
+- `frontend/src/lib/shareCard.ts` -- canvas rendering engine
+- `frontend/src/lib/share.ts` -- share/download utility
+- `frontend/src/components/ShareButton.tsx` -- reusable component
 
 ## Spotify API Constraints
 - `GET /v1/me/player/recently-played` -- max 50 tracks
@@ -159,7 +176,9 @@ Navbar: 5 tabs (Home, Feed, Gatekeep, Trophies, Friends) + user menu dropdown (U
 - Batched polling: 500 users/cycle, ordered by `last_poll_at`, 1s inter-user delay
 - Redis lock prevents overlapping poll cycles
 - At 10k users: each user polled every ~5 hours (Spotify returns last 50 tracks regardless)
-- ZIP upload enrichment capped at 500 tracks immediate, rest via 2-min backfill cron
+- ZIP upload processed async via Celery task with full enrichment during upload
+- Upload is resumable on server restart (idempotent inserts via ON CONFLICT)
+- Unresolvable tracks skipped after 5 enrichment attempts
 - Award snapshots cached every 6 hours to avoid expensive CTE queries on page load
 
 ## Edge Cases
@@ -173,7 +192,14 @@ Navbar: 5 tabs (Home, Feed, Gatekeep, Trophies, Friends) + user menu dropdown (U
 - Revoked Spotify tokens cleared automatically, user must re-auth
 - Timeline uses Python-side month grouping (not `strftime`) for PostgreSQL compatibility
 - CORS allows all origins (safe with Bearer token auth, needed for Vercel preview deployments)
-- OAuth `state` parameter carries frontend origin for preview deployment support
+- OAuth `state` parameter carries frontend origin + invite code as JSON (survives cross-domain redirects)
+- OAuth redirect URL validated against allowed origins (prevents open redirect JWT theft)
+- Admin endpoints require `is_admin` flag on User model
+- SpotifyOAuth uses MemoryCacheHandler (prevents cross-user token contamination)
+- Wrapped uses `ms_played` from export data when available (not track duration)
+- Activity feed skips new obsession detection for users who joined within the feed window
+- Milestones only fire when threshold was freshly crossed (not from bulk export uploads)
+- Upload task handles Spotify 429 rate limits (retry same batch) and 401 token expiry (refresh)
 
 ## Logging
 
