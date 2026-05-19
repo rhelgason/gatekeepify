@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { isLoggedIn } from "@/lib/auth";
 import { api } from "@/lib/api";
 import { trackEvent } from "@/lib/track";
+import ShareButton from "@/components/ShareButton";
 import Link from "next/link";
 
 type Period = "all" | "year" | "month" | "today";
@@ -333,7 +334,20 @@ function DashboardContent() {
                 </p>
               )}
 
-              <div className="card p-8 text-center bg-gradient-to-br from-[var(--green-dim)] to-transparent border-[var(--green)]/10">
+              <div className="card p-8 text-center bg-gradient-to-br from-[var(--green-dim)] to-transparent border-[var(--green)]/10 relative">
+                <div className="absolute top-4 right-4">
+                  <ShareButton
+                    cardData={{
+                      artistName: wrappedData.top_artists?.[0]?.artist_name || "Your Year",
+                      imageUrl: wrappedData.top_artists?.[0]?.image_url,
+                      statNumber: wrappedData.total_minutes.toLocaleString(),
+                      statLabel: "minutes listened",
+                      contextLine: `${year} Wrapped`,
+                      secondaryStat: `${(wrappedData.unique_artists || 0).toLocaleString()} artists · ${(wrappedData.unique_tracks || 0).toLocaleString()} tracks`,
+                    }}
+                    surface="wrapped"
+                  />
+                </div>
                 <div className="text-gray-400 text-sm uppercase tracking-widest mb-2">
                   Minutes Listened
                 </div>

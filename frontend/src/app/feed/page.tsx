@@ -5,7 +5,10 @@ import { useRouter } from "next/navigation";
 import { isLoggedIn } from "@/lib/auth";
 import { api } from "@/lib/api";
 import { trackEvent } from "@/lib/track";
+import ShareButton from "@/components/ShareButton";
 import Link from "next/link";
+
+const SHAREABLE_EVENTS = new Set(["binge", "new_obsession", "milestone", "track_repeat", "crown_stolen"]);
 
 export default function Feed() {
   const router = useRouter();
@@ -262,10 +265,24 @@ export default function Feed() {
                   >
                     <div className="flex items-start gap-3">
                       <span className="text-xl flex-shrink-0 mt-0.5">{event.emoji}</span>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm text-gray-200 leading-relaxed">
+                      <div className="flex-1 min-w-0 relative">
+                        <p className="text-sm text-gray-200 leading-relaxed pr-8">
                           {event.message}
                         </p>
+                        {SHAREABLE_EVENTS.has(event.type) && event.artist_name && (
+                          <div className="absolute top-0 right-0">
+                            <ShareButton
+                              cardData={{
+                                artistName: event.artist_name,
+                                statNumber: event.stat?.split(" ")[0] || "",
+                                statLabel: event.stat?.replace(/^[\d,]+\s*/, "") || "plays",
+                                contextLine: event.message.length > 60 ? event.message.slice(0, 57) + "..." : event.message,
+                              }}
+                              surface="feed"
+                              entityId={event.artist_id}
+                            />
+                          </div>
+                        )}
                         <div className="flex items-center gap-3 mt-2">
                           <span className="text-xs text-gray-600">
                             {new Date(event.ts).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
