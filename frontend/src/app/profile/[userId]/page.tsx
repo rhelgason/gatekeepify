@@ -26,6 +26,7 @@ export default function Profile() {
   const [isFriend, setIsFriend] = useState(false);
   const [requestSent, setRequestSent] = useState(false);
   const [memberSince, setMemberSince] = useState<string | null>(null);
+  const [sharedArtists, setSharedArtists] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -79,6 +80,15 @@ export default function Profile() {
     trackEvent("profile_viewed", { profile_user_id: userId });
   }, [userId]);
 
+  useEffect(() => {
+    if (isSelf || !artists.length) return;
+    api.getTopArtists("all", 10).then(myArtists => {
+      const myNames = new Set(myArtists.map((a: any) => a.artist_name));
+      const shared = artists.filter((a: any) => myNames.has(a.artist_name)).map((a: any) => a.artist_name);
+      setSharedArtists(shared);
+    }).catch(() => {});
+  }, [artists, isSelf]);
+
   const periods: { value: Period; label: string }[] = [
     { value: "today", label: "Today (UTC)" },
     { value: "month", label: "30 Days" },
@@ -126,6 +136,16 @@ export default function Profile() {
           </p>
         </div>
       </div>
+
+      {!isSelf && sharedArtists.length > 0 && (
+        <div className="mb-6 px-1">
+          <span className="text-xs text-gray-500">You both listen to </span>
+          <span className="text-xs text-gray-300">{sharedArtists.slice(0, 5).join(", ")}</span>
+          {sharedArtists.length > 5 && (
+            <span className="text-xs text-gray-600"> and {sharedArtists.length - 5} more</span>
+          )}
+        </div>
+      )}
 
       {!isSelf && !isFriend && (
         <div className="card p-5 mb-8 flex items-center justify-between">
