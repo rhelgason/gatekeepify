@@ -6,7 +6,18 @@ import BackfillBanner from "@/components/BackfillBanner";
 
 export const metadata: Metadata = {
   title: "Gatekeepify",
-  description: "Prove you listened first.",
+  description: "Prove you listened first. Track your Spotify history, compare with friends, and settle it with timestamps.",
+  openGraph: {
+    title: "Gatekeepify",
+    description: "Prove you listened first. Track your Spotify history, compare with friends, and settle it with timestamps.",
+    siteName: "Gatekeepify",
+    type: "website",
+  },
+  twitter: {
+    card: "summary",
+    title: "Gatekeepify",
+    description: "Prove you listened first. Track your Spotify history, compare with friends, and settle it with timestamps.",
+  },
 };
 
 export default function RootLayout({
