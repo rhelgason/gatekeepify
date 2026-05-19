@@ -47,7 +47,15 @@ async function request<T>(
     headers["Content-Type"] = "application/json";
   }
 
-  const res = await fetch(`${API_URL}${path}`, { ...options, headers });
+  let res: Response;
+  try {
+    res = await fetch(`${API_URL}${path}`, { ...options, headers });
+  } catch {
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new Event("api-unreachable"));
+    }
+    throw new ApiError("Unable to connect to server", 0);
+  }
 
   if (res.status === 401) {
     if (typeof window !== "undefined") {

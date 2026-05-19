@@ -3,6 +3,7 @@ import "./globals.css";
 import Navbar from "@/components/Navbar";
 import PageTracker from "@/components/PageTracker";
 import BackfillBanner from "@/components/BackfillBanner";
+import ConnectionBanner from "@/components/ConnectionBanner";
 
 export const metadata: Metadata = {
   title: "Gatekeepify",
@@ -41,6 +42,7 @@ export default function RootLayout({
           <BackfillBanner />
           {children}
         </main>
+        <ConnectionBanner />
       </body>
     </html>
   );
