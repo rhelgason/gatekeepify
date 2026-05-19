@@ -7,6 +7,13 @@ import BackfillBanner from "@/components/BackfillBanner";
 export const metadata: Metadata = {
   title: "Gatekeepify",
   description: "Prove you listened first. Track your Spotify history, compare with friends, and settle it with timestamps.",
+  manifest: "/manifest.json",
+  themeColor: "#0a0a0a",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "Gatekeepify",
+  },
   openGraph: {
     title: "Gatekeepify",
     description: "Prove you listened first. Track your Spotify history, compare with friends, and settle it with timestamps.",
