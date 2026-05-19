@@ -28,26 +28,6 @@ export default function Upload() {
   const [checkingJob, setCheckingJob] = useState(true);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  useEffect(() => {
-    if (!isLoggedIn()) {
-      router.replace("/");
-      return;
-    }
-    api.getBackfillStatus().then(setStatus);
-    api.getUploadStatus().then((j) => {
-      if (j.status === "pending" || j.status === "running") {
-        setJob(j);
-        startPolling();
-      } else if (j.status === "completed" || j.status === "error") {
-        setJob(j);
-      }
-    }).catch(() => {}).finally(() => setCheckingJob(false));
-
-    return () => {
-      if (pollRef.current) clearInterval(pollRef.current);
-    };
-  }, [router, startPolling]);
-
   const startPolling = useCallback(() => {
     if (pollRef.current) clearInterval(pollRef.current);
     let noneCount = 0;
@@ -79,6 +59,26 @@ export default function Upload() {
       }
     }, 2000);
   }, []);
+
+  useEffect(() => {
+    if (!isLoggedIn()) {
+      router.replace("/");
+      return;
+    }
+    api.getBackfillStatus().then(setStatus);
+    api.getUploadStatus().then((j) => {
+      if (j.status === "pending" || j.status === "running") {
+        setJob(j);
+        startPolling();
+      } else if (j.status === "completed" || j.status === "error") {
+        setJob(j);
+      }
+    }).catch(() => {}).finally(() => setCheckingJob(false));
+
+    return () => {
+      if (pollRef.current) clearInterval(pollRef.current);
+    };
+  }, [router, startPolling]);
 
   async function handleFile(file: File) {
     if (!file.name.endsWith(".zip")) {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { isLoggedIn } from "@/lib/auth";
 import { api, ApiError } from "@/lib/api";
@@ -13,16 +13,7 @@ export default function InvitePage() {
   const [status, setStatus] = useState<"checking" | "accepting" | "success" | "error">("checking");
   const [message, setMessage] = useState("");
 
-  useEffect(() => {
-    if (!isLoggedIn()) {
-      localStorage.setItem("pending_invite", code);
-      router.replace(`/?invite=${encodeURIComponent(code)}`);
-      return;
-    }
-    acceptInvite();
-  }, [code, router]);
-
-  async function acceptInvite() {
+  const acceptInvite = useCallback(async () => {
     setStatus("accepting");
     trackEvent("invite_link_opened", { code });
     try {
@@ -46,7 +37,16 @@ export default function InvitePage() {
         setMessage("Something went wrong. Try pasting the code on the Friends page.");
       }
     }
-  }
+  }, [code, router]);
+
+  useEffect(() => {
+    if (!isLoggedIn()) {
+      localStorage.setItem("pending_invite", code);
+      router.replace(`/?invite=${encodeURIComponent(code)}`);
+      return;
+    }
+    acceptInvite();
+  }, [code, router, acceptInvite]);
 
   return (
     <div className="fixed inset-0 flex items-center justify-center bg-[#0a0a0a]">

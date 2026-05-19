@@ -25,6 +25,7 @@ export default function BackfillBanner() {
         setShow(true);
       }
     }).catch(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname]);
 
   if (!show || dismissed) return null;
