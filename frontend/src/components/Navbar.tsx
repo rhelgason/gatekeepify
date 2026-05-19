@@ -19,11 +19,12 @@ export default function Navbar() {
   useEffect(() => {
     if (!loggedIn) return;
     api.getMe().then(u => setUser({ user_id: u.user_id, user_name: u.user_name, image_url: u.image_url })).catch(() => {});
-    api.getPendingRequests().then(r => setPendingCount(r.length)).catch(() => {});
-    const interval = setInterval(() => {
-      api.getPendingRequests().then(r => setPendingCount(r.length)).catch(() => {});
-    }, 60000);
-    return () => clearInterval(interval);
+    const fetchPending = () => api.getPendingRequests().then(r => setPendingCount(r.length)).catch(() => {});
+    fetchPending();
+    const interval = setInterval(fetchPending, 60000);
+    const onFriendsUpdated = () => fetchPending();
+    window.addEventListener("friends-updated", onFriendsUpdated);
+    return () => { clearInterval(interval); window.removeEventListener("friends-updated", onFriendsUpdated); };
   }, [loggedIn]);
 
   useEffect(() => {

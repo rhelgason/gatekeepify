@@ -96,12 +96,14 @@ export default function Friends() {
     trackEvent("friend_request_accepted", { request_id: requestId });
     await api.acceptFriendRequest(requestId);
     loadData();
+    window.dispatchEvent(new Event("friends-updated"));
   }
 
   async function handleDeclineRequest(requestId: number) {
     trackEvent("friend_request_declined", { request_id: requestId });
     await api.declineFriendRequest(requestId);
     loadData();
+    window.dispatchEvent(new Event("friends-updated"));
   }
 
   if (loading) {
