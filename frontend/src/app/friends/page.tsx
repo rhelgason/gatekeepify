@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { isLoggedIn } from "@/lib/auth";
 import { api, ApiError } from "@/lib/api";
@@ -61,24 +61,21 @@ export default function Friends() {
 
   const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  useEffect(() => {
-    if (!userQuery.trim()) { setUserResults([]); return; }
-    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
-    searchDebounceRef.current = setTimeout(() => {
-      handleSearchUsers(userQuery.trim());
-    }, 300);
-    return () => { if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current); };
-  }, [userQuery]);
-
-  async function handleSearchUsers(q?: string) {
-    const searchQuery = q || userQuery.trim();
+  const doSearchUsers = useCallback(async (searchQuery: string) => {
     if (!searchQuery) return;
     setSearching(true);
     trackEvent("friend_search", { query: searchQuery });
     const data = await api.searchUsers(searchQuery);
     setUserResults(data);
     setSearching(false);
-  }
+  }, []);
+
+  useEffect(() => {
+    if (!userQuery.trim()) { setUserResults([]); return; }
+    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+    searchDebounceRef.current = setTimeout(() => doSearchUsers(userQuery.trim()), 300);
+    return () => { if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current); };
+  }, [userQuery, doSearchUsers]);
 
   async function handleSendRequest(toUserId: string) {
     trackEvent("friend_request_sent", { to_user: toUserId }, "user", toUserId);

@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { isLoggedIn } from "@/lib/auth";
 import { api } from "@/lib/api";
@@ -28,24 +28,7 @@ function GatekeepContent() {
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  useEffect(() => {
-    if (prefillQuery) {
-      setSearching(true);
-      api.searchArtists(prefillQuery).then(setResults).finally(() => setSearching(false));
-    }
-  }, [prefillQuery]);
-
-  useEffect(() => {
-    if (!query.trim() || query === prefillQuery) return;
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => {
-      handleSearch(query.trim());
-    }, 300);
-    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
-  }, [query]);
-
-  async function handleSearch(q?: string) {
-    const searchQuery = q || query.trim();
+  const doSearch = useCallback(async (searchQuery: string) => {
     if (!searchQuery) return;
     setSearching(true);
     setSpotifyResults([]);
@@ -58,7 +41,18 @@ function GatekeepContent() {
       setSpotifyResults(spotify.filter((a: any) => !existingIds.has(a.artist_id)));
     }
     setSearching(false);
-  }
+  }, []);
+
+  useEffect(() => {
+    if (prefillQuery) doSearch(prefillQuery);
+  }, [prefillQuery, doSearch]);
+
+  useEffect(() => {
+    if (!query.trim() || query === prefillQuery) return;
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => doSearch(query.trim()), 300);
+    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
+  }, [query, prefillQuery, doSearch]);
 
   return (
     <div className="animate-fade-in">

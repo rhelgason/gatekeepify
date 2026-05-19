@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useCallback, useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { isLoggedIn } from "@/lib/auth";
 import { api } from "@/lib/api";
@@ -46,9 +46,9 @@ export default function Upload() {
     return () => {
       if (pollRef.current) clearInterval(pollRef.current);
     };
-  }, [router]);
+  }, [router, startPolling]);
 
-  function startPolling() {
+  const startPolling = useCallback(() => {
     if (pollRef.current) clearInterval(pollRef.current);
     let noneCount = 0;
     pollRef.current = setInterval(async () => {
@@ -78,7 +78,7 @@ export default function Upload() {
         // keep polling
       }
     }, 2000);
-  }
+  }, []);
 
   async function handleFile(file: File) {
     if (!file.name.endsWith(".zip")) {
