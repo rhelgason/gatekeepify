@@ -35,8 +35,7 @@ def _deactivate_user(db, user: User, reason: str) -> None:
     user.spotify_refresh_token = None
     db.commit()
     logger.warning(
-        f"Deactivated user {user.user_id}: {reason}. "
-        f"User must re-authenticate via /auth/login to resume polling."
+        f"Deactivated user {user.user_id}: {reason}. User must re-authenticate via /auth/login to resume polling."
     )
 
 
@@ -52,6 +51,7 @@ def poll_recent_listens(self):
     lock = None
     try:
         from redis import Redis
+
         redis = Redis.from_url(settings.redis_url)
         lock = redis.lock(lock_key, timeout=settings.poll_interval_seconds - 10)
         if not lock.acquire(blocking=False):
@@ -109,18 +109,19 @@ def poll_recent_listens(self):
                 time.sleep(INTER_USER_DELAY)
 
         pending = total_users - len(batch)
-        logger.info(
-            f"Poll cycle complete: {polled} polled, {errors} errors, "
-            f"{pending} pending for next cycle"
-        )
+        logger.info(f"Poll cycle complete: {polled} polled, {errors} errors, {pending} pending for next cycle")
         log_job_run(
-            db, "poll_recent_listens", None, started_at,
-            datetime.now(timezone.utc), "success", polled,
+            db,
+            "poll_recent_listens",
+            None,
+            started_at,
+            datetime.now(timezone.utc),
+            "success",
+            polled,
         )
     except Exception as e:
         logger.error(f"Poll cycle failed: {e}")
-        log_job_run(db, "poll_recent_listens", None, started_at,
-                    datetime.now(timezone.utc), "error")
+        log_job_run(db, "poll_recent_listens", None, started_at, datetime.now(timezone.utc), "error")
     finally:
         db.close()
         if lock:
@@ -130,9 +131,7 @@ def poll_recent_listens(self):
                 pass
 
 
-def _poll_single_user(
-    db, service: SpotifyService, user: User
-) -> None:
+def _poll_single_user(db, service: SpotifyService, user: User) -> None:
     started_at = datetime.now(timezone.utc)
 
     refresh_token = decrypt_token(user.spotify_refresh_token)
@@ -143,9 +142,7 @@ def _poll_single_user(
     if new_refresh and new_refresh != refresh_token:
         user.spotify_refresh_token = encrypt_token(new_refresh)
 
-    last_ts = db.execute(
-        select(func.max(Listen.ts)).where(Listen.user_id == user.user_id)
-    ).scalar()
+    last_ts = db.execute(select(func.max(Listen.ts)).where(Listen.user_id == user.user_id)).scalar()
 
     items = service.get_recent_listens(access_token, after=last_ts)
     count = 0
@@ -196,6 +193,7 @@ def backfill_track_metadata():
         failed_ids = missing - enriched_ids
         if failed_ids:
             from app.models import Track
+
             db.execute(
                 Track.__table__.update()
                 .where(Track.__table__.c.track_id.in_(failed_ids))
@@ -205,9 +203,7 @@ def backfill_track_metadata():
 
         removed = retroactively_validate_export_listens(db, missing)
         if removed:
-            logger.info(
-                f"Removed {removed} export listens that predate track release dates"
-            )
+            logger.info(f"Removed {removed} export listens that predate track release dates")
 
         log_job_run(
             db,
@@ -252,11 +248,7 @@ def compute_award_snapshots():
 
         for u in all_users:
             friend_ids = [
-                r[0] for r in db.execute(
-                    select(Friendship.user_id_2).where(
-                        Friendship.user_id_1 == u.user_id
-                    )
-                ).all()
+                r[0] for r in db.execute(select(Friendship.user_id_2).where(Friendship.user_id_1 == u.user_id)).all()
             ]
             if not friend_ids:
                 continue
@@ -268,7 +260,15 @@ def compute_award_snapshots():
                 continue
             processed_groups.add(group_hash)
 
-            cached_awards = {"archaeologist", "patient_zero", "completionist", "genre_snob", "time_traveler", "streak", "hypebeast"}
+            cached_awards = {
+                "archaeologist",
+                "patient_zero",
+                "completionist",
+                "genre_snob",
+                "time_traveler",
+                "streak",
+                "hypebeast",
+            }
             for award_id in cached_awards:
                 fn = ALL_COMPUTE_FUNCTIONS.get(award_id)
                 if not fn:
@@ -276,17 +276,19 @@ def compute_award_snapshots():
                 try:
                     results = fn(db, group_ids)
                     for entry in results:
-                        db.merge(AwardSnapshot(
-                            user_id=entry["user_id"],
-                            friend_group_hash=group_hash,
-                            award_id=award_id,
-                            rank=entry["rank"],
-                            stat_value=entry.get("stat_value"),
-                            stat_detail=entry.get("stat_detail"),
-                            entity_id=entry.get("entity_id"),
-                            entity_name=entry.get("entity_name"),
-                            computed_at=datetime.now(timezone.utc),
-                        ))
+                        db.merge(
+                            AwardSnapshot(
+                                user_id=entry["user_id"],
+                                friend_group_hash=group_hash,
+                                award_id=award_id,
+                                rank=entry["rank"],
+                                stat_value=entry.get("stat_value"),
+                                stat_detail=entry.get("stat_detail"),
+                                entity_id=entry.get("entity_id"),
+                                entity_name=entry.get("entity_name"),
+                                computed_at=datetime.now(timezone.utc),
+                            )
+                        )
                         total_snapshots += 1
                 except Exception as e:
                     logger.warning(f"Failed to compute {award_id}: {e}")
@@ -294,7 +296,9 @@ def compute_award_snapshots():
 
             db.commit()
 
-        log_job_run(db, "compute_award_snapshots", None, started_at, datetime.now(timezone.utc), "success", total_snapshots)
+        log_job_run(
+            db, "compute_award_snapshots", None, started_at, datetime.now(timezone.utc), "success", total_snapshots
+        )
         logger.info(f"Computed {total_snapshots} award snapshots across {len(processed_groups)} groups")
     except Exception as e:
         db.rollback()
@@ -370,7 +374,7 @@ def process_backfill_upload(job_id: int, user_id: str):
                 if job.status == "error":
                     logger.info(f"Backfill job {job_id} was cancelled, stopping")
                     return
-                batch = accepted[bi:bi + batch_size]
+                batch = accepted[bi : bi + batch_size]
                 seen_tracks = set()
                 for listen, track_name in batch:
                     if listen.track_id not in seen_tracks:
@@ -386,11 +390,16 @@ def process_backfill_upload(job_id: int, user_id: str):
                     if lk in seen_listens:
                         continue
                     seen_listens.add(lk)
-                    listen_rows.append({
-                        "ts": listen.ts, "user_id": listen.user_id,
-                        "track_id": listen.track_id, "source": listen.source,
-                        "ms_played": listen.ms_played, "export_metadata": listen.export_metadata,
-                    })
+                    listen_rows.append(
+                        {
+                            "ts": listen.ts,
+                            "user_id": listen.user_id,
+                            "track_id": listen.track_id,
+                            "source": listen.source,
+                            "ms_played": listen.ms_played,
+                            "export_metadata": listen.export_metadata,
+                        }
+                    )
                 if listen_rows:
                     dialect = db.bind.dialect.name if db.bind else "sqlite"
                     tbl = Listen.__table__
@@ -429,7 +438,7 @@ def process_backfill_upload(job_id: int, user_id: str):
                     if job.status == "error":
                         logger.info(f"Backfill job {job_id} cancelled during enrichment")
                         return
-                    batch = all_unenriched[enrich_idx:enrich_idx + 50]
+                    batch = all_unenriched[enrich_idx : enrich_idx + 50]
                     try:
                         res = client.tracks(batch)
                         if res and res.get("tracks"):
@@ -440,7 +449,9 @@ def process_backfill_upload(job_id: int, user_id: str):
                         enrich_idx += 50
                     except SpotifyExc as e:
                         if e.http_status == 429:
-                            retry_after = int(e.headers.get("Retry-After", 5)) if hasattr(e, "headers") and e.headers else 5
+                            retry_after = (
+                                int(e.headers.get("Retry-After", 5)) if hasattr(e, "headers") and e.headers else 5
+                            )
                             rate_limit_strikes += 1
                             if rate_limit_strikes >= 5:
                                 logger.warning(f"Too many rate limits, stopping at {enriched}/{total_to_enrich}")
@@ -466,7 +477,7 @@ def process_backfill_upload(job_id: int, user_id: str):
 
         # --- Phase 3: Retroactive validation ---
         if enriched > 0:
-            enriched_ids = set(all_unenriched[:min(enrich_idx, total_to_enrich)])
+            enriched_ids = set(all_unenriched[: min(enrich_idx, total_to_enrich)])
             removed = retroactively_validate_export_listens(db, enriched_ids)
             if removed:
                 logger.info(f"Removed {removed} pre-release listens after enrichment")
@@ -474,25 +485,40 @@ def process_backfill_upload(job_id: int, user_id: str):
         # --- Phase 4: Anomaly detection ---
         _update_job("analyzing", 95, enriched=enriched, enrich_total=total_to_enrich, enrich_done=enriched)
         from app.services.anomaly import analyze_user_export
+
         anomaly_result = analyze_user_export(db, user_id)
         if anomaly_result["flags"]:
-            log_action(db, "backfill.anomaly_detected", user_id=user_id,
-                       status="warning", details=anomaly_result)
+            log_action(db, "backfill.anomaly_detected", user_id=user_id, status="warning", details=anomaly_result)
 
         # --- Done ---
         job.status = "completed"
         job.completed_at = datetime.now(timezone.utc)
         job.record_count = inserted
         rejected = total_processed - total_accepted if total_processed else 0
-        _update_job("done", 100,
-                    inserted=inserted, accepted=total_accepted, rejected=rejected,
-                    rejection_reasons=rejection_reasons, enriched=enriched,
-                    trust_score=anomaly_result["score"])
+        _update_job(
+            "done",
+            100,
+            inserted=inserted,
+            accepted=total_accepted,
+            rejected=rejected,
+            rejection_reasons=rejection_reasons,
+            enriched=enriched,
+            trust_score=anomaly_result["score"],
+        )
 
-        log_action(db, "backfill.upload", user_id=user_id,
-                   details={"total_processed": total_processed, "total_accepted": inserted,
-                            "total_rejected": rejected, "rejection_reasons": rejection_reasons,
-                            "tracks_enriched": enriched, "trust_score": anomaly_result["score"]})
+        log_action(
+            db,
+            "backfill.upload",
+            user_id=user_id,
+            details={
+                "total_processed": total_processed,
+                "total_accepted": inserted,
+                "total_rejected": rejected,
+                "rejection_reasons": rejection_reasons,
+                "tracks_enriched": enriched,
+                "trust_score": anomaly_result["score"],
+            },
+        )
         logger.info(f"Backfill upload complete for {user_id}: {inserted} inserted, {enriched} enriched")
 
     except Exception as e:

@@ -16,11 +16,13 @@ _CACHE_TTL = 3600  # seconds
 
 
 def _lastfm_get(method: str, params: dict) -> Optional[dict]:
-    params.update({
-        "method": method,
-        "api_key": settings.lastfm_api_key,
-        "format": "json",
-    })
+    params.update(
+        {
+            "method": method,
+            "api_key": settings.lastfm_api_key,
+            "format": "json",
+        }
+    )
     resp = requests.get(BASE_URL, params=params, timeout=10)
     if resp.status_code != 200:
         logger.warning(f"Last.fm {method} returned {resp.status_code}: {resp.text[:200]}")

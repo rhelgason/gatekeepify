@@ -100,9 +100,7 @@ def _get_top_tracks(
             album_name=row.album_name,
             image_url=row.image_url,
             listen_count=row.listen_count,
-            total_minutes=_ms_to_minutes(
-                (row.duration_ms or 0) * row.listen_count
-            ),
+            total_minutes=_ms_to_minutes((row.duration_ms or 0) * row.listen_count),
         )
         for i, row in enumerate(rows)
     ]
@@ -139,9 +137,7 @@ def _get_top_artists(
     genres_by_artist: dict[str, list[str]] = {}
     if artist_ids:
         genre_rows = db.execute(
-            select(ArtistGenre.artist_id, ArtistGenre.genre).where(
-                ArtistGenre.artist_id.in_(artist_ids)
-            )
+            select(ArtistGenre.artist_id, ArtistGenre.genre).where(ArtistGenre.artist_id.in_(artist_ids))
         ).all()
         for gr in genre_rows:
             genres_by_artist.setdefault(gr.artist_id, []).append(gr.genre)
@@ -207,10 +203,9 @@ def _get_top_genres(
     ]
 
 
-def _get_total_minutes(
-    db: Session, user_id: str, since: Optional[datetime], until: Optional[datetime] = None
-) -> int:
+def _get_total_minutes(db: Session, user_id: str, since: Optional[datetime], until: Optional[datetime] = None) -> int:
     from sqlalchemy import case
+
     ms_expr = func.sum(
         case(
             (Listen.ms_played.isnot(None), Listen.ms_played),
@@ -231,23 +226,20 @@ def _get_total_minutes(
     return _ms_to_minutes(result)
 
 
-def _get_total_listens(
-    db: Session, user_id: str, since: Optional[datetime]
-) -> int:
+def _get_total_listens(db: Session, user_id: str, since: Optional[datetime]) -> int:
     stmt = select(func.count()).select_from(Listen).where(Listen.user_id == user_id)
     if since:
         stmt = stmt.where(Listen.ts >= since)
     return db.execute(stmt).scalar() or 0
 
 
-def _resolve_target_user(
-    db: Session, requester: User, target_user_id: Optional[str]
-) -> str:
+def _resolve_target_user(db: Session, requester: User, target_user_id: Optional[str]) -> str:
     if not target_user_id or target_user_id == requester.user_id:
         return requester.user_id
     target = db.query(User).filter(User.user_id == target_user_id).first()
     if not target:
         from fastapi import HTTPException
+
         raise HTTPException(status_code=404, detail="User not found")
     # Verify requester is friends with the target user
     is_friend = db.execute(
@@ -258,6 +250,7 @@ def _resolve_target_user(
     ).first()
     if not is_friend:
         from fastapi import HTTPException
+
         raise HTTPException(status_code=403, detail="You can only view stats of friends")
     return target_user_id
 
@@ -274,8 +267,12 @@ def top_tracks(
     uid = _resolve_target_user(db, user, target_user_id)
     since = _period_to_since(period)
     results = _get_top_tracks(db, uid, since, _clamp_limit(limit), _clamp_offset(offset))
-    log_action(db, "stats.top_tracks_viewed", user_id=user.user_id,
-               details={"period": period.value, "target": uid, "results": len(results)})
+    log_action(
+        db,
+        "stats.top_tracks_viewed",
+        user_id=user.user_id,
+        details={"period": period.value, "target": uid, "results": len(results)},
+    )
     return results
 
 
@@ -291,8 +288,12 @@ def top_artists(
     uid = _resolve_target_user(db, user, target_user_id)
     since = _period_to_since(period)
     results = _get_top_artists(db, uid, since, _clamp_limit(limit), _clamp_offset(offset))
-    log_action(db, "stats.top_artists_viewed", user_id=user.user_id,
-               details={"period": period.value, "target": uid, "results": len(results)})
+    log_action(
+        db,
+        "stats.top_artists_viewed",
+        user_id=user.user_id,
+        details={"period": period.value, "target": uid, "results": len(results)},
+    )
     return results
 
 
@@ -308,8 +309,12 @@ def top_genres(
     uid = _resolve_target_user(db, user, target_user_id)
     since = _period_to_since(period)
     results = _get_top_genres(db, uid, since, _clamp_limit(limit), _clamp_offset(offset))
-    log_action(db, "stats.top_genres_viewed", user_id=user.user_id,
-               details={"period": period.value, "target": uid, "results": len(results)})
+    log_action(
+        db,
+        "stats.top_genres_viewed",
+        user_id=user.user_id,
+        details={"period": period.value, "target": uid, "results": len(results)},
+    )
     return results
 
 
@@ -319,11 +324,11 @@ def wrapped(
     year: Optional[int] = None,
     db: Session = Depends(get_db),
 ):
-
     current_year = datetime.now(timezone.utc).year
     if year:
         if year < 2000 or year > current_year + 1:
             from fastapi import HTTPException
+
             raise HTTPException(status_code=400, detail=f"Year must be between 2000 and {current_year + 1}")
         since = datetime(year, 1, 1, tzinfo=timezone.utc)
     else:
@@ -351,23 +356,26 @@ def wrapped(
     total_minutes = _get_total_minutes(db, user.user_id, since, until=until)
     total_listens = _get_total_listens(db, user.user_id, since)
 
-    unique_artists = db.execute(
-        select(func.count(func.distinct(TrackArtist.artist_id)))
-        .select_from(Listen)
-        .join(TrackArtist, Listen.track_id == TrackArtist.track_id)
-        .where(Listen.user_id == user.user_id, Listen.ts >= since,
-               *([Listen.ts < until] if until else []))
-    ).scalar() or 0
+    unique_artists = (
+        db.execute(
+            select(func.count(func.distinct(TrackArtist.artist_id)))
+            .select_from(Listen)
+            .join(TrackArtist, Listen.track_id == TrackArtist.track_id)
+            .where(Listen.user_id == user.user_id, Listen.ts >= since, *([Listen.ts < until] if until else []))
+        ).scalar()
+        or 0
+    )
 
-    unique_tracks = db.execute(
-        select(func.count(func.distinct(Listen.track_id)))
-        .select_from(Listen)
-        .where(Listen.user_id == user.user_id, Listen.ts >= since,
-               *([Listen.ts < until] if until else []))
-    ).scalar() or 0
+    unique_tracks = (
+        db.execute(
+            select(func.count(func.distinct(Listen.track_id)))
+            .select_from(Listen)
+            .where(Listen.user_id == user.user_id, Listen.ts >= since, *([Listen.ts < until] if until else []))
+        ).scalar()
+        or 0
+    )
 
-    log_action(db, "stats.wrapped_viewed", user_id=user.user_id,
-               details={"year": year, "total_minutes": total_minutes})
+    log_action(db, "stats.wrapped_viewed", user_id=user.user_id, details={"year": year, "total_minutes": total_minutes})
 
     return WrappedResponse(
         top_artists=top_artists,
@@ -394,6 +402,7 @@ def timeline(
 ):
     if not artist_id and not track_id:
         from fastapi import HTTPException
+
         raise HTTPException(status_code=400, detail="Provide artist_id or track_id")
 
     if mode == "global":
@@ -409,27 +418,20 @@ def timeline(
             valid_ids = [fid for fid in requested_ids if fid in actual_friends]
             user_ids = [user.user_id] + valid_ids
         else:
-            friend_rows = db.execute(
-                select(Friendship.user_id_2).where(Friendship.user_id_1 == user.user_id)
-            ).all()
+            friend_rows = db.execute(select(Friendship.user_id_2).where(Friendship.user_id_1 == user.user_id)).all()
             user_ids = [user.user_id] + [r[0] for r in friend_rows]
     else:
         user_ids = [user.user_id]
 
-    stmt = (
-        select(
-            Listen.user_id,
-            User.user_name,
-            Listen.ts,
-        )
-        .join(User, Listen.user_id == User.user_id)
-    )
+    stmt = select(
+        Listen.user_id,
+        User.user_name,
+        Listen.ts,
+    ).join(User, Listen.user_id == User.user_id)
     if user_ids is not None:
         stmt = stmt.where(Listen.user_id.in_(user_ids))
     if artist_id:
-        stmt = stmt.join(TrackArtist, Listen.track_id == TrackArtist.track_id).where(
-            TrackArtist.artist_id == artist_id
-        )
+        stmt = stmt.join(TrackArtist, Listen.track_id == TrackArtist.track_id).where(TrackArtist.artist_id == artist_id)
     elif track_id:
         stmt = stmt.where(Listen.track_id == track_id)
 
@@ -448,10 +450,7 @@ def timeline(
             "_global": {
                 "user_id": "_global",
                 "user_name": "All Users",
-                "months": [
-                    {"month": m, "listen_count": c}
-                    for m, c in sorted(global_months.items())
-                ],
+                "months": [{"month": m, "listen_count": c} for m, c in sorted(global_months.items())],
             }
         }
     else:
@@ -471,10 +470,7 @@ def timeline(
                 "user_id": uid,
                 "user_name": info["user_name"],
                 "total_listens": total_listens,
-                "months": [
-                    {"month": m, "listen_count": c}
-                    for m, c in sorted(info["months"].items())
-                ],
+                "months": [{"month": m, "listen_count": c} for m, c in sorted(info["months"].items())],
             }
 
     # In friends mode, cap to current user + top 5 friends by listen count
@@ -485,7 +481,10 @@ def timeline(
         friend_entries = sorted(data.values(), key=lambda x: x.get("total_listens", 0), reverse=True)
         total_friends_with_data = len(friend_entries)
         top_friends = friend_entries[:5]
-        all_friend_data = [{"user_id": f["user_id"], "user_name": f["user_name"], "total_listens": f.get("total_listens", 0)} for f in friend_entries]
+        all_friend_data = [
+            {"user_id": f["user_id"], "user_name": f["user_name"], "total_listens": f.get("total_listens", 0)}
+            for f in friend_entries
+        ]
         data = {}
         if current_user_data:
             data[user.user_id] = current_user_data
@@ -493,7 +492,8 @@ def timeline(
             data[f["user_id"]] = f
 
     log_action(
-        db, "stats.timeline_viewed",
+        db,
+        "stats.timeline_viewed",
         user_id=user.user_id,
         details={"artist_id": artist_id, "track_id": track_id, "mode": mode},
     )
@@ -516,7 +516,8 @@ def lastfm_timeline(
     result = get_artist_global_stats(artist_name)
 
     log_action(
-        db, "stats.lastfm_timeline_viewed",
+        db,
+        "stats.lastfm_timeline_viewed",
         user_id=user.user_id,
         details={"artist_name": artist_name, "has_data": result is not None},
     )

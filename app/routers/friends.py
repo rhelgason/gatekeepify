@@ -23,9 +23,7 @@ def _escape_like(q: str) -> str:
 
 
 def get_friend_ids(db: Session, user_id: str) -> List[str]:
-    rows = db.execute(
-        select(Friendship.user_id_2).where(Friendship.user_id_1 == user_id)
-    ).all()
+    rows = db.execute(select(Friendship.user_id_2).where(Friendship.user_id_1 == user_id)).all()
     return [row[0] for row in rows]
 
 
@@ -49,8 +47,7 @@ def list_friends(
         .offset(offset)
     )
     rows = db.execute(stmt).all()
-    log_action(db, "friends.list_viewed", user_id=user.user_id,
-               details={"count": len(rows)})
+    log_action(db, "friends.list_viewed", user_id=user.user_id, details={"count": len(rows)})
     return [
         FriendResponse(
             user_id=row[0],
@@ -77,7 +74,8 @@ def create_invite(
     db.commit()
 
     log_action(
-        db, "friends.invite_created",
+        db,
+        "friends.invite_created",
         user_id=user.user_id,
         entity_type="invite",
         entity_id=code,
@@ -91,15 +89,11 @@ def accept_invite(
     user: UserModel = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-
-    invite = (
-        db.query(FriendInvite)
-        .filter(FriendInvite.invite_code == invite_code)
-        .first()
-    )
+    invite = db.query(FriendInvite).filter(FriendInvite.invite_code == invite_code).first()
     if not invite:
         log_action(
-            db, "friends.invite_accepted",
+            db,
+            "friends.invite_accepted",
             user_id=user.user_id,
             entity_type="invite",
             entity_id=invite_code,
@@ -110,7 +104,8 @@ def accept_invite(
 
     if invite.accepted_by_user_id is not None:
         log_action(
-            db, "friends.invite_accepted",
+            db,
+            "friends.invite_accepted",
             user_id=user.user_id,
             entity_type="invite",
             entity_id=invite_code,
@@ -121,7 +116,8 @@ def accept_invite(
 
     if invite.from_user_id == user.user_id:
         log_action(
-            db, "friends.invite_accepted",
+            db,
+            "friends.invite_accepted",
             user_id=user.user_id,
             entity_type="invite",
             entity_id=invite_code,
@@ -138,7 +134,8 @@ def accept_invite(
     ).first()
     if existing:
         log_action(
-            db, "friends.invite_accepted",
+            db,
+            "friends.invite_accepted",
             user_id=user.user_id,
             entity_type="invite",
             entity_id=invite_code,
@@ -159,7 +156,8 @@ def accept_invite(
     )
     if result.rowcount == 0:
         log_action(
-            db, "friends.invite_accepted",
+            db,
+            "friends.invite_accepted",
             user_id=user.user_id,
             entity_type="invite",
             entity_id=invite_code,
@@ -173,7 +171,8 @@ def accept_invite(
     db.commit()
 
     log_action(
-        db, "friends.invite_accepted",
+        db,
+        "friends.invite_accepted",
         user_id=user.user_id,
         entity_type="invite",
         entity_id=invite_code,
@@ -211,8 +210,7 @@ def search_users(
         .limit(10)
     ).all()
 
-    log_action(db, "friends.search_users", user_id=user.user_id,
-               details={"query": q, "results": len(users)})
+    log_action(db, "friends.search_users", user_id=user.user_id, details={"query": q, "results": len(users)})
     return [
         {
             "user_id": u.user_id,
@@ -256,16 +254,17 @@ def send_friend_request(
         raise HTTPException(status_code=400, detail="Request already sent")
 
     code = secrets.token_urlsafe(16)
-    db.add(FriendInvite(
-        from_user_id=user.user_id,
-        to_user_id=to_user_id,
-        invite_code=code,
-        created_at=datetime.now(timezone.utc),
-    ))
+    db.add(
+        FriendInvite(
+            from_user_id=user.user_id,
+            to_user_id=to_user_id,
+            invite_code=code,
+            created_at=datetime.now(timezone.utc),
+        )
+    )
     db.commit()
 
-    log_action(db, "friends.request_sent", user_id=user.user_id,
-               entity_type="user", entity_id=to_user_id)
+    log_action(db, "friends.request_sent", user_id=user.user_id, entity_type="user", entity_id=to_user_id)
 
     return {"status": "sent", "to_user_id": to_user_id}
 
@@ -285,8 +284,7 @@ def get_pending_requests(
         .order_by(FriendInvite.created_at.desc())
     ).all()
 
-    log_action(db, "friends.requests_viewed", user_id=user.user_id,
-               details={"pending_count": len(incoming)})
+    log_action(db, "friends.requests_viewed", user_id=user.user_id, details={"pending_count": len(incoming)})
     return [
         {
             "id": r.id,
@@ -304,11 +302,15 @@ def accept_friend_request(
     user: UserModel = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    invite = db.query(FriendInvite).filter(
-        FriendInvite.id == request_id,
-        FriendInvite.to_user_id == user.user_id,
-        FriendInvite.accepted_by_user_id.is_(None),
-    ).first()
+    invite = (
+        db.query(FriendInvite)
+        .filter(
+            FriendInvite.id == request_id,
+            FriendInvite.to_user_id == user.user_id,
+            FriendInvite.accepted_by_user_id.is_(None),
+        )
+        .first()
+    )
     if not invite:
         raise HTTPException(status_code=404, detail="Request not found")
 
@@ -328,8 +330,7 @@ def accept_friend_request(
     db.add(Friendship(user_id_1=invite.from_user_id, user_id_2=user.user_id, created_at=now))
     db.commit()
 
-    log_action(db, "friends.request_accepted", user_id=user.user_id,
-               entity_type="user", entity_id=invite.from_user_id)
+    log_action(db, "friends.request_accepted", user_id=user.user_id, entity_type="user", entity_id=invite.from_user_id)
 
     return {"status": "accepted", "friend_id": invite.from_user_id}
 
@@ -340,19 +341,22 @@ def decline_friend_request(
     user: UserModel = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    invite = db.query(FriendInvite).filter(
-        FriendInvite.id == request_id,
-        FriendInvite.to_user_id == user.user_id,
-        FriendInvite.accepted_by_user_id.is_(None),
-    ).first()
+    invite = (
+        db.query(FriendInvite)
+        .filter(
+            FriendInvite.id == request_id,
+            FriendInvite.to_user_id == user.user_id,
+            FriendInvite.accepted_by_user_id.is_(None),
+        )
+        .first()
+    )
     if not invite:
         raise HTTPException(status_code=404, detail="Request not found")
 
     db.delete(invite)
     db.commit()
 
-    log_action(db, "friends.request_declined", user_id=user.user_id,
-               entity_type="user", entity_id=invite.from_user_id)
+    log_action(db, "friends.request_declined", user_id=user.user_id, entity_type="user", entity_id=invite.from_user_id)
 
     return {"status": "declined"}
 
@@ -368,10 +372,16 @@ def get_compatibility(
         raise HTTPException(status_code=403, detail="Not friends with this user")
 
     from app.services.compatibility import compute_compatibility
+
     result = compute_compatibility(db, user.user_id, friend_id)
 
-    log_action(db, "friends.compatibility_viewed", user_id=user.user_id,
-               entity_type="user", entity_id=friend_id,
-               details={"score": result["score"]})
+    log_action(
+        db,
+        "friends.compatibility_viewed",
+        user_id=user.user_id,
+        entity_type="user",
+        entity_id=friend_id,
+        details={"score": result["score"]},
+    )
 
     return result

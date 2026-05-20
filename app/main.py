@@ -33,14 +33,24 @@ Base.metadata.create_all(bind=engine)
 
 import re
 
+
 def _add_column_if_missing(engine, table, column, col_type):
     from sqlalchemy import inspect as sa_inspect, text as sa_text
+
     # Validate identifiers to prevent SQL injection
-    if not re.match(r'^[a-z_][a-z0-9_]*$', table):
+    if not re.match(r"^[a-z_][a-z0-9_]*$", table):
         raise ValueError(f"Invalid table name: {table}")
-    if not re.match(r'^[a-z_][a-z0-9_]*$', column):
+    if not re.match(r"^[a-z_][a-z0-9_]*$", column):
         raise ValueError(f"Invalid column name: {column}")
-    allowed_types = {"VARCHAR(512)", "VARCHAR(255)", "TIMESTAMP", "INTEGER", "INTEGER DEFAULT 0", "BOOLEAN DEFAULT FALSE", "TEXT"}
+    allowed_types = {
+        "VARCHAR(512)",
+        "VARCHAR(255)",
+        "TIMESTAMP",
+        "INTEGER",
+        "INTEGER DEFAULT 0",
+        "BOOLEAN DEFAULT FALSE",
+        "TEXT",
+    }
     if col_type not in allowed_types:
         raise ValueError(f"Disallowed column type: {col_type}")
     insp = sa_inspect(engine)
@@ -72,11 +82,16 @@ def _resume_orphaned_jobs():
         from app.models import JobRun
         from datetime import datetime, timezone
         import json as _json
+
         _startup_db = SessionLocal()
-        orphaned = _startup_db.query(JobRun).filter(
-            JobRun.job_name == "backfill_upload",
-            JobRun.status.in_(["pending", "running"]),
-        ).all()
+        orphaned = (
+            _startup_db.query(JobRun)
+            .filter(
+                JobRun.job_name == "backfill_upload",
+                JobRun.status.in_(["pending", "running"]),
+            )
+            .all()
+        )
         for j in orphaned:
             details = _json.loads(j.details) if j.details else {}
             has_listen_data = "listen_data" in details
@@ -87,6 +102,7 @@ def _resume_orphaned_jobs():
                 j.details = _json.dumps(details)
                 _startup_db.commit()
                 from app.celery_app import celery_app
+
                 celery_app.send_task("app.tasks.process_backfill_upload", args=[j.id, j.user_id])
                 logger.info(f"Resuming interrupted upload job {j.id} for user {j.user_id}")
             elif phase in ("enriching", "analyzing", "inserting"):
@@ -95,6 +111,7 @@ def _resume_orphaned_jobs():
                 j.details = _json.dumps(details)
                 _startup_db.commit()
                 from app.celery_app import celery_app
+
                 celery_app.send_task("app.tasks.process_backfill_upload", args=[j.id, j.user_id])
                 logger.info(f"Resuming interrupted upload job {j.id} (was in {phase} phase)")
             elif details.get("inserted", 0) > 0:
@@ -103,7 +120,9 @@ def _resume_orphaned_jobs():
                 details.update({"phase": "done", "progress": 100})
                 j.details = _json.dumps(details)
                 _startup_db.commit()
-                logger.info(f"Marked interrupted job {j.id} as completed ({details.get('inserted', 0)} listens already inserted)")
+                logger.info(
+                    f"Marked interrupted job {j.id} as completed ({details.get('inserted', 0)} listens already inserted)"
+                )
                 continue
             else:
                 j.status = "error"
@@ -123,6 +142,7 @@ app = FastAPI(
     description="Prove you listened first.",
     version="0.1.0",
 )
+
 
 def _get_allowed_origins() -> list[str]:
     origins = []
@@ -200,15 +220,13 @@ async def spotify_api_exception_handler(request: Request, exc: SpotifyException)
 
 @app.exception_handler(Exception)
 async def unhandled_exception_handler(request: Request, exc: Exception):
-    logger.error(
-        f"Unhandled exception on {request.method} {request.url.path}: {exc}\n"
-        f"{traceback.format_exc()}"
-    )
+    logger.error(f"Unhandled exception on {request.method} {request.url.path}: {exc}\n{traceback.format_exc()}")
     db = None
     try:
         db = SessionLocal()
         log_action(
-            db, "system.unhandled_error",
+            db,
+            "system.unhandled_error",
             status="error",
             details={
                 "path": request.url.path,
@@ -232,14 +250,10 @@ async def request_logging_middleware(request: Request, call_next):
         response = await call_next(request)
     except Exception:
         duration = time.time() - start
-        logger.error(
-            f"{request.method} {request.url.path} -> 500 ({duration:.3f}s)"
-        )
+        logger.error(f"{request.method} {request.url.path} -> 500 ({duration:.3f}s)")
         raise
     duration = time.time() - start
-    logger.info(
-        f"{request.method} {request.url.path} -> {response.status_code} ({duration:.3f}s)"
-    )
+    logger.info(f"{request.method} {request.url.path} -> {response.status_code} ({duration:.3f}s)")
     return response
 
 
@@ -264,6 +278,7 @@ def health():
 @app.post("/admin/trigger-poll")
 def trigger_poll(user: User = Depends(get_admin_user), db: Session = Depends(get_db)):
     from app.tasks import poll_recent_listens
+
     poll_recent_listens.delay()
     log_action(db, "admin.trigger_poll", user_id=user.user_id)
     return {"status": "triggered", "task": "poll_recent_listens"}
@@ -272,6 +287,7 @@ def trigger_poll(user: User = Depends(get_admin_user), db: Session = Depends(get
 @app.post("/admin/trigger-backfill")
 def trigger_backfill(user: User = Depends(get_admin_user), db: Session = Depends(get_db)):
     from app.tasks import backfill_track_metadata
+
     backfill_track_metadata.delay()
     log_action(db, "admin.trigger_backfill", user_id=user.user_id)
     return {"status": "triggered", "task": "backfill_track_metadata"}
@@ -280,6 +296,7 @@ def trigger_backfill(user: User = Depends(get_admin_user), db: Session = Depends
 @app.post("/admin/trigger-awards")
 def trigger_awards(user: User = Depends(get_admin_user), db: Session = Depends(get_db)):
     from app.tasks import compute_award_snapshots
+
     compute_award_snapshots.delay()
     log_action(db, "admin.trigger_awards", user_id=user.user_id)
     return {"status": "triggered", "task": "compute_award_snapshots"}
@@ -292,6 +309,7 @@ def track_event(
     db: Session = Depends(get_db),
 ):
     from app.services.audit import log_action
+
     action = event.get("action", "frontend.unknown")
     log_action(
         db,
@@ -311,9 +329,9 @@ def trust_score(
     db: Session = Depends(get_db),
 ):
     from app.services.anomaly import analyze_user_export
+
     uid = target_user_id or user.user_id
-    log_action(db, "admin.trust_score", user_id=user.user_id,
-               details={"target_user_id": uid})
+    log_action(db, "admin.trust_score", user_id=user.user_id, details={"target_user_id": uid})
     return analyze_user_export(db, uid)
 
 
@@ -324,6 +342,7 @@ def force_logout_all(
 ):
     from datetime import datetime, timezone
     from app.models import User as UserModel
+
     now = datetime.now(timezone.utc)
     db.query(UserModel).update({"token_invalidated_at": now})
     db.commit()
@@ -339,14 +358,12 @@ def force_logout_user(
 ):
     from datetime import datetime, timezone
     from app.models import User as UserModel
+
     now = datetime.now(timezone.utc)
     target = db.query(UserModel).filter(UserModel.user_id == target_user_id).first()
     if not target:
         raise HTTPException(status_code=404, detail="User not found")
     target.token_invalidated_at = now
     db.commit()
-    log_action(db, "admin.force_logout_user", user_id=user.user_id,
-               details={"target_user_id": target_user_id})
+    log_action(db, "admin.force_logout_user", user_id=user.user_id, details={"target_user_id": target_user_id})
     return {"status": "token_invalidated", "target_user_id": target_user_id, "invalidated_at": now.isoformat()}
-
-
