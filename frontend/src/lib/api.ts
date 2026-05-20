@@ -10,6 +10,7 @@ export class ApiError extends Error {
 
 const cache = new Map<string, { data: any; ts: number }>();
 const CACHE_TTL = 30_000; // 30 seconds
+const MAX_CACHE_SIZE = 100;
 
 function getCached<T>(key: string): T | null {
   const entry = cache.get(key);
@@ -19,7 +20,22 @@ function getCached<T>(key: string): T | null {
 }
 
 function setCache(key: string, data: any) {
+  // Evict oldest entries when cache is full
+  if (cache.size >= MAX_CACHE_SIZE) {
+    const oldest = cache.keys().next().value;
+    if (oldest) cache.delete(oldest);
+  }
   cache.set(key, { data, ts: Date.now() });
+}
+
+export function invalidateCache(pattern?: string) {
+  if (!pattern) {
+    cache.clear();
+    return;
+  }
+  for (const key of cache.keys()) {
+    if (key.includes(pattern)) cache.delete(key);
+  }
 }
 
 async function cachedRequest<T>(path: string): Promise<T> {
@@ -122,22 +138,30 @@ export const api = {
   createInvite: () =>
     request<{ invite_code: string }>("/friends/invite", { method: "POST" }),
 
-  acceptInvite: (code: string) =>
-    request<any>(`/friends/accept/${code}`, { method: "POST" }),
+  acceptInvite: (code: string) => {
+    invalidateCache("/friends");
+    return request<any>(`/friends/accept/${code}`, { method: "POST" });
+  },
 
   searchUsers: (q: string) =>
     request<any[]>(`/friends/search-users?q=${encodeURIComponent(q)}`),
 
-  sendFriendRequest: (toUserId: string) =>
-    request<any>(`/friends/request?to_user_id=${encodeURIComponent(toUserId)}`, { method: "POST" }),
+  sendFriendRequest: (toUserId: string) => {
+    invalidateCache("/friends");
+    return request<any>(`/friends/request?to_user_id=${encodeURIComponent(toUserId)}`, { method: "POST" });
+  },
 
   getPendingRequests: () => request<any[]>("/friends/requests"),
 
-  acceptFriendRequest: (requestId: number) =>
-    request<any>(`/friends/requests/${requestId}/accept`, { method: "POST" }),
+  acceptFriendRequest: (requestId: number) => {
+    invalidateCache("/friends");
+    return request<any>(`/friends/requests/${requestId}/accept`, { method: "POST" });
+  },
 
-  declineFriendRequest: (requestId: number) =>
-    request<any>(`/friends/requests/${requestId}/decline`, { method: "POST" }),
+  declineFriendRequest: (requestId: number) => {
+    invalidateCache("/friends");
+    return request<any>(`/friends/requests/${requestId}/decline`, { method: "POST" });
+  },
 
   getCompatibility: (friendId: string) =>
     cachedRequest<any>(`/friends/compatibility/${friendId}`),
