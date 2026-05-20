@@ -79,8 +79,6 @@ export default function Profile() {
     trackEvent("profile_viewed", { profile_user_id: userId });
   }, [userId]);
 
-  const periods
-
   const periods: { value: Period; label: string }[] = [
     { value: "today", label: "Today (UTC)" },
     { value: "month", label: "30 Days" },
