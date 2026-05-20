@@ -189,7 +189,6 @@ export default function Profile() {
                     <div className="text-[10px] text-gray-600 mt-1">top 5 match</div>
                   </div>
                 </div>
-                <div className="h-3 w-48 bg-white/5 rounded animate-pulse mb-2" />
                 <div className="h-3 w-36 bg-white/5 rounded animate-pulse" />
               </div>
             </div>
@@ -216,12 +215,6 @@ export default function Profile() {
                     <div className="text-[10px] text-gray-600">top 5 match</div>
                   </div>
                 </div>
-                {compat.shared_artists?.length > 0 && (
-                  <div className="mb-2">
-                    <span className="text-[10px] text-gray-500 uppercase tracking-wider">You both listen to: </span>
-                    <span className="text-xs text-gray-300">{compat.shared_artists.slice(0, 5).join(", ")}</span>
-                  </div>
-                )}
                 {compat.disagreement_genres?.length > 0 && (
                   <div>
                     <span className="text-[10px] text-gray-500 uppercase tracking-wider">You disagree on: </span>
