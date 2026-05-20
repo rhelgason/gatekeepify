@@ -158,12 +158,25 @@ class TestTimeline:
 
 
 class TestTargetUserStats:
-    def test_can_view_any_user_stats(self, client, seeded_db, auth_headers):
+    def test_cannot_view_stranger_stats(self, client, seeded_db, auth_headers):
         seeded_db.add(User(user_id="stranger", user_name="Stranger"))
         seeded_db.commit()
         resp = client.get(
             "/stats/top-tracks",
             params={"period": "all", "target_user_id": "stranger"},
+            headers=auth_headers,
+        )
+        assert resp.status_code == 403
+
+    def test_can_view_friend_stats(self, client, seeded_db, auth_headers):
+        from app.models import Friendship
+        from datetime import datetime, timezone
+        seeded_db.add(User(user_id="friend_user", user_name="Friend"))
+        seeded_db.add(Friendship(user_id_1="test_user_1", user_id_2="friend_user", created_at=datetime.now(timezone.utc)))
+        seeded_db.commit()
+        resp = client.get(
+            "/stats/top-tracks",
+            params={"period": "all", "target_user_id": "friend_user"},
             headers=auth_headers,
         )
         assert resp.status_code == 200

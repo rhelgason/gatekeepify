@@ -492,7 +492,6 @@ ALL_COMPUTE_FUNCTIONS = {
     "obsessive": compute_obsessive,
     "basic": compute_basic,
     "archaeologist": compute_archaeologist,
-    "trendsetter": compute_crown,
     "patient_zero": compute_patient_zero,
     "completionist": compute_completionist,
     "genre_snob": compute_genre_snob,

@@ -50,68 +50,73 @@ def _add_column_if_missing(engine, table, column, col_type):
             conn.execute(sa_text(f"ALTER TABLE {table} ADD COLUMN {column} {col_type}"))
         logger.info(f"Added column {table}.{column}")
 
-try:
-    _add_column_if_missing(engine, "dim_all_albums", "image_url", "VARCHAR(512)")
-    _add_column_if_missing(engine, "dim_all_tracks", "image_url", "VARCHAR(512)")
-    _add_column_if_missing(engine, "dim_all_artists", "image_url", "VARCHAR(512)")
-    _add_column_if_missing(engine, "friend_invites", "to_user_id", "VARCHAR(255)")
-    _add_column_if_missing(engine, "dim_all_users", "token_invalidated_at", "TIMESTAMP")
-    _add_column_if_missing(engine, "dim_all_listens", "ms_played", "INTEGER")
-    _add_column_if_missing(engine, "dim_all_tracks", "enrich_attempts", "INTEGER DEFAULT 0")
-    _add_column_if_missing(engine, "dim_all_users", "image_url", "VARCHAR(512)")
-    _add_column_if_missing(engine, "dim_all_users", "is_admin", "BOOLEAN DEFAULT FALSE")
-    _add_column_if_missing(engine, "job_runs", "details", "TEXT")
-except Exception as e:
-    logger.warning(f"Column migration skipped: {e}")
 
-try:
-    from app.models import JobRun
-    from datetime import datetime, timezone
-    import json as _json
-    _startup_db = SessionLocal()
-    orphaned = _startup_db.query(JobRun).filter(
-        JobRun.job_name == "backfill_upload",
-        JobRun.status.in_(["pending", "running"]),
-    ).all()
-    for j in orphaned:
-        details = _json.loads(j.details) if j.details else {}
-        has_listen_data = "listen_data" in details
-        phase = details.get("phase", "")
-        if has_listen_data:
-            j.status = "pending"
-            details.update({"phase": "resuming", "progress": 0})
-            j.details = _json.dumps(details)
-            _startup_db.commit()
-            from app.celery_app import celery_app
-            celery_app.send_task("app.tasks.process_backfill_upload", args=[j.id, j.user_id])
-            logger.info(f"Resuming interrupted upload job {j.id} for user {j.user_id}")
-        elif phase in ("enriching", "analyzing", "inserting"):
-            j.status = "pending"
-            details.update({"phase": "resuming", "progress": details.get("progress", 80)})
-            j.details = _json.dumps(details)
-            _startup_db.commit()
-            from app.celery_app import celery_app
-            celery_app.send_task("app.tasks.process_backfill_upload", args=[j.id, j.user_id])
-            logger.info(f"Resuming interrupted upload job {j.id} (was in {phase} phase)")
-        elif details.get("inserted", 0) > 0:
-            j.status = "completed"
-            j.completed_at = datetime.now(timezone.utc)
-            details.update({"phase": "done", "progress": 100})
-            j.details = _json.dumps(details)
-            _startup_db.commit()
-            logger.info(f"Marked interrupted job {j.id} as completed ({details.get('inserted', 0)} listens already inserted)")
-            continue
-        else:
-            j.status = "error"
-            j.completed_at = datetime.now(timezone.utc)
-            details.pop("listen_data", None)
-            details.update({"phase": "error", "error": "Server restarted during processing"})
-            j.details = _json.dumps(details)
-            _startup_db.commit()
-            logger.info(f"Marked orphaned upload job {j.id} as failed (no data to resume)")
-    _startup_db.close()
-except Exception as e:
-    logger.warning(f"Orphaned job cleanup skipped: {e}")
+def _run_schema_migrations():
+    try:
+        _add_column_if_missing(engine, "dim_all_albums", "image_url", "VARCHAR(512)")
+        _add_column_if_missing(engine, "dim_all_tracks", "image_url", "VARCHAR(512)")
+        _add_column_if_missing(engine, "dim_all_artists", "image_url", "VARCHAR(512)")
+        _add_column_if_missing(engine, "friend_invites", "to_user_id", "VARCHAR(255)")
+        _add_column_if_missing(engine, "dim_all_users", "token_invalidated_at", "TIMESTAMP")
+        _add_column_if_missing(engine, "dim_all_listens", "ms_played", "INTEGER")
+        _add_column_if_missing(engine, "dim_all_tracks", "enrich_attempts", "INTEGER DEFAULT 0")
+        _add_column_if_missing(engine, "dim_all_users", "image_url", "VARCHAR(512)")
+        _add_column_if_missing(engine, "dim_all_users", "is_admin", "BOOLEAN DEFAULT FALSE")
+        _add_column_if_missing(engine, "job_runs", "details", "TEXT")
+    except Exception as e:
+        logger.warning(f"Column migration skipped: {e}")
+
+
+def _resume_orphaned_jobs():
+    try:
+        from app.models import JobRun
+        from datetime import datetime, timezone
+        import json as _json
+        _startup_db = SessionLocal()
+        orphaned = _startup_db.query(JobRun).filter(
+            JobRun.job_name == "backfill_upload",
+            JobRun.status.in_(["pending", "running"]),
+        ).all()
+        for j in orphaned:
+            details = _json.loads(j.details) if j.details else {}
+            has_listen_data = "listen_data" in details
+            phase = details.get("phase", "")
+            if has_listen_data:
+                j.status = "pending"
+                details.update({"phase": "resuming", "progress": 0})
+                j.details = _json.dumps(details)
+                _startup_db.commit()
+                from app.celery_app import celery_app
+                celery_app.send_task("app.tasks.process_backfill_upload", args=[j.id, j.user_id])
+                logger.info(f"Resuming interrupted upload job {j.id} for user {j.user_id}")
+            elif phase in ("enriching", "analyzing", "inserting"):
+                j.status = "pending"
+                details.update({"phase": "resuming", "progress": details.get("progress", 80)})
+                j.details = _json.dumps(details)
+                _startup_db.commit()
+                from app.celery_app import celery_app
+                celery_app.send_task("app.tasks.process_backfill_upload", args=[j.id, j.user_id])
+                logger.info(f"Resuming interrupted upload job {j.id} (was in {phase} phase)")
+            elif details.get("inserted", 0) > 0:
+                j.status = "completed"
+                j.completed_at = datetime.now(timezone.utc)
+                details.update({"phase": "done", "progress": 100})
+                j.details = _json.dumps(details)
+                _startup_db.commit()
+                logger.info(f"Marked interrupted job {j.id} as completed ({details.get('inserted', 0)} listens already inserted)")
+                continue
+            else:
+                j.status = "error"
+                j.completed_at = datetime.now(timezone.utc)
+                details.pop("listen_data", None)
+                details.update({"phase": "error", "error": "Server restarted during processing"})
+                j.details = _json.dumps(details)
+                _startup_db.commit()
+                logger.info(f"Marked orphaned upload job {j.id} as failed (no data to resume)")
+        _startup_db.close()
+    except Exception as e:
+        logger.warning(f"Orphaned job cleanup skipped: {e}")
+
 
 app = FastAPI(
     title="Gatekeepify",
@@ -144,6 +149,12 @@ app.include_router(gatekeep.router)
 app.include_router(search.router)
 app.include_router(awards.router)
 app.include_router(discover.router)
+
+
+@app.on_event("startup")
+def startup_event():
+    _run_schema_migrations()
+    _resume_orphaned_jobs()
 
 
 def _error_response(status_code: int, error: str, detail: str) -> JSONResponse:

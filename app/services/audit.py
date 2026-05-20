@@ -29,7 +29,10 @@ def log_action(
         status=status,
     )
     db.add(entry)
-    db.commit()
+    try:
+        db.flush()
+    except Exception:
+        pass
 
     log_msg = f"[{status}] {action}"
     if user_id:

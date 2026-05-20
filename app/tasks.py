@@ -9,6 +9,7 @@ from app.celery_app import celery_app
 from app.config import settings
 from app.database import SessionLocal
 from app.models import Listen, User
+from app.models import Friendship
 from app.services.ingestion import (
     get_active_users,
     get_tracks_missing_metadata,
@@ -252,10 +253,8 @@ def compute_award_snapshots():
         for u in all_users:
             friend_ids = [
                 r[0] for r in db.execute(
-                    __import__("sqlalchemy", fromlist=["select"]).select(
-                        __import__("app.models", fromlist=["Friendship"]).Friendship.user_id_2
-                    ).where(
-                        __import__("app.models", fromlist=["Friendship"]).Friendship.user_id_1 == u.user_id
+                    select(Friendship.user_id_2).where(
+                        Friendship.user_id_1 == u.user_id
                     )
                 ).all()
             ]
