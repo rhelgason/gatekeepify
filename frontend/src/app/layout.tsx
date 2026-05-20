@@ -4,6 +4,7 @@ import Navbar from "@/components/Navbar";
 import PageTracker from "@/components/PageTracker";
 import BackfillBanner from "@/components/BackfillBanner";
 import ConnectionBanner from "@/components/ConnectionBanner";
+import AuthGuard from "@/components/AuthGuard";
 
 export const metadata: Metadata = {
   title: "Gatekeepify",
@@ -39,8 +40,10 @@ export default function RootLayout({
         <Navbar />
         <PageTracker />
         <main className="mx-auto max-w-6xl px-4 md:px-6 py-6 md:py-8">
-          <BackfillBanner />
-          {children}
+          <AuthGuard>
+            <BackfillBanner />
+            {children}
+          </AuthGuard>
         </main>
         <ConnectionBanner />
       </body>

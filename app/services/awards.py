@@ -48,7 +48,7 @@ AWARD_DEFINITIONS = {
         "description": "Heard every track. Yes, the B-sides.",
         "tier": "devotion",
     },
-"genre_snob": {
+    "genre_snob": {
         "name": "The Genre Snob",
         "description": "Listens to genres nobody else has heard of.",
         "tier": "taste",
@@ -164,7 +164,6 @@ def compute_obsessive(db: Session, group_ids: List[str]) -> List[dict]:
     ]
 
 
-
 def compute_basic(db: Session, group_ids: List[str]) -> List[dict]:
     user_top: dict = {}
     for uid in group_ids:
@@ -201,11 +200,13 @@ def compute_basic(db: Session, group_ids: List[str]) -> List[dict]:
 
         if overlaps:
             avg_overlap = round(sum(overlaps) / len(overlaps), 1)
-            results.append({
-                "user_id": uid,
-                "stat_value": avg_overlap,
-                "stat_detail": f"{avg_overlap}% of top artists shared with friends",
-            })
+            results.append(
+                {
+                    "user_id": uid,
+                    "stat_value": avg_overlap,
+                    "stat_detail": f"{avg_overlap}% of top artists shared with friends",
+                }
+            )
 
     results.sort(key=lambda r: -r["stat_value"])
     for i, r in enumerate(results):
@@ -231,7 +232,11 @@ def compute_archaeologist(db: Session, group_ids: List[str]) -> List[dict]:
 
     artist_listens: dict = defaultdict(list)
     for row in rows:
-        ts = row.first_listen if isinstance(row.first_listen, datetime) else datetime.fromisoformat(str(row.first_listen))
+        ts = (
+            row.first_listen
+            if isinstance(row.first_listen, datetime)
+            else datetime.fromisoformat(str(row.first_listen))
+        )
         artist_listens[row.artist_id].append((row.user_id, ts, row.artist_name))
 
     best_per_user: dict = {}
@@ -274,13 +279,19 @@ def compute_patient_zero(db: Session, group_ids: List[str]) -> List[dict]:
 
     artist_entries: dict = defaultdict(list)
     for row in rows:
-        ts = row.first_listen if isinstance(row.first_listen, datetime) else datetime.fromisoformat(str(row.first_listen))
+        ts = (
+            row.first_listen
+            if isinstance(row.first_listen, datetime)
+            else datetime.fromisoformat(str(row.first_listen))
+        )
         artist_entries[row.artist_id].append((row.user_id, ts))
 
     artist_names = {}
     artist_ids_needed = set(artist_entries.keys())
     if artist_ids_needed:
-        for a in db.execute(select(Artist.artist_id, Artist.artist_name).where(Artist.artist_id.in_(artist_ids_needed))).all():
+        for a in db.execute(
+            select(Artist.artist_id, Artist.artist_name).where(Artist.artist_id.in_(artist_ids_needed))
+        ).all():
             artist_names[a.artist_id] = a.artist_name
 
     infections: dict = defaultdict(lambda: {"artists": 0, "friends": set(), "detail": []})
@@ -293,22 +304,26 @@ def compute_patient_zero(db: Session, group_ids: List[str]) -> List[dict]:
         for uid, _ in entries[1:]:
             infections[winner]["friends"].add(uid)
         infections[winner]["artists"] += 1
-        infections[winner]["detail"].append({
-            "artist_name": artist_names.get(artist_id, artist_id),
-            "artist_id": artist_id,
-            "friend_count": infected_count,
-        })
+        infections[winner]["detail"].append(
+            {
+                "artist_name": artist_names.get(artist_id, artist_id),
+                "artist_id": artist_id,
+                "friend_count": infected_count,
+            }
+        )
 
     results = []
     for uid, data in infections.items():
         friend_count = len(data["friends"])
         detail = sorted(data["detail"], key=lambda d: -d["friend_count"])[:10]
-        results.append({
-            "user_id": uid,
-            "stat_value": float(friend_count),
-            "stat_detail": f"Infected {friend_count} friends across {data['artists']} artists",
-            "infections_detail": detail,
-        })
+        results.append(
+            {
+                "user_id": uid,
+                "stat_value": float(friend_count),
+                "stat_detail": f"Infected {friend_count} friends across {data['artists']} artists",
+                "infections_detail": detail,
+            }
+        )
 
     results.sort(key=lambda r: -r["stat_value"])
     for i, r in enumerate(results):
@@ -370,11 +385,13 @@ def compute_genre_snob(db: Session, group_ids: List[str]) -> List[dict]:
                 all_friend_genres.update(user_genres.get(fid, set()))
         exclusive = user_genres[uid] - all_friend_genres
         if exclusive:
-            results.append({
-                "user_id": uid,
-                "stat_value": float(len(exclusive)),
-                "stat_detail": f"Listens to {len(exclusive)} genres none of your friends touch",
-            })
+            results.append(
+                {
+                    "user_id": uid,
+                    "stat_value": float(len(exclusive)),
+                    "stat_detail": f"Listens to {len(exclusive)} genres none of your friends touch",
+                }
+            )
 
     results.sort(key=lambda r: -r["stat_value"])
     for i, r in enumerate(results):
@@ -397,11 +414,13 @@ def compute_time_traveler(db: Session, group_ids: List[str]) -> List[dict]:
             continue
         years = sorted([d.year for d in dates])
         median_year = years[len(years) // 2]
-        results.append({
-            "user_id": uid,
-            "stat_value": float(median_year),
-            "stat_detail": f"Median album from {median_year}",
-        })
+        results.append(
+            {
+                "user_id": uid,
+                "stat_value": float(median_year),
+                "stat_detail": f"Median album from {median_year}",
+            }
+        )
 
     results.sort(key=lambda r: r["stat_value"])
     for i, r in enumerate(results):
@@ -417,10 +436,9 @@ def compute_streak(db: Session, group_ids: List[str]) -> List[dict]:
         if not rows:
             continue
 
-        days = sorted(set(
-            (r[0] if isinstance(r[0], datetime) else datetime.fromisoformat(str(r[0]))).date()
-            for r in rows
-        ))
+        days = sorted(
+            set((r[0] if isinstance(r[0], datetime) else datetime.fromisoformat(str(r[0]))).date() for r in rows)
+        )
 
         if not days:
             continue
@@ -441,12 +459,14 @@ def compute_streak(db: Session, group_ids: List[str]) -> List[dict]:
         else:
             current_streak = 0
 
-        results.append({
-            "user_id": uid,
-            "stat_value": float(max_streak),
-            "stat_detail": f"Longest streak: {max_streak} days",
-            "current_streak": current_streak,
-        })
+        results.append(
+            {
+                "user_id": uid,
+                "stat_value": float(max_streak),
+                "stat_detail": f"Longest streak: {max_streak} days",
+                "current_streak": current_streak,
+            }
+        )
 
     results.sort(key=lambda r: -r["stat_value"])
     for i, r in enumerate(results):
@@ -461,25 +481,31 @@ def compute_hypebeast(db: Session, group_ids: List[str]) -> List[dict]:
 
     results = []
     for uid in group_ids:
-        recent = db.execute(
-            select(func.count()).select_from(Listen).where(
-                Listen.user_id == uid, Listen.ts >= recent_start
-            )
-        ).scalar() or 0
+        recent = (
+            db.execute(
+                select(func.count()).select_from(Listen).where(Listen.user_id == uid, Listen.ts >= recent_start)
+            ).scalar()
+            or 0
+        )
 
-        prior = db.execute(
-            select(func.count()).select_from(Listen).where(
-                Listen.user_id == uid, Listen.ts >= prior_start, Listen.ts < recent_start
-            )
-        ).scalar() or 0
+        prior = (
+            db.execute(
+                select(func.count())
+                .select_from(Listen)
+                .where(Listen.user_id == uid, Listen.ts >= prior_start, Listen.ts < recent_start)
+            ).scalar()
+            or 0
+        )
 
         if prior >= 10:
             change = round((recent - prior) / prior * 100, 1)
-            results.append({
-                "user_id": uid,
-                "stat_value": change,
-                "stat_detail": f"Listening {'up' if change >= 0 else 'down'} {abs(change)}% this month",
-            })
+            results.append(
+                {
+                    "user_id": uid,
+                    "stat_value": change,
+                    "stat_detail": f"Listening {'up' if change >= 0 else 'down'} {abs(change)}% this month",
+                }
+            )
 
     results.sort(key=lambda r: -r["stat_value"])
     for i, r in enumerate(results):
@@ -492,7 +518,6 @@ ALL_COMPUTE_FUNCTIONS = {
     "obsessive": compute_obsessive,
     "basic": compute_basic,
     "archaeologist": compute_archaeologist,
-    "trendsetter": compute_crown,
     "patient_zero": compute_patient_zero,
     "completionist": compute_completionist,
     "genre_snob": compute_genre_snob,

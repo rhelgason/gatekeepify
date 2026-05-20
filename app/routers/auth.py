@@ -25,8 +25,7 @@ security = HTTPBearer()
 def create_jwt(user_id: str) -> str:
     payload = {
         "sub": user_id,
-        "exp": datetime.now(timezone.utc)
-        + timedelta(hours=settings.jwt_expiration_hours),
+        "exp": datetime.now(timezone.utc) + timedelta(hours=settings.jwt_expiration_hours),
         "iat": datetime.now(timezone.utc),
     }
     return jwt.encode(payload, settings.jwt_secret, algorithm=settings.jwt_algorithm)
@@ -38,9 +37,7 @@ def get_current_user(
 ) -> User:
     token = credentials.credentials
     try:
-        payload = jwt.decode(
-            token, settings.jwt_secret, algorithms=[settings.jwt_algorithm]
-        )
+        payload = jwt.decode(token, settings.jwt_secret, algorithms=[settings.jwt_algorithm])
         user_id = payload.get("sub")
         if not user_id:
             raise HTTPException(status_code=401, detail="Invalid token")
@@ -53,7 +50,9 @@ def get_current_user(
         raise HTTPException(status_code=401, detail="User not found")
     if user.token_invalidated_at:
         iat = payload.get("iat")
-        if iat and datetime.fromtimestamp(iat, tz=timezone.utc) < user.token_invalidated_at.replace(tzinfo=timezone.utc):
+        if iat and datetime.fromtimestamp(iat, tz=timezone.utc) < user.token_invalidated_at.replace(
+            tzinfo=timezone.utc
+        ):
             raise HTTPException(status_code=401, detail="Token has been revoked")
     return user
 
@@ -68,6 +67,7 @@ def get_admin_user(user: User = Depends(get_current_user)) -> User:
 def login(return_url: str = Query(None), invite_code: str = Query(None)):
     import base64
     import json as _json
+
     service = SpotifyService()
     auth_url = service.get_auth_url()
     if return_url or invite_code:
@@ -149,6 +149,7 @@ def callback(code: str = Query(...), state: str = Query(None), db: Session = Dep
         try:
             import base64
             import json as _json
+
             decoded = base64.urlsafe_b64decode(state.encode()).decode()
             try:
                 state_data = _json.loads(decoded)
@@ -157,7 +158,9 @@ def callback(code: str = Query(...), state: str = Query(None), db: Session = Dep
             except (_json.JSONDecodeError, AttributeError):
                 origin = decoded
             allowed_origins = {settings.frontend_url}
-            if origin in allowed_origins or origin.endswith(".vercel.app"):
+            if settings.allowed_origins:
+                allowed_origins.update(o.strip() for o in settings.allowed_origins.split(",") if o.strip())
+            if origin in allowed_origins:
                 redirect_url = origin
             else:
                 logger.warning(f"Rejected redirect to untrusted origin: {origin}")
@@ -167,9 +170,10 @@ def callback(code: str = Query(...), state: str = Query(None), db: Session = Dep
         redirect_url = settings.frontend_url
 
     if redirect_url:
-        callback_url = f"{redirect_url}/auth/callback?token={token}"
+        callback_url = f"{redirect_url}/auth/callback#token={token}"
         if invite_code:
             from urllib.parse import quote
+
             callback_url += f"&invite={quote(invite_code)}"
         return RedirectResponse(url=callback_url)
 
