@@ -39,6 +39,11 @@ export default function ArtistPage() {
       setDetail(d);
       setComparison(c);
       setTimeline(t);
+      // Fetch Last.fm data after we have the artist name
+      if (d?.artist_name) {
+        setLastfmLoading(true);
+        api.getLastfmTimeline(d.artist_name).then(setLastfmData).catch(() => {}).finally(() => setLastfmLoading(false));
+      }
     } catch {}
     setLoading(false);
   }, [artistId]);
@@ -55,10 +60,6 @@ export default function ArtistPage() {
     if (artistId && !loading) {
       if (timelineMode === "global") {
         api.getTimeline(artistId, "global").then(setTimeline).catch(() => {});
-        if (detail?.artist_name) {
-          setLastfmLoading(true);
-          api.getLastfmTimeline(detail.artist_name).then(setLastfmData).catch(() => {}).finally(() => setLastfmLoading(false));
-        }
       } else if (timelineMode === "friends" && selectedFriendIds) {
         api.getTimeline(artistId, "friends", selectedFriendIds).then(data => {
           setTimeline(data);
@@ -73,7 +74,7 @@ export default function ArtistPage() {
         }).catch(() => {});
       }
     }
-  }, [artistId, timelineMode, loading, detail?.artist_name, selectedFriendIds]);
+  }, [artistId, timelineMode, loading, selectedFriendIds]);
 
   async function handleChallenge() {
     trackEvent("challenge_created", { artist_id: artistId }, "artist", artistId);
@@ -384,113 +385,40 @@ export default function ArtistPage() {
                   </div>
                 )}
                 {lastfmLoading && (
-                  <>
-                    {/* Last.fm stats skeleton */}
-                    <div className="card p-6">
-                      <div className="flex justify-center gap-10 mb-2">
-                        <div className="text-center">
-                          <div className="h-9 w-24 bg-white/5 rounded animate-pulse mx-auto" />
-                          <div className="text-gray-600 text-xs uppercase tracking-wider mt-1">listeners</div>
-                        </div>
-                        <div className="text-center">
-                          <div className="h-9 w-24 bg-white/5 rounded animate-pulse mx-auto" />
-                          <div className="text-gray-600 text-xs uppercase tracking-wider mt-1">total plays</div>
-                        </div>
+                  <div className="card p-6">
+                    <div className="flex justify-center gap-10 mb-2">
+                      <div className="text-center">
+                        <div className="h-9 w-24 bg-white/5 rounded animate-pulse mx-auto" />
+                        <div className="text-gray-600 text-xs uppercase tracking-wider mt-1">listeners</div>
                       </div>
-                      <div className="flex gap-2 justify-center mt-4">
-                        {[1, 2, 3].map(n => (
-                          <div key={n} className="h-6 w-16 bg-white/5 rounded-full animate-pulse" />
-                        ))}
-                      </div>
-                      <p className="text-center text-gray-600 text-xs mt-3">Global stats via Last.fm</p>
-                    </div>
-                    {/* Top tracks skeleton */}
-                    <div className="card p-5">
-                      <h3 className="text-xs font-bold uppercase tracking-widest text-gray-500 mb-3">Top Tracks (Global)</h3>
-                      <div className="space-y-2">
-                        {[1, 2, 3, 4, 5].map(n => (
-                          <div key={n} className="flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                              <div className="h-4 w-5 bg-white/5 rounded animate-pulse" />
-                              <div className="h-4 w-32 bg-white/5 rounded animate-pulse" />
-                            </div>
-                            <div className="h-4 w-16 bg-white/5 rounded animate-pulse" />
-                          </div>
-                        ))}
+                      <div className="text-center">
+                        <div className="h-9 w-24 bg-white/5 rounded animate-pulse mx-auto" />
+                        <div className="text-gray-600 text-xs uppercase tracking-wider mt-1">total plays</div>
                       </div>
                     </div>
-                    {/* Similar artists skeleton */}
-                    <div className="card p-5">
-                      <h3 className="text-xs font-bold uppercase tracking-widest text-gray-500 mb-3">Similar Artists</h3>
-                      <div className="flex gap-2 flex-wrap">
-                        {[1, 2, 3, 4, 5].map(n => (
-                          <div key={n} className="h-8 w-24 bg-white/5 rounded-full animate-pulse" />
-                        ))}
-                      </div>
-                    </div>
-                  </>
+                  </div>
                 )}
                 {!lastfmLoading && d && (
-                  <>
-                    <div className="card p-6">
-                      <div className="flex justify-center gap-10 mb-2">
-                        <div className="text-center">
-                          <div className="stat-number text-3xl gradient-text">{d.total_listeners?.toLocaleString()}</div>
-                          <div className="text-gray-600 text-xs uppercase tracking-wider">listeners</div>
-                        </div>
-                        <div className="text-center">
-                          <div className="stat-number text-3xl">{d.total_playcount?.toLocaleString()}</div>
-                          <div className="text-gray-600 text-xs uppercase tracking-wider">total plays</div>
-                        </div>
+                  <div className="card p-6">
+                    <div className="flex justify-center gap-10 mb-2">
+                      <div className="text-center">
+                        <div className="stat-number text-3xl gradient-text">{d.total_listeners?.toLocaleString()}</div>
+                        <div className="text-gray-600 text-xs uppercase tracking-wider">listeners</div>
                       </div>
-                      {d.tags?.length > 0 && (
-                        <div className="flex gap-2 justify-center mt-4 flex-wrap">
-                          {d.tags.map((tag: string) => (
-                            <span key={tag} className="text-xs bg-white/5 border border-white/10 px-3 py-1 rounded-full text-gray-400">{tag}</span>
-                          ))}
-                        </div>
-                      )}
-                      <p className="text-center text-gray-600 text-xs mt-3">Global stats via Last.fm</p>
+                      <div className="text-center">
+                        <div className="stat-number text-3xl">{d.total_playcount?.toLocaleString()}</div>
+                        <div className="text-gray-600 text-xs uppercase tracking-wider">total plays</div>
+                      </div>
                     </div>
-                    {d.top_tracks?.length > 0 && (
-                      <div className="card p-5">
-                        <h3 className="text-xs font-bold uppercase tracking-widest text-gray-500 mb-3">Top Tracks (Global)</h3>
-                        <div className="space-y-2">
-                          {d.top_tracks.map((t: any, i: number) => (
-                            <div key={i} className="flex items-center justify-between text-sm">
-                              <div className="flex items-center gap-3">
-                                <span className={`font-mono w-5 text-right ${i === 0 ? "text-[var(--green)]" : "text-gray-600"}`}>{i + 1}</span>
-                                <span className="text-gray-200">{t.name}</span>
-                              </div>
-                              <span className="text-gray-500 text-xs">{t.playcount.toLocaleString()} plays</span>
-                            </div>
-                          ))}
-                        </div>
+                    {d.tags?.length > 0 && (
+                      <div className="flex gap-2 justify-center mt-4 flex-wrap">
+                        {d.tags.map((tag: string) => (
+                          <span key={tag} className="text-xs bg-white/5 border border-white/10 px-3 py-1 rounded-full text-gray-400">{tag}</span>
+                        ))}
                       </div>
                     )}
-                    {d.similar_artists?.length > 0 && (
-                      <div className="card p-5">
-                        <h3 className="text-xs font-bold uppercase tracking-widest text-gray-500 mb-3">Similar Artists</h3>
-                        <div className="flex gap-2 flex-wrap">
-                          {d.similar_artists.map((artistName: string) => (
-                            <button key={artistName}
-                              onClick={async () => {
-                                trackEvent("similar_artist_clicked", { from_artist: artistId, to_artist: artistName });
-                                try {
-                                  const resolved = await api.resolveArtist(artistName);
-                                  router.push(`/artist/${resolved.artist_id}`);
-                                } catch {
-                                  router.push(`/gatekeep?q=${encodeURIComponent(artistName)}`);
-                                }
-                              }}
-                              className="text-sm bg-white/5 px-4 py-1.5 rounded-full text-gray-300 hover:bg-white/10 hover:text-white transition-all">
-                              {artistName}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </>
+                    <p className="text-center text-gray-600 text-xs mt-3">Global stats via Last.fm</p>
+                  </div>
                 )}
               </div>
             );
@@ -565,6 +493,79 @@ export default function ArtistPage() {
           );
         })()}
       </section>
+
+      {/* Discover More — Last.fm data shown in all modes */}
+      {!lastfmLoading && lastfmData?.data && (
+        (() => {
+          const d = lastfmData.data;
+          const hasContent = d.similar_artists?.length > 0 || d.top_tracks?.length > 0 || d.top_albums?.length > 0;
+          if (!hasContent) return null;
+          return (
+            <section className="mb-10">
+              <h2 className="text-sm font-bold uppercase tracking-widest text-gray-500 mb-4">
+                Discover More
+              </h2>
+              <div className="space-y-4">
+                {d.top_tracks?.length > 0 && (
+                  <div className="card p-5">
+                    <h3 className="text-xs font-bold uppercase tracking-widest text-gray-500 mb-3">Top Tracks (Global)</h3>
+                    <div className="space-y-2">
+                      {d.top_tracks.map((t: any, i: number) => (
+                        <div key={i} className="flex items-center justify-between text-sm">
+                          <div className="flex items-center gap-3">
+                            <span className={`font-mono w-5 text-right ${i === 0 ? "text-[var(--green)]" : "text-gray-600"}`}>{i + 1}</span>
+                            <span className="text-gray-200">{t.name}</span>
+                          </div>
+                          <span className="text-gray-500 text-xs">{t.playcount.toLocaleString()} plays</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {d.top_albums?.length > 0 && (
+                  <div className="card p-5">
+                    <h3 className="text-xs font-bold uppercase tracking-widest text-gray-500 mb-3">Top Albums (Global)</h3>
+                    <div className="space-y-2">
+                      {d.top_albums.map((a: any, i: number) => (
+                        <div key={i} className="flex items-center justify-between text-sm">
+                          <div className="flex items-center gap-3">
+                            <span className={`font-mono w-5 text-right ${i === 0 ? "text-[var(--green)]" : "text-gray-600"}`}>{i + 1}</span>
+                            <span className="text-gray-200">{a.name}</span>
+                          </div>
+                          <span className="text-gray-500 text-xs">{a.playcount.toLocaleString()} plays</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {d.similar_artists?.length > 0 && (
+                  <div className="card p-5">
+                    <h3 className="text-xs font-bold uppercase tracking-widest text-gray-500 mb-3">Similar Artists</h3>
+                    <div className="flex gap-2 flex-wrap">
+                      {d.similar_artists.map((artistName: string) => (
+                        <button key={artistName}
+                          onClick={async () => {
+                            trackEvent("similar_artist_clicked", { from_artist: artistId, to_artist: artistName });
+                            try {
+                              const resolved = await api.resolveArtist(artistName);
+                              router.push(`/artist/${resolved.artist_id}`);
+                            } catch {
+                              router.push(`/gatekeep?q=${encodeURIComponent(artistName)}`);
+                            }
+                          }}
+                          className="text-sm bg-white/5 px-4 py-1.5 rounded-full text-gray-300 hover:bg-white/10 hover:text-white transition-all">
+                          {artistName}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+              <p className="text-center text-gray-600 text-xs mt-3">Global stats via Last.fm</p>
+            </section>
+          );
+        })()
+      )}
 
       {/* Gatekeep Comparison */}
       {comparison?.entries?.length > 0 && (

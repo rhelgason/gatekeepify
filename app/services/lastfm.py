@@ -1,4 +1,5 @@
 import logging
+import time
 from typing import Optional
 
 import requests
@@ -8,6 +9,10 @@ from app.config import settings
 logger = logging.getLogger("gatekeepify.lastfm")
 
 BASE_URL = "https://ws.audioscrobbler.com/2.0/"
+
+# In-memory cache for Last.fm responses (TTL: 1 hour)
+_cache: dict[str, tuple[float, dict]] = {}
+_CACHE_TTL = 3600  # seconds
 
 
 def _lastfm_get(method: str, params: dict) -> Optional[dict]:
@@ -31,6 +36,13 @@ def get_artist_global_stats(artist_name: str) -> Optional[dict]:
     if not settings.lastfm_api_key:
         logger.warning("LASTFM_API_KEY is not set")
         return None
+
+    # Check cache
+    cache_key = artist_name.lower().strip()
+    if cache_key in _cache:
+        cached_time, cached_data = _cache[cache_key]
+        if time.time() - cached_time < _CACHE_TTL:
+            return cached_data
 
     logger.info(f"Fetching Last.fm data for '{artist_name}'")
 
@@ -81,6 +93,7 @@ def get_artist_global_stats(artist_name: str) -> Optional[dict]:
             ]
 
         logger.info(f"Last.fm data for '{artist_name}': {total_listeners} listeners, {total_playcount} plays")
+        _cache[cache_key] = (time.time(), result)
         return result
 
     except Exception as e:
