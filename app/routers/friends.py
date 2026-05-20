@@ -18,6 +18,10 @@ from app.services.audit import log_action
 router = APIRouter(prefix="/friends", tags=["friends"])
 
 
+def _escape_like(q: str) -> str:
+    return q.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+
 def get_friend_ids(db: Session, user_id: str) -> List[str]:
     rows = db.execute(
         select(Friendship.user_id_2).where(Friendship.user_id_1 == user_id)
@@ -196,7 +200,7 @@ def search_users(
 ):
     existing_friend_ids = set(get_friend_ids(db, user.user_id))
     words = q.strip().split()
-    word_filters = [User.user_name.ilike(f"%{w}%") for w in words]
+    word_filters = [User.user_name.ilike(f"%{_escape_like(w)}%") for w in words]
 
     users = db.execute(
         select(User.user_id, User.user_name, User.image_url)

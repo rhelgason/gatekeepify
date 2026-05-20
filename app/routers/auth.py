@@ -157,7 +157,9 @@ def callback(code: str = Query(...), state: str = Query(None), db: Session = Dep
             except (_json.JSONDecodeError, AttributeError):
                 origin = decoded
             allowed_origins = {settings.frontend_url}
-            if origin in allowed_origins or origin.endswith(".vercel.app"):
+            if settings.allowed_origins:
+                allowed_origins.update(o.strip() for o in settings.allowed_origins.split(",") if o.strip())
+            if origin in allowed_origins:
                 redirect_url = origin
             else:
                 logger.warning(f"Rejected redirect to untrusted origin: {origin}")
@@ -167,7 +169,7 @@ def callback(code: str = Query(...), state: str = Query(None), db: Session = Dep
         redirect_url = settings.frontend_url
 
     if redirect_url:
-        callback_url = f"{redirect_url}/auth/callback?token={token}"
+        callback_url = f"{redirect_url}/auth/callback#token={token}"
         if invite_code:
             from urllib.parse import quote
             callback_url += f"&invite={quote(invite_code)}"

@@ -1,20 +1,33 @@
 "use client";
 
-import { Suspense, useEffect } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { setToken } from "@/lib/auth";
 import { trackEvent } from "@/lib/track";
 
 function CallbackHandler() {
   const router = useRouter();
-  const searchParams = useSearchParams();
+  const [processed, setProcessed] = useState(false);
 
   useEffect(() => {
-    const token = searchParams.get("token");
-    if (token) {
-      setToken(token);
+    if (processed) return;
+
+    // Read token from URL fragment hash (not query params) for security
+    const hash = window.location.hash.substring(1); // remove leading '#'
+    const params = new URLSearchParams(hash);
+    const token = params.get("token");
+
+    // Also check query params as fallback for backwards compatibility
+    const urlParams = new URLSearchParams(window.location.search);
+    const tokenFromQuery = urlParams.get("token");
+    const finalToken = token || tokenFromQuery;
+
+    if (finalToken) {
+      setToken(finalToken);
       trackEvent("login_completed");
-      const invite = searchParams.get("invite") || localStorage.getItem("pending_invite");
+      setProcessed(true);
+
+      const invite = params.get("invite") || urlParams.get("invite") || localStorage.getItem("pending_invite");
       if (invite) {
         localStorage.removeItem("pending_invite");
         router.replace(`/invite/${invite}`);
@@ -24,7 +37,7 @@ function CallbackHandler() {
     } else {
       router.replace("/");
     }
-  }, [router, searchParams]);
+  }, [router, processed]);
 
   return (
     <div className="text-center">

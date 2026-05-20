@@ -31,8 +31,18 @@ logger = logging.getLogger("gatekeepify.http")
 validate_settings()
 Base.metadata.create_all(bind=engine)
 
+import re
+
 def _add_column_if_missing(engine, table, column, col_type):
     from sqlalchemy import inspect as sa_inspect, text as sa_text
+    # Validate identifiers to prevent SQL injection
+    if not re.match(r'^[a-z_][a-z0-9_]*$', table):
+        raise ValueError(f"Invalid table name: {table}")
+    if not re.match(r'^[a-z_][a-z0-9_]*$', column):
+        raise ValueError(f"Invalid column name: {column}")
+    allowed_types = {"VARCHAR(512)", "VARCHAR(255)", "TIMESTAMP", "INTEGER", "INTEGER DEFAULT 0", "BOOLEAN DEFAULT FALSE", "TEXT"}
+    if col_type not in allowed_types:
+        raise ValueError(f"Disallowed column type: {col_type}")
     insp = sa_inspect(engine)
     existing = [c["name"] for c in insp.get_columns(table)]
     if column not in existing:
@@ -109,9 +119,18 @@ app = FastAPI(
     version="0.1.0",
 )
 
+def _get_allowed_origins() -> list[str]:
+    origins = []
+    if settings.frontend_url:
+        origins.append(settings.frontend_url)
+    if settings.allowed_origins:
+        origins.extend(o.strip() for o in settings.allowed_origins.split(",") if o.strip())
+    return origins if origins else ["*"]
+
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=_get_allowed_origins(),
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],

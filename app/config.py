@@ -13,6 +13,7 @@ class Settings(BaseSettings):
     encryption_key: str = ""
     redis_url: str = "redis://localhost:6379/0"
     frontend_url: str = ""
+    allowed_origins: str = ""  # comma-separated list of allowed origins (e.g. "https://gatekeepify.vercel.app,http://localhost:3000")
     lastfm_api_key: str = ""
     poll_interval_seconds: int = 900
     backfill_interval_seconds: int = 120
