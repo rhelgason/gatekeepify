@@ -14,6 +14,7 @@ celery_app.conf.update(
     accept_content=["json"],
     result_serializer="json",
     timezone="UTC",
+    beat_schedule_filename="/tmp/celerybeat-schedule",
     beat_schedule={
         "poll-recent-listens": {
             "task": "app.tasks.poll_recent_listens",
