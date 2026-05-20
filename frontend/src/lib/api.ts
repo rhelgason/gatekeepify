@@ -157,8 +157,13 @@ export const api = {
 
   getTrackDetail: (trackId: string) => request<any>(`/search/track/${trackId}`),
 
-  getTimeline: (artistId: string, mode: string = "personal") =>
-    cachedRequest<any>(`/stats/timeline?artist_id=${artistId}&mode=${mode}`),
+  getTimeline: (artistId: string, mode: string = "personal", friendIds?: string[]) => {
+    let url = `/stats/timeline?artist_id=${artistId}&mode=${mode}`;
+    if (friendIds?.length) {
+      url += `&friend_ids=${friendIds.join(",")}`;
+    }
+    return friendIds ? request<any>(url) : cachedRequest<any>(url);
+  },
 
   getLastfmTimeline: (artistName: string) =>
     cachedRequest<any>(`/stats/lastfm-timeline?artist_name=${encodeURIComponent(artistName)}`),

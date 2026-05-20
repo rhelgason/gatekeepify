@@ -378,6 +378,7 @@ def timeline(
     artist_id: str = Query(None),
     track_id: str = Query(None),
     mode: str = Query("personal"),
+    friend_ids: str = Query(None, description="Comma-separated friend user IDs to include"),
     user: UserModel = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -388,10 +389,20 @@ def timeline(
     if mode == "global":
         user_ids = None
     elif mode == "friends":
-        friend_rows = db.execute(
-            select(Friendship.user_id_2).where(Friendship.user_id_1 == user.user_id)
-        ).all()
-        user_ids = [user.user_id] + [r[0] for r in friend_rows]
+        if friend_ids:
+            # Specific friends requested — validate they are actual friends
+            requested_ids = [fid.strip() for fid in friend_ids.split(",") if fid.strip()]
+            actual_friend_rows = db.execute(
+                select(Friendship.user_id_2).where(Friendship.user_id_1 == user.user_id)
+            ).all()
+            actual_friends = {r[0] for r in actual_friend_rows}
+            valid_ids = [fid for fid in requested_ids if fid in actual_friends]
+            user_ids = [user.user_id] + valid_ids
+        else:
+            friend_rows = db.execute(
+                select(Friendship.user_id_2).where(Friendship.user_id_1 == user.user_id)
+            ).all()
+            user_ids = [user.user_id] + [r[0] for r in friend_rows]
     else:
         user_ids = [user.user_id]
 
@@ -445,14 +456,31 @@ def timeline(
 
         data = {}
         for uid, info in counts.items():
+            total_listens = sum(info["months"].values())
             data[uid] = {
                 "user_id": uid,
                 "user_name": info["user_name"],
+                "total_listens": total_listens,
                 "months": [
                     {"month": m, "listen_count": c}
                     for m, c in sorted(info["months"].items())
                 ],
             }
+
+    # In friends mode, cap to current user + top 5 friends by listen count
+    total_friends_with_data = None
+    all_friend_data = None
+    if mode == "friends" and not friend_ids:
+        current_user_data = data.pop(user.user_id, None)
+        friend_entries = sorted(data.values(), key=lambda x: x.get("total_listens", 0), reverse=True)
+        total_friends_with_data = len(friend_entries)
+        top_friends = friend_entries[:5]
+        all_friend_data = [{"user_id": f["user_id"], "user_name": f["user_name"], "total_listens": f.get("total_listens", 0)} for f in friend_entries]
+        data = {}
+        if current_user_data:
+            data[user.user_id] = current_user_data
+        for f in top_friends:
+            data[f["user_id"]] = f
 
     log_action(
         db, "stats.timeline_viewed",
@@ -460,7 +488,11 @@ def timeline(
         details={"artist_id": artist_id, "track_id": track_id, "mode": mode},
     )
 
-    return {"users": list(data.values())}
+    result = {"users": list(data.values())}
+    if total_friends_with_data is not None:
+        result["total_friends_with_data"] = total_friends_with_data
+        result["all_friends"] = all_friend_data
+    return result
 
 
 @router.get("/lastfm-timeline")

@@ -23,6 +23,10 @@ export default function ArtistPage() {
   const [copied, setCopied] = useState(false);
   const [loading, setLoading] = useState(true);
   const [hoveredPoint, setHoveredPoint] = useState<{ idx: number } | null>(null);
+  const [selectedFriendIds, setSelectedFriendIds] = useState<string[] | null>(null);
+  const [allFriends, setAllFriends] = useState<any[] | null>(null);
+  const [totalFriendsWithData, setTotalFriendsWithData] = useState<number | null>(null);
+  const [showFriendSelector, setShowFriendSelector] = useState(false);
 
   const loadArtist = useCallback(async () => {
     setLoading(true);
@@ -55,11 +59,21 @@ export default function ArtistPage() {
           setLastfmLoading(true);
           api.getLastfmTimeline(detail.artist_name).then(setLastfmData).catch(() => {}).finally(() => setLastfmLoading(false));
         }
+      } else if (timelineMode === "friends" && selectedFriendIds) {
+        api.getTimeline(artistId, "friends", selectedFriendIds).then(data => {
+          setTimeline(data);
+        }).catch(() => {});
       } else {
-        api.getTimeline(artistId, timelineMode).then(setTimeline).catch(() => {});
+        api.getTimeline(artistId, timelineMode).then(data => {
+          setTimeline(data);
+          if (timelineMode === "friends") {
+            setTotalFriendsWithData(data.total_friends_with_data ?? null);
+            setAllFriends(data.all_friends ?? null);
+          }
+        }).catch(() => {});
       }
     }
-  }, [artistId, timelineMode, loading, detail?.artist_name]);
+  }, [artistId, timelineMode, loading, detail?.artist_name, selectedFriendIds]);
 
   async function handleChallenge() {
     trackEvent("challenge_created", { artist_id: artistId }, "artist", artistId);
@@ -176,7 +190,7 @@ export default function ArtistPage() {
             ] as const).map(({ key, label }) => (
               <button
                 key={key}
-                onClick={() => { setTimelineMode(key); trackEvent("timeline_mode_changed", { mode: key, artist_id: artistId }, "artist", artistId); }}
+                onClick={() => { setTimelineMode(key); setSelectedFriendIds(null); setShowFriendSelector(false); trackEvent("timeline_mode_changed", { mode: key, artist_id: artistId }, "artist", artistId); }}
                 className={`px-3 py-1.5 rounded-full text-xs transition-all ${
                   timelineMode === key
                     ? "bg-[var(--green)] text-black font-bold"
@@ -190,7 +204,7 @@ export default function ArtistPage() {
         </div>
 
         {(() => {
-          const lineColors = ["#1DB954", "#34d399", "#2dd4bf", "#22d3ee", "#38bdf8", "#a78bfa"];
+          const lineColors = ["#1DB954", "#34d399", "#2dd4bf", "#22d3ee", "#38bdf8", "#a78bfa", "#f472b6", "#fb923c", "#facc15", "#4ade80"];
 
           function formatMonth(m: string) {
             const [y, mo] = m.split("-");
@@ -501,12 +515,53 @@ export default function ArtistPage() {
             );
           }
 
-          return renderLineChart(
-            users.filter((u: any) => u.months?.length > 0).map((u: any, i: number) => ({
-              label: u.user_name || u.user_id,
-              months: u.months,
-              color: lineColors[i % lineColors.length],
-            }))
+          return (
+            <div>
+              {renderLineChart(
+                users.filter((u: any) => u.months?.length > 0).map((u: any, i: number) => ({
+                  label: u.user_name || u.user_id,
+                  months: u.months,
+                  color: lineColors[i % lineColors.length],
+                }))
+              )}
+              {timelineMode === "friends" && totalFriendsWithData !== null && totalFriendsWithData > 5 && (
+                <div className="mt-3 flex items-center justify-between">
+                  <p className="text-xs text-gray-500">
+                    Showing top 5 of {totalFriendsWithData} friends by listens
+                  </p>
+                  <button
+                    onClick={() => setShowFriendSelector(!showFriendSelector)}
+                    className="text-xs text-[var(--green)] hover:text-white transition-colors"
+                  >
+                    {showFriendSelector ? "Hide" : "Select friends"}
+                  </button>
+                </div>
+              )}
+              {showFriendSelector && allFriends && (
+                <div className="mt-2 card p-4 space-y-2 animate-slide-up">
+                  <p className="text-xs text-gray-500 uppercase tracking-wider mb-2">Choose friends to display</p>
+                  {allFriends.map((f: any) => (
+                    <label key={f.user_id} className="flex items-center gap-3 cursor-pointer text-sm">
+                      <input
+                        type="checkbox"
+                        checked={selectedFriendIds ? selectedFriendIds.includes(f.user_id) : allFriends.indexOf(f) < 5}
+                        onChange={(e) => {
+                          const current = selectedFriendIds || allFriends.slice(0, 5).map((af: any) => af.user_id);
+                          if (e.target.checked) {
+                            setSelectedFriendIds([...current, f.user_id]);
+                          } else {
+                            setSelectedFriendIds(current.filter((id: string) => id !== f.user_id));
+                          }
+                        }}
+                        className="accent-[var(--green)]"
+                      />
+                      <span className="text-gray-300">{f.user_name || f.user_id}</span>
+                      <span className="text-gray-600 text-xs ml-auto">{f.total_listens} listens</span>
+                    </label>
+                  ))}
+                </div>
+              )}
+            </div>
           );
         })()}
       </section>
