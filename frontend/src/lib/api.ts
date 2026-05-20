@@ -22,7 +22,7 @@ function getCached<T>(key: string): T | null {
 function setCache(key: string, data: any) {
   // Evict oldest entries when cache is full
   if (cache.size >= MAX_CACHE_SIZE) {
-    const oldest = cache.keys().next().value;
+    const oldest = Array.from(cache.keys())[0];
     if (oldest) cache.delete(oldest);
   }
   cache.set(key, { data, ts: Date.now() });
@@ -33,9 +33,9 @@ export function invalidateCache(pattern?: string) {
     cache.clear();
     return;
   }
-  for (const key of cache.keys()) {
+  Array.from(cache.keys()).forEach((key) => {
     if (key.includes(pattern)) cache.delete(key);
-  }
+  });
 }
 
 async function cachedRequest<T>(path: string): Promise<T> {
