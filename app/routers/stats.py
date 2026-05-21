@@ -46,7 +46,7 @@ def _clamp_offset(offset: int) -> int:
 def _period_to_since(period: TimePeriod) -> Optional[datetime]:
     now = datetime.now(timezone.utc)
     if period == TimePeriod.today:
-        return now.replace(hour=0, minute=0, second=0, microsecond=0)
+        return now - timedelta(hours=24)
     elif period == TimePeriod.month:
         return now - timedelta(days=30)
     elif period == TimePeriod.year:
