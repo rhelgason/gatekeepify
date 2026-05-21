@@ -1,5 +1,5 @@
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from spotipy.exceptions import SpotifyException
 from spotipy.oauth2 import SpotifyOauthError
@@ -10,6 +10,7 @@ from app.config import settings
 from app.database import SessionLocal
 from app.models import Listen, User
 from app.models import Friendship
+from app.models import AuditLog, JobRun
 from app.services.ingestion import (
     get_active_users,
     get_tracks_missing_metadata,
@@ -551,3 +552,34 @@ def _get_working_access_token(db, service: SpotifyService, users: list) -> str |
             else:
                 logger.warning(f"Failed to refresh token for {user.user_id}: {e}")
     return None
+
+
+@celery_app.task(name="app.tasks.cleanup_old_records")
+def cleanup_old_records():
+    """Delete audit_log and job_runs entries older than 30 days, then VACUUM."""
+    db = SessionLocal()
+    try:
+        cutoff = datetime.now(timezone.utc) - timedelta(days=30)
+
+        audit_deleted = db.query(AuditLog).filter(AuditLog.ts < cutoff).delete()
+        jobs_deleted = db.query(JobRun).filter(JobRun.ended_at < cutoff).delete()
+        db.commit()
+
+        logger.info(
+            f"Cleanup: deleted {audit_deleted} audit_log rows, "
+            f"{jobs_deleted} job_runs rows older than 30 days"
+        )
+
+        # VACUUM to reclaim disk space (must run outside transaction)
+        conn = db.get_bind().raw_connection()
+        conn.set_isolation_level(0)  # autocommit for VACUUM
+        conn.cursor().execute("VACUUM audit_log")
+        conn.cursor().execute("VACUUM job_runs")
+        conn.close()
+
+        logger.info("VACUUM completed on audit_log and job_runs")
+    except Exception:
+        db.rollback()
+        logger.exception("cleanup_old_records failed")
+    finally:
+        db.close()

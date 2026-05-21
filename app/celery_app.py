@@ -29,5 +29,9 @@ celery_app.conf.update(
             "task": "app.tasks.compute_award_snapshots",
             "schedule": 21600,
         },
+        "cleanup-old-records": {
+            "task": "app.tasks.cleanup_old_records",
+            "schedule": 86400,
+        },
     },
 )
