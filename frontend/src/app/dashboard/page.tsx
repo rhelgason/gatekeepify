@@ -82,31 +82,74 @@ function DashboardContent() {
     viewMode === "recent" && tracks.length === 0 && artists.length === 0 && genres.length === 0;
 
   if (recentEmpty) {
+    const periodLabel = periods.find((p) => p.value === period)?.label ?? "this period";
+    const isDefaultPeriod = period === "today";
     return (
-      <div className="mt-16 max-w-lg mx-auto text-center animate-fade-in">
-        <h1 className="text-4xl font-black mb-4">Welcome to Gatekeepify</h1>
-        <p className="text-gray-400 mb-8 text-lg">
-          We&apos;re collecting your listening data now. Your recent history
-          will appear here within 15 minutes.
-        </p>
-        <div className="space-y-4">
-          <Link href="/upload" className="card block p-6 text-left hover:border-white/10 transition-all">
-            <h2 className="font-bold text-[var(--green)] mb-1 text-lg">
-              Upload your full history
-            </h2>
-            <p className="text-gray-500 text-sm">
-              Spotify&apos;s API only gives us your last 50 listens. Upload your data
-              export for years of history.
-            </p>
-          </Link>
-          <Link href="/friends" className="card block p-6 text-left hover:border-white/10 transition-all">
-            <h2 className="font-bold text-[var(--green)] mb-1 text-lg">
-              Invite your friends
-            </h2>
-            <p className="text-gray-500 text-sm">
-              Gatekeeping is a team sport. Add friends to see who listened first.
-            </p>
-          </Link>
+      <div className="animate-fade-in">
+        {/* View mode toggle */}
+        <div className="flex justify-center mb-6">
+          <div className="flex gap-1 bg-white/5 rounded-full p-1">
+            <button
+              onClick={() => { setViewMode("recent"); trackEvent("view_mode_changed", { mode: "recent" }); }}
+              className="px-4 py-1.5 rounded-full text-sm transition-all duration-200 bg-[var(--green)] text-black font-bold"
+            >
+              Recent
+            </button>
+            <button
+              onClick={() => { setViewMode("wrapped"); trackEvent("view_mode_changed", { mode: "wrapped" }); }}
+              className="px-4 py-1.5 rounded-full text-sm transition-all duration-200 text-gray-500 hover:text-white"
+            >
+              Wrapped
+            </button>
+          </div>
+        </div>
+
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-8">
+          <h1 className="text-3xl font-black">Your Stats</h1>
+          <div className="flex gap-1 bg-white/5 rounded-full p-1">
+            {periods.map((p) => (
+              <button
+                key={p.value}
+                onClick={() => { setPeriod(p.value); trackEvent("period_changed", { period: p.value }); }}
+                className={`px-3 md:px-4 py-1.5 rounded-full text-xs md:text-sm transition-all duration-200 ${
+                  period === p.value
+                    ? "bg-[var(--green)] text-black font-bold"
+                    : "text-gray-500 hover:text-white"
+                }`}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="max-w-lg mx-auto text-center mt-12">
+          <div className="text-5xl mb-4">🎧</div>
+          <h2 className="text-2xl font-bold mb-2">
+            {isDefaultPeriod ? "Nothing in the last 24 hours" : `No listens for ${periodLabel}`}
+          </h2>
+          <p className="text-gray-400 mb-8">
+            {isDefaultPeriod
+              ? "Play something on Spotify and check back soon — we poll every 15 minutes."
+              : "Try switching to a different time period above."}
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <Link href="/upload" className="card p-5 text-center hover:border-white/10 transition-all">
+              <div className="text-2xl mb-2">📤</div>
+              <h3 className="font-bold text-[var(--green)] text-sm mb-1">Upload History</h3>
+              <p className="text-gray-500 text-xs">Import your full Spotify data export</p>
+            </Link>
+            <Link href="/friends" className="card p-5 text-center hover:border-white/10 transition-all">
+              <div className="text-2xl mb-2">👥</div>
+              <h3 className="font-bold text-[var(--green)] text-sm mb-1">Add Friends</h3>
+              <p className="text-gray-500 text-xs">See who listened first</p>
+            </Link>
+            <Link href="/feed" className="card p-5 text-center hover:border-white/10 transition-all">
+              <div className="text-2xl mb-2">📡</div>
+              <h3 className="font-bold text-[var(--green)] text-sm mb-1">Activity Feed</h3>
+              <p className="text-gray-500 text-xs">See what friends are playing</p>
+            </Link>
+          </div>
         </div>
       </div>
     );
