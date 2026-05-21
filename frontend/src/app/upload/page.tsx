@@ -171,13 +171,13 @@ export default function Upload() {
             />
             {uploading ? (
               <div>
-                <div className="text-3xl mb-3 animate-pulse">📦</div>
+                <svg className="w-8 h-8 mx-auto mb-3 text-gray-400 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 16v-8m0 0l-3 3m3-3l3 3M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1M4 12V8a3 3 0 013-3h10a3 3 0 013 3v4" /></svg>
                 <p className="text-gray-400">Uploading file to server...</p>
                 <p className="text-orange-400 text-xs mt-2">Do not navigate away until upload completes.</p>
               </div>
             ) : (
               <div>
-                <div className="text-3xl mb-3">📁</div>
+                <svg className="w-8 h-8 mx-auto mb-3 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" /></svg>
                 <p className="text-gray-300 font-medium mb-1">
                   Drop your ZIP file here, or click to browse
                 </p>

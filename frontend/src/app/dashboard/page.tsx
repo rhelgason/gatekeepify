@@ -124,7 +124,7 @@ function DashboardContent() {
         </div>
 
         <div className="max-w-lg mx-auto text-center mt-12">
-          <div className="text-5xl mb-4">🎧</div>
+          <svg className="w-12 h-12 mx-auto mb-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 9l10.5-3m0 6.553v3.75a2.25 2.25 0 01-1.632 2.163l-1.32.377a1.803 1.803 0 11-.99-3.467l2.31-.66a2.25 2.25 0 001.632-2.163zm0 0V4.228c0-.89-.922-1.48-1.735-1.11L6.286 5.526a1.886 1.886 0 00-1.036 1.684v3.04M5.25 21A2.25 2.25 0 013 18.75v0A2.25 2.25 0 015.25 16.5h0A2.25 2.25 0 017.5 18.75v0A2.25 2.25 0 015.25 21z" /></svg>
           <h2 className="text-2xl font-bold mb-2">
             {isDefaultPeriod ? "Nothing in the last 24 hours" : `No listens for ${periodLabel}`}
           </h2>
@@ -135,17 +135,17 @@ function DashboardContent() {
           </p>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <Link href="/upload" className="card p-5 text-center hover:border-white/10 transition-all">
-              <div className="text-2xl mb-2">📤</div>
+              <svg className="w-6 h-6 mx-auto mb-2 text-[var(--green)]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" /></svg>
               <h3 className="font-bold text-[var(--green)] text-sm mb-1">Upload History</h3>
               <p className="text-gray-500 text-xs">Import your full Spotify data export</p>
             </Link>
             <Link href="/friends" className="card p-5 text-center hover:border-white/10 transition-all">
-              <div className="text-2xl mb-2">👥</div>
+              <svg className="w-6 h-6 mx-auto mb-2 text-[var(--green)]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" /></svg>
               <h3 className="font-bold text-[var(--green)] text-sm mb-1">Add Friends</h3>
               <p className="text-gray-500 text-xs">See who listened first</p>
             </Link>
             <Link href="/feed" className="card p-5 text-center hover:border-white/10 transition-all">
-              <div className="text-2xl mb-2">📡</div>
+              <svg className="w-6 h-6 mx-auto mb-2 text-[var(--green)]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3.75 12h16.5m-16.5 3.75h16.5M3.75 19.5h16.5M5.625 4.5h12.75a1.875 1.875 0 010 3.75H5.625a1.875 1.875 0 010-3.75z" /></svg>
               <h3 className="font-bold text-[var(--green)] text-sm mb-1">Activity Feed</h3>
               <p className="text-gray-500 text-xs">See what friends are playing</p>
             </Link>
@@ -363,7 +363,7 @@ function DashboardContent() {
 
           {wrappedEmpty ? (
             <div className="card p-12 text-center">
-              <span className="text-5xl mb-4 block">🎵</span>
+              <svg className="w-12 h-12 mx-auto mb-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 9l10.5-3m0 6.553v3.75a2.25 2.25 0 01-1.632 2.163l-1.32.377a1.803 1.803 0 11-.99-3.467l2.31-.66a2.25 2.25 0 001.632-2.163zm0 0V4.228c0-.89-.922-1.48-1.735-1.11L6.286 5.526a1.886 1.886 0 00-1.036 1.684v3.04M5.25 21A2.25 2.25 0 013 18.75v0A2.25 2.25 0 015.25 16.5h0A2.25 2.25 0 017.5 18.75v0A2.25 2.25 0 015.25 21z" /></svg>
               <p className="text-gray-400 text-lg mb-2">No data for {year}</p>
               <p className="text-gray-600 text-sm">
                 Upload your Spotify data export to see past years.
