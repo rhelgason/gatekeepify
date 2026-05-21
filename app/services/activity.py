@@ -58,6 +58,14 @@ def generate_activity_feed(
 
 
 def _detect_binges(db: Session, user_id: str, since: datetime) -> List[dict]:
+    user_obj = db.query(User).filter(User.user_id == user_id).first()
+    if user_obj and user_obj.created_at:
+        created = user_obj.created_at
+        if created.tzinfo is None:
+            created = created.replace(tzinfo=timezone.utc)
+        if created >= since:
+            return []
+
     rows = db.execute(
         select(Listen.ts, Listen.track_id, TrackArtist.artist_id, Artist.artist_name, Track.duration_ms)
         .join(Track, Listen.track_id == Track.track_id)
@@ -164,6 +172,14 @@ def _detect_milestones(db: Session, user_id: str) -> List[dict]:
     milestones = [1000, 500, 100]
     since = datetime.now(timezone.utc) - timedelta(days=7)
 
+    user_obj = db.query(User).filter(User.user_id == user_id).first()
+    if user_obj and user_obj.created_at:
+        created = user_obj.created_at
+        if created.tzinfo is None:
+            created = created.replace(tzinfo=timezone.utc)
+        if created >= since:
+            return []
+
     rows = db.execute(
         select(TrackArtist.artist_id, Artist.artist_name, func.count().label("cnt"))
         .select_from(Listen)
@@ -228,6 +244,14 @@ def _detect_milestones(db: Session, user_id: str) -> List[dict]:
 def _detect_late_to_party(
     db: Session, user_id: str, group_ids: List[str], since: datetime
 ) -> List[dict]:
+    user_obj = db.query(User).filter(User.user_id == user_id).first()
+    if user_obj and user_obj.created_at:
+        created = user_obj.created_at
+        if created.tzinfo is None:
+            created = created.replace(tzinfo=timezone.utc)
+        if created >= since:
+            return []
+
     new_listens = db.execute(
         select(TrackArtist.artist_id, Artist.artist_name, func.min(Listen.ts).label("first"))
         .join(TrackArtist, Listen.track_id == TrackArtist.track_id)
@@ -294,7 +318,7 @@ def _detect_crown_steals(db: Session, group_ids: List[str], since: datetime) -> 
         .select_from(Listen)
         .join(TrackArtist, Listen.track_id == TrackArtist.track_id)
         .join(Artist, TrackArtist.artist_id == Artist.artist_id)
-        .where(Listen.user_id.in_(group_ids))
+        .where(Listen.user_id.in_(group_ids), Listen.source == ListenSource.api.value)
         .group_by(TrackArtist.artist_id, Artist.artist_name, Listen.user_id)
     )
     rows = db.execute(artist_user_first).all()
@@ -402,6 +426,14 @@ def _detect_broken_streaks(db: Session, user_id: str) -> List[dict]:
 
 
 def _detect_track_repeats(db: Session, user_id: str, since: datetime) -> List[dict]:
+    user_obj = db.query(User).filter(User.user_id == user_id).first()
+    if user_obj and user_obj.created_at:
+        created = user_obj.created_at
+        if created.tzinfo is None:
+            created = created.replace(tzinfo=timezone.utc)
+        if created >= since:
+            return []
+
     rows = db.execute(
         select(
             Listen.track_id,
