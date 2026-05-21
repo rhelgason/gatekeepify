@@ -565,10 +565,7 @@ def cleanup_old_records():
         jobs_deleted = db.query(JobRun).filter(JobRun.ended_at < cutoff).delete()
         db.commit()
 
-        logger.info(
-            f"Cleanup: deleted {audit_deleted} audit_log rows, "
-            f"{jobs_deleted} job_runs rows older than 30 days"
-        )
+        logger.info(f"Cleanup: deleted {audit_deleted} audit_log rows, {jobs_deleted} job_runs rows older than 30 days")
 
         # VACUUM to reclaim disk space (must run outside transaction)
         conn = db.get_bind().raw_connection()

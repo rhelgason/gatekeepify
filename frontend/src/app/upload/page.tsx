@@ -258,8 +258,9 @@ export default function Upload() {
               <span>{PHASE_LABELS[job.phase] || job.phase}</span>
               <span>
                 {job.progress || 0}%
-                {job.progress > 5 && job.started_at && (() => {
+                {job.progress > 0 && job.started_at && (() => {
                   const elapsed = (Date.now() - new Date(job.started_at).getTime()) / 1000;
+                  if (elapsed < 30) return null; // wait for meaningful data
                   const remaining = Math.round(elapsed * (100 - job.progress) / job.progress);
                   if (remaining < 60) return ` · ~${remaining}s remaining`;
                   if (remaining < 3600) return ` · ~${Math.round(remaining / 60)} min remaining`;
