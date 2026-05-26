@@ -310,7 +310,7 @@ def compute_award_snapshots():
 
 
 @celery_app.task(name="app.tasks.process_backfill_upload", acks_late=True, reject_on_worker_lost=True)
-def process_backfill_upload(job_id: int, user_id: str):
+def process_backfill_upload(job_id: int, user_id: str, raw_listens: list | None = None):
     import json
     import time
 
@@ -338,7 +338,8 @@ def process_backfill_upload(job_id: int, user_id: str):
 
         job.status = "running"
         details = json.loads(job.details) if job.details else {}
-        raw_listens = details.get("listen_data", [])
+        if not raw_listens:
+            raw_listens = []
         prev_phase = details.get("phase", "")
         resuming = not raw_listens and prev_phase in ("resuming", "enriching", "analyzing", "inserting")
 

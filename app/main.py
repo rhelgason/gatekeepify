@@ -94,18 +94,8 @@ def _resume_orphaned_jobs():
         )
         for j in orphaned:
             details = _json.loads(j.details) if j.details else {}
-            has_listen_data = "listen_data" in details
             phase = details.get("phase", "")
-            if has_listen_data:
-                j.status = "pending"
-                details.update({"phase": "resuming", "progress": 0})
-                j.details = _json.dumps(details)
-                _startup_db.commit()
-                from app.celery_app import celery_app
-
-                celery_app.send_task("app.tasks.process_backfill_upload", args=[j.id, j.user_id])
-                logger.info(f"Resuming interrupted upload job {j.id} for user {j.user_id}")
-            elif phase in ("enriching", "analyzing", "inserting"):
+            if phase in ("enriching", "analyzing", "inserting"):
                 j.status = "pending"
                 details.update({"phase": "resuming", "progress": details.get("progress", 80)})
                 j.details = _json.dumps(details)
@@ -127,7 +117,6 @@ def _resume_orphaned_jobs():
             else:
                 j.status = "error"
                 j.completed_at = datetime.now(timezone.utc)
-                details.pop("listen_data", None)
                 details.update({"phase": "error", "error": "Server restarted during processing"})
                 j.details = _json.dumps(details)
                 _startup_db.commit()

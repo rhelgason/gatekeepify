@@ -258,7 +258,6 @@ def upload_data_export(
             "progress": 0,
             "filename": file.filename,
             "total_listens": len(raw_listens),
-            "listen_data": raw_listens,
         }),
     )
     db.add(job)
@@ -266,7 +265,7 @@ def upload_data_export(
     db.refresh(job)
 
     from app.celery_app import celery_app
-    celery_app.send_task("app.tasks.process_backfill_upload", args=[job.id, user.user_id])
+    celery_app.send_task("app.tasks.process_backfill_upload", args=[job.id, user.user_id, raw_listens])
 
     log_action(db, "backfill.upload_started", user_id=user.user_id,
                details={"job_id": job.id, "filename": file.filename, "size_bytes": len(content)})
@@ -310,7 +309,6 @@ def upload_job_status(
             db.commit()
 
     details = json.loads(job.details) if job.details else {}
-    details.pop("listen_data", None)
     return {
         "job_id": job.id,
         "status": job.status,
