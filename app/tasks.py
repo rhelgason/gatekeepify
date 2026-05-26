@@ -403,7 +403,7 @@ def process_backfill_upload(job_id: int, user_id: str, raw_listens: list | None 
                         }
                     )
                 if listen_rows:
-                    dialect = db.bind.dialect.name if db.bind else "sqlite"
+                    dialect = db.get_bind().dialect.name
                     tbl = Listen.__table__
                     if dialect == "postgresql":
                         stmt = pg_dialect.insert(tbl).values(listen_rows)

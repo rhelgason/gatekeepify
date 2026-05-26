@@ -139,7 +139,9 @@ def _get_allowed_origins() -> list[str]:
         origins.append(settings.frontend_url)
     if settings.allowed_origins:
         origins.extend(o.strip() for o in settings.allowed_origins.split(",") if o.strip())
-    return origins if origins else ["*"]
+    if not origins:
+        logger.warning("No CORS origins configured — set FRONTEND_URL or ALLOWED_ORIGINS")
+    return origins
 
 
 app.add_middleware(
