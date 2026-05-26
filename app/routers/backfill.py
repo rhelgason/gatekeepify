@@ -316,25 +316,20 @@ def upload_job_status(
             return {"status": "none"}
 
     JOB_TIMEOUT_MINUTES = 120
+    timed_out = False
     if job.status in ("pending", "running") and job.started_at:
         started = job.started_at
         if started.tzinfo is None:
             started = started.replace(tzinfo=timezone.utc)
-        if (datetime.now(timezone.utc) - started).total_seconds() > JOB_TIMEOUT_MINUTES * 60:
-            job.status = "error"
-            job.completed_at = datetime.now(timezone.utc)
-            details = json.loads(job.details) if job.details else {}
-            details.update({"phase": "error", "error": f"Job timed out after {JOB_TIMEOUT_MINUTES} minutes"})
-            job.details = json.dumps(details)
-            db.commit()
+        timed_out = (datetime.now(timezone.utc) - started).total_seconds() > JOB_TIMEOUT_MINUTES * 60
 
     details = json.loads(job.details) if job.details else {}
     return {
         "job_id": job.id,
-        "status": job.status,
+        "status": "error" if timed_out else job.status,
         "started_at": job.started_at.isoformat() if job.started_at else None,
         "completed_at": job.completed_at.isoformat() if job.completed_at else None,
-        "phase": details.get("phase", "unknown"),
+        "phase": "error" if timed_out else details.get("phase", "unknown"),
         "progress": details.get("progress", 0),
         "total_listens": details.get("total_listens"),
         "accepted": details.get("accepted"),
@@ -343,7 +338,7 @@ def upload_job_status(
         "enriched": details.get("enriched"),
         "enrich_total": details.get("enrich_total"),
         "enrich_done": details.get("enrich_done"),
-        "error": details.get("error"),
+        "error": f"Job timed out after {JOB_TIMEOUT_MINUTES} minutes" if timed_out else details.get("error"),
     }
 
 
