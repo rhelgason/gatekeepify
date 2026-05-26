@@ -30,26 +30,31 @@ export default function Friends() {
   }, [router]);
 
   async function loadData() {
-    const [f, r] = await Promise.all([
-      api.getFriends(),
-      api.getPendingRequests(),
-    ]);
-    setFriends(f);
-    setPendingRequests(r);
-    setLoading(false);
+    try {
+      const [f, r] = await Promise.all([
+        api.getFriends(),
+        api.getPendingRequests(),
+      ]);
+      setFriends(f);
+      setPendingRequests(r);
 
-    const loadingInit: Record<string, boolean> = {};
-    for (const friend of f) {
-      loadingInit[friend.user_id] = true;
-    }
-    setCompatLoading(loadingInit);
+      const loadingInit: Record<string, boolean> = {};
+      for (const friend of f) {
+        loadingInit[friend.user_id] = true;
+      }
+      setCompatLoading(loadingInit);
 
-    for (const friend of f) {
-      api.getCompatibility(friend.user_id).then(c => {
-        setCompatScores(prev => ({ ...prev, [friend.user_id]: c.score }));
-      }).catch(() => {}).finally(() => {
-        setCompatLoading(prev => ({ ...prev, [friend.user_id]: false }));
-      });
+      for (const friend of f) {
+        api.getCompatibility(friend.user_id).then(c => {
+          setCompatScores(prev => ({ ...prev, [friend.user_id]: c.score }));
+        }).catch(() => {}).finally(() => {
+          setCompatLoading(prev => ({ ...prev, [friend.user_id]: false }));
+        });
+      }
+    } catch {
+      setMessage("Failed to load friends. Please refresh.");
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -65,9 +70,14 @@ export default function Friends() {
     if (!searchQuery) return;
     setSearching(true);
     trackEvent("friend_search", { query: searchQuery });
-    const data = await api.searchUsers(searchQuery);
-    setUserResults(data);
-    setSearching(false);
+    try {
+      const data = await api.searchUsers(searchQuery);
+      setUserResults(data);
+    } catch {
+      setUserResults([]);
+    } finally {
+      setSearching(false);
+    }
   }, []);
 
   useEffect(() => {
@@ -91,16 +101,24 @@ export default function Friends() {
 
   async function handleAcceptRequest(requestId: number) {
     trackEvent("friend_request_accepted", { request_id: requestId });
-    await api.acceptFriendRequest(requestId);
-    loadData();
-    window.dispatchEvent(new Event("friends-updated"));
+    try {
+      await api.acceptFriendRequest(requestId);
+      loadData();
+      window.dispatchEvent(new Event("friends-updated"));
+    } catch (e) {
+      setMessage(e instanceof ApiError ? e.message : "Failed to accept request.");
+    }
   }
 
   async function handleDeclineRequest(requestId: number) {
     trackEvent("friend_request_declined", { request_id: requestId });
-    await api.declineFriendRequest(requestId);
-    loadData();
-    window.dispatchEvent(new Event("friends-updated"));
+    try {
+      await api.declineFriendRequest(requestId);
+      loadData();
+      window.dispatchEvent(new Event("friends-updated"));
+    } catch (e) {
+      setMessage(e instanceof ApiError ? e.message : "Failed to decline request.");
+    }
   }
 
   if (loading) {
@@ -114,6 +132,12 @@ export default function Friends() {
   return (
     <div className="animate-fade-in">
       <h1 className="text-3xl font-black mb-8">Friends</h1>
+
+      {message && (
+        <div className="bg-red-500/10 border border-red-500/20 rounded-lg px-4 py-3 mb-6">
+          <p className="text-red-400 text-sm">{message}</p>
+        </div>
+      )}
 
       {/* Pending Requests */}
       {pendingRequests.length > 0 && (

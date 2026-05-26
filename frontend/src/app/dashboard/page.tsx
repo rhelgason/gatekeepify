@@ -34,27 +34,26 @@ function DashboardContent() {
       return;
     }
     if (viewMode === "recent") {
+      let cancelled = false;
       setLoading(true);
       Promise.all([
         api.getTopTracks(period),
         api.getTopArtists(period),
         api.getTopGenres(period, 5),
       ]).then(([t, a, g]) => {
-        setTracks(t);
-        setArtists(a);
-        setGenres(g);
-        setLoading(false);
-      });
+        if (!cancelled) { setTracks(t); setArtists(a); setGenres(g); }
+      }).catch(() => {}).finally(() => { if (!cancelled) setLoading(false); });
+      return () => { cancelled = true; };
     }
   }, [period, router, viewMode]);
 
   useEffect(() => {
     if (!isLoggedIn() || viewMode !== "wrapped") return;
     setWrappedLoading(true);
-    api.getWrapped(year).then((d) => {
-      setWrappedData(d);
-      setWrappedLoading(false);
-    });
+    api.getWrapped(year)
+      .then((d) => setWrappedData(d))
+      .catch(() => setWrappedData(null))
+      .finally(() => setWrappedLoading(false));
   }, [year, viewMode]);
 
   const periods: { value: Period; label: string }[] = [
@@ -383,7 +382,7 @@ function DashboardContent() {
                     cardData={{
                       artistName: wrappedData.top_artists?.[0]?.artist_name || "Your Year",
                       imageUrl: wrappedData.top_artists?.[0]?.image_url,
-                      statNumber: wrappedData.total_minutes.toLocaleString(),
+                      statNumber: (wrappedData.total_minutes ?? 0).toLocaleString(),
                       statLabel: "minutes listened",
                       contextLine: `${year} Wrapped`,
                       secondaryStat: `${(wrappedData.unique_artists || 0).toLocaleString()} artists · ${(wrappedData.unique_tracks || 0).toLocaleString()} tracks`,
@@ -395,12 +394,12 @@ function DashboardContent() {
                   Minutes Listened
                 </div>
                 <div className="text-7xl font-black gradient-text">
-                  {wrappedData.total_minutes.toLocaleString()}
+                  {(wrappedData.total_minutes ?? 0).toLocaleString()}
                 </div>
                 <div className="text-gray-600 text-sm mt-2">
-                  That&apos;s {Math.round(wrappedData.total_minutes / 60).toLocaleString()} hours
-                  {wrappedData.total_minutes > 1440 &&
-                    ` or ${Math.round(wrappedData.total_minutes / 1440).toLocaleString()} days`}
+                  That&apos;s {Math.round((wrappedData.total_minutes ?? 0) / 60).toLocaleString()} hours
+                  {(wrappedData.total_minutes ?? 0) > 1440 &&
+                    ` or ${Math.round((wrappedData.total_minutes ?? 0) / 1440).toLocaleString()} days`}
                 </div>
               </div>
 
