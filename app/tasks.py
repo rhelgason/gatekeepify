@@ -556,25 +556,19 @@ def _get_working_access_token(db, service: SpotifyService, users: list) -> str |
 
 @celery_app.task(name="app.tasks.cleanup_old_records")
 def cleanup_old_records():
-    """Delete audit_log and job_runs entries older than 30 days, then VACUUM."""
+    """Delete audit_log and job_runs entries older than 30 days."""
     db = SessionLocal()
     try:
         cutoff = datetime.now(timezone.utc) - timedelta(days=30)
 
         audit_deleted = db.query(AuditLog).filter(AuditLog.ts < cutoff).delete()
-        jobs_deleted = db.query(JobRun).filter(JobRun.ended_at < cutoff).delete()
+        jobs_deleted = db.query(JobRun).filter(JobRun.completed_at < cutoff).delete()
         db.commit()
 
-        logger.info(f"Cleanup: deleted {audit_deleted} audit_log rows, {jobs_deleted} job_runs rows older than 30 days")
-
-        # VACUUM to reclaim disk space (must run outside transaction)
-        conn = db.get_bind().raw_connection()
-        conn.set_isolation_level(0)  # autocommit for VACUUM
-        conn.cursor().execute("VACUUM audit_log")
-        conn.cursor().execute("VACUUM job_runs")
-        conn.close()
-
-        logger.info("VACUUM completed on audit_log and job_runs")
+        logger.info(
+            f"Cleanup: deleted {audit_deleted} audit_log rows, "
+            f"{jobs_deleted} job_runs rows older than 30 days"
+        )
     except Exception:
         db.rollback()
         logger.exception("cleanup_old_records failed")
