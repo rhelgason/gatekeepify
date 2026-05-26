@@ -90,21 +90,41 @@ def _validate_and_process_listens(
     accepted: list[tuple[Listen, Optional[str]]] = []
 
     album_release_dates: dict[str, Optional[datetime]] = {}
-    albums = db.execute(
-        select(Album.album_id, Album.release_date).where(
-            Album.release_date.isnot(None)
-        )
-    ).all()
-    for a in albums:
-        album_release_dates[a.album_id] = datetime(
-            a.release_date.year, a.release_date.month, a.release_date.day
-        )
-
     track_albums: dict[str, str] = {}
-    track_rows = db.execute(select(Track.track_id, Track.album_id)).all()
-    for tr in track_rows:
-        if tr.album_id:
-            track_albums[tr.track_id] = tr.album_id
+
+    # Only query tracks/albums relevant to this upload instead of full table scans
+    upload_track_ids = set()
+    for lj in raw_listens:
+        uri = lj.get("spotify_track_uri", "") if isinstance(lj, dict) else ""
+        if isinstance(uri, str) and uri.startswith(TRACK_URI_PREFIX):
+            tid = uri.removeprefix(TRACK_URI_PREFIX)
+            if tid:
+                upload_track_ids.add(tid)
+
+    if upload_track_ids:
+        id_list = list(upload_track_ids)
+        for i in range(0, len(id_list), 500):
+            batch = id_list[i:i+500]
+            rows = db.execute(
+                select(Track.track_id, Track.album_id).where(Track.track_id.in_(batch))
+            ).all()
+            for tr in rows:
+                if tr.album_id:
+                    track_albums[tr.track_id] = tr.album_id
+
+        album_ids = list(set(track_albums.values()))
+        for i in range(0, len(album_ids), 500):
+            batch = album_ids[i:i+500]
+            rows = db.execute(
+                select(Album.album_id, Album.release_date).where(
+                    Album.album_id.in_(batch),
+                    Album.release_date.isnot(None),
+                )
+            ).all()
+            for a in rows:
+                album_release_dates[a.album_id] = datetime(
+                    a.release_date.year, a.release_date.month, a.release_date.day
+                )
 
     user_api_listen_range = _get_api_listen_range(db, user.user_id)
 
