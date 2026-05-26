@@ -315,10 +315,11 @@ export default function Feed() {
                     setFeedLoading(true);
                     trackEvent("feed_load_more", { days: feedDays + 14 });
                     const newDays = feedDays + 14;
-                    const more = await api.getActivityFeed(50, newDays).catch(() => []);
+                    const prevLen = feed.length;
+                    const more = await api.getActivityFeed(prevLen + 50, newDays).catch(() => []);
                     setFeed(more);
                     setFeedDays(newDays);
-                    setFeedHasMore(more.length > feed.length);
+                    setFeedHasMore(more.length > prevLen);
                     setFeedLoading(false);
                   }}
                   disabled={feedLoading}

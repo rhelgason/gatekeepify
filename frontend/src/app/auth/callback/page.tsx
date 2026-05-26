@@ -19,16 +19,20 @@ function CallbackHandler() {
 
     // Also check query params as fallback for backwards compatibility
     const urlParams = new URLSearchParams(window.location.search);
-    const tokenFromQuery = urlParams.get("token");
-    const finalToken = token || tokenFromQuery;
+    const finalToken = token;
+
+    // Clean token from URL to prevent leaking in browser history/referrer
+    if (window.location.hash || urlParams.has("token")) {
+      window.history.replaceState(null, "", window.location.pathname);
+    }
 
     if (finalToken) {
       setToken(finalToken);
       trackEvent("login_completed");
       setProcessed(true);
 
-      const invite = params.get("invite") || urlParams.get("invite") || localStorage.getItem("pending_invite");
-      if (invite) {
+      const invite = params.get("invite") || localStorage.getItem("pending_invite");
+      if (invite && /^[a-zA-Z0-9_-]+$/.test(invite)) {
         localStorage.removeItem("pending_invite");
         router.replace(`/invite/${invite}`);
       } else {
