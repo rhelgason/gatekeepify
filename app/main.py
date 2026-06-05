@@ -63,20 +63,32 @@ def _add_column_if_missing(engine, table, column, col_type):
         logger.info(f"Added column {table}.{column}")
 
 
+# Incremental columns added to existing tables after the initial schema.
+# This list is the runtime authority for schema drift because the deploy builds
+# the schema via Base.metadata.create_all (not `alembic upgrade`), and create_all
+# does not alter existing tables. Alembic migration 006 mirrors this same set so
+# `alembic upgrade head` produces an equivalent schema (verified in CI). Keep the
+# two in sync when adding a column to an existing table.
+_INCREMENTAL_COLUMNS = [
+    ("dim_all_albums", "image_url", "VARCHAR(512)"),
+    ("dim_all_tracks", "image_url", "VARCHAR(512)"),
+    ("dim_all_artists", "image_url", "VARCHAR(512)"),
+    ("friend_invites", "to_user_id", "VARCHAR(255)"),
+    ("dim_all_users", "token_invalidated_at", "TIMESTAMP"),
+    ("dim_all_listens", "ms_played", "INTEGER"),
+    ("dim_all_tracks", "enrich_attempts", "INTEGER DEFAULT 0"),
+    ("dim_all_users", "image_url", "VARCHAR(512)"),
+    ("dim_all_users", "is_admin", "BOOLEAN DEFAULT FALSE"),
+    ("job_runs", "details", "TEXT"),
+]
+
+
 def _run_schema_migrations():
-    try:
-        _add_column_if_missing(engine, "dim_all_albums", "image_url", "VARCHAR(512)")
-        _add_column_if_missing(engine, "dim_all_tracks", "image_url", "VARCHAR(512)")
-        _add_column_if_missing(engine, "dim_all_artists", "image_url", "VARCHAR(512)")
-        _add_column_if_missing(engine, "friend_invites", "to_user_id", "VARCHAR(255)")
-        _add_column_if_missing(engine, "dim_all_users", "token_invalidated_at", "TIMESTAMP")
-        _add_column_if_missing(engine, "dim_all_listens", "ms_played", "INTEGER")
-        _add_column_if_missing(engine, "dim_all_tracks", "enrich_attempts", "INTEGER DEFAULT 0")
-        _add_column_if_missing(engine, "dim_all_users", "image_url", "VARCHAR(512)")
-        _add_column_if_missing(engine, "dim_all_users", "is_admin", "BOOLEAN DEFAULT FALSE")
-        _add_column_if_missing(engine, "job_runs", "details", "TEXT")
-    except Exception as e:
-        logger.warning(f"Column migration skipped: {e}")
+    for table, column, col_type in _INCREMENTAL_COLUMNS:
+        try:
+            _add_column_if_missing(engine, table, column, col_type)
+        except Exception as e:
+            logger.warning(f"Column migration skipped ({table}.{column}): {e}")
 
 
 def _resume_orphaned_jobs():
