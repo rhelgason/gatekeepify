@@ -63,6 +63,22 @@ def _add_column_if_missing(engine, table, column, col_type):
         logger.info(f"Added column {table}.{column}")
 
 
+def _add_index_if_missing(engine, index_name, table, columns):
+    from sqlalchemy import inspect as sa_inspect, text as sa_text
+
+    # Validate identifiers to prevent SQL injection.
+    for ident in (index_name, table, *columns):
+        if not re.match(r"^[a-z_][a-z0-9_]*$", ident):
+            raise ValueError(f"Invalid identifier: {ident}")
+    insp = sa_inspect(engine)
+    existing = {ix["name"] for ix in insp.get_indexes(table)}
+    if index_name not in existing:
+        cols = ", ".join(columns)
+        with engine.begin() as conn:
+            conn.execute(sa_text(f"CREATE INDEX {index_name} ON {table} ({cols})"))
+        logger.info(f"Added index {index_name} on {table}({cols})")
+
+
 # Incremental columns added to existing tables after the initial schema.
 # This list is the runtime authority for schema drift because the deploy builds
 # the schema via Base.metadata.create_all (not `alembic upgrade`), and create_all
@@ -82,6 +98,13 @@ _INCREMENTAL_COLUMNS = [
     ("job_runs", "details", "TEXT"),
 ]
 
+# Indexes added to existing tables after the initial schema. Same rationale as
+# _INCREMENTAL_COLUMNS: create_all adds these to fresh DBs, but existing prod
+# tables need them backfilled at startup. Mirrored by an Alembic migration.
+_INCREMENTAL_INDEXES = [
+    ("ix_listens_user_ts", "dim_all_listens", ["user_id", "ts"]),
+]
+
 
 def _run_schema_migrations():
     for table, column, col_type in _INCREMENTAL_COLUMNS:
@@ -89,6 +112,11 @@ def _run_schema_migrations():
             _add_column_if_missing(engine, table, column, col_type)
         except Exception as e:
             logger.warning(f"Column migration skipped ({table}.{column}): {e}")
+    for index_name, table, columns in _INCREMENTAL_INDEXES:
+        try:
+            _add_index_if_missing(engine, index_name, table, columns)
+        except Exception as e:
+            logger.warning(f"Index migration skipped ({index_name}): {e}")
 
 
 def _resume_orphaned_jobs():

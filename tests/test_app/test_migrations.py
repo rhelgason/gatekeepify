@@ -38,6 +38,32 @@ def _model_schema() -> dict[str, set[str]]:
     return {t: {c["name"] for c in insp.get_columns(t)} for t in insp.get_table_names()}
 
 
+def test_add_index_if_missing_is_idempotent_and_validates():
+    import pytest
+
+    from app.main import _add_index_if_missing
+
+    engine = sa.create_engine("sqlite://")
+    with engine.begin() as conn:
+        conn.execute(sa.text("CREATE TABLE t (user_id TEXT, ts TEXT)"))
+
+    def _indexes() -> set[str]:
+        return {ix["name"] for ix in sa.inspect(engine).get_indexes("t")}
+
+    assert "ix_t_user_ts" not in _indexes()
+    _add_index_if_missing(engine, "ix_t_user_ts", "t", ["user_id", "ts"])
+    assert "ix_t_user_ts" in _indexes()
+    # Second call must be a no-op, not an error.
+    _add_index_if_missing(engine, "ix_t_user_ts", "t", ["user_id", "ts"])
+    assert "ix_t_user_ts" in _indexes()
+
+    # Identifier validation guards against injection.
+    with pytest.raises(ValueError):
+        _add_index_if_missing(engine, "bad name", "t", ["user_id"])
+    with pytest.raises(ValueError):
+        _add_index_if_missing(engine, "ix_ok", "t", ["user_id; DROP TABLE t"])
+
+
 def test_alembic_head_matches_model():
     with tempfile.TemporaryDirectory() as d:
         db_path = os.path.join(d, "alembic_check.db")
