@@ -1,7 +1,7 @@
 from datetime import date, datetime
 from typing import List, Optional, Set
 
-from sqlalchemy import func, select
+from sqlalchemy import and_, delete, func, or_, select
 from sqlalchemy.orm import Session
 
 from app.models import (
@@ -191,22 +191,19 @@ def retroactively_validate_export_listens(
     if not track_release_dates:
         return 0
 
-    removed = 0
-    for track_id, release_dt in track_release_dates.items():
-        invalid = (
-            db.execute(
-                select(Listen).where(
-                    Listen.track_id == track_id,
-                    Listen.source == ListenSource.export.value,
-                    Listen.ts < release_dt,
-                )
-            )
-            .scalars()
-            .all()
-        )
-        for listen in invalid:
-            db.delete(listen)
-            removed += 1
+    # Single bulk DELETE for all backdated export listens across every track,
+    # instead of a per-track SELECT followed by row-by-row deletes (which was
+    # slow when a large upload invalidated many listens).
+    conditions = [
+        and_(Listen.track_id == track_id, Listen.ts < release_dt)
+        for track_id, release_dt in track_release_dates.items()
+    ]
+    result = db.execute(
+        delete(Listen)
+        .where(Listen.source == ListenSource.export.value, or_(*conditions))
+        .execution_options(synchronize_session=False)
+    )
+    removed = result.rowcount or 0
 
     if removed:
         db.commit()
