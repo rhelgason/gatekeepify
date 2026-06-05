@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { generateShareCard, ShareCardData } from "@/lib/shareCard";
 import { tryNativeShare, downloadBlob, copyImageToClipboard } from "@/lib/share";
 import { trackEvent } from "@/lib/track";
@@ -48,6 +48,17 @@ export default function ShareButton({ cardData, surface, entityId, className = "
     setCopied(false);
   }
 
+  // Close the preview modal on Escape.
+  useEffect(() => {
+    if (!previewUrl) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") closeModal();
+    }
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [previewUrl]);
+
   const shareIcon = (
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
@@ -73,6 +84,7 @@ export default function ShareButton({ cardData, surface, entityId, className = "
           disabled={generating}
           className={`w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-gray-500 hover:text-white hover:bg-white/10 transition-all ${generating ? "animate-pulse" : ""} ${className}`}
           title="Share"
+          aria-label="Share"
         >
           {shareIcon}
         </button>
@@ -80,6 +92,9 @@ export default function ShareButton({ cardData, surface, entityId, className = "
 
       {previewUrl && blob && (
         <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Share card preview"
           className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4"
           onClick={closeModal}
         >

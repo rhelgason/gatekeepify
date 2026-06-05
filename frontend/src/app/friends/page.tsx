@@ -185,6 +185,7 @@ export default function Friends() {
             value={userQuery}
             onChange={(e) => setUserQuery(e.target.value)}
             placeholder="Search by name..."
+            aria-label="Search for friends by name"
             className="w-full bg-white/5 border border-white/10 rounded-full px-6 py-3 text-gray-100 placeholder-gray-600 focus:border-[var(--green)] focus:outline-none text-sm transition-all"
           />
           {searching && (
