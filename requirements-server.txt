@@ -21,3 +21,6 @@ psycopg2-binary>=2.9.0
 
 # Celery + Redis
 celery[redis]>=5.4.0
+
+# Observability (optional; init_sentry is a no-op unless SENTRY_DSN is set)
+sentry-sdk[fastapi]>=2.0.0

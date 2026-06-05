@@ -24,6 +24,9 @@ redis>=5.2.0
 # Spotify
 spotipy>=2.24.0
 
+# Observability (optional; init_sentry is a no-op unless SENTRY_DSN is set)
+sentry-sdk[fastapi]>=2.0.0
+
 # Testing
 pytest>=8.0.0
 httpx>=0.27.0

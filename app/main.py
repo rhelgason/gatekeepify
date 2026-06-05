@@ -20,6 +20,7 @@ from app.routers import auth, awards, backfill, discover, friends, gatekeep, sea
 from app.models import User
 from app.routers.auth import get_admin_user, get_current_user
 from app.services.audit import log_action
+from app.services.observability import init_sentry
 
 logging.basicConfig(
     level=logging.INFO,
@@ -29,6 +30,7 @@ logging.basicConfig(
 logger = logging.getLogger("gatekeepify.http")
 
 validate_settings()
+init_sentry()
 Base.metadata.create_all(bind=engine)
 
 import re
