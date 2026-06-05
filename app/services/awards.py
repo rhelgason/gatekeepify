@@ -165,18 +165,32 @@ def compute_obsessive(db: Session, group_ids: List[str]) -> List[dict]:
 
 
 def compute_basic(db: Session, group_ids: List[str]) -> List[dict]:
+    # Single query for every (user, artist, play_count) pair in the group; both
+    # each user's top-20 and their full artist set are derived in-memory. This
+    # replaces the previous O(N^2) pattern (a full per-friend query inside a
+    # per-user loop) with one query total.
+    rows = db.execute(
+        select(
+            Listen.user_id,
+            TrackArtist.artist_id,
+            func.count().label("cnt"),
+        )
+        .select_from(Listen)
+        .join(TrackArtist, Listen.track_id == TrackArtist.track_id)
+        .where(Listen.user_id.in_(group_ids))
+        .group_by(Listen.user_id, TrackArtist.artist_id)
+    ).all()
+
+    counts_by_user: dict = defaultdict(list)
+    user_all: dict = defaultdict(set)
+    for r in rows:
+        counts_by_user[r.user_id].append((r.artist_id, r.cnt))
+        user_all[r.user_id].add(r.artist_id)
+
     user_top: dict = {}
     for uid in group_ids:
-        stmt = (
-            select(TrackArtist.artist_id)
-            .select_from(Listen)
-            .join(TrackArtist, Listen.track_id == TrackArtist.track_id)
-            .where(Listen.user_id == uid)
-            .group_by(TrackArtist.artist_id)
-            .order_by(func.count().desc())
-            .limit(20)
-        )
-        user_top[uid] = set(r[0] for r in db.execute(stmt).all())
+        ranked = sorted(counts_by_user.get(uid, []), key=lambda x: (-x[1], x[0]))
+        user_top[uid] = set(a for a, _ in ranked[:20])
 
     results = []
     for uid in group_ids:
@@ -186,16 +200,7 @@ def compute_basic(db: Session, group_ids: List[str]) -> List[dict]:
         for fid in group_ids:
             if fid == uid or not user_top[fid]:
                 continue
-            all_friend_artists = set()
-            stmt = (
-                select(TrackArtist.artist_id)
-                .select_from(Listen)
-                .join(TrackArtist, Listen.track_id == TrackArtist.track_id)
-                .where(Listen.user_id == fid)
-                .group_by(TrackArtist.artist_id)
-            )
-            all_friend_artists = set(r[0] for r in db.execute(stmt).all())
-            overlap = len(user_top[uid] & all_friend_artists) / len(user_top[uid]) * 100
+            overlap = len(user_top[uid] & user_all[fid]) / len(user_top[uid]) * 100
             overlaps.append(overlap)
 
         if overlaps:
@@ -363,17 +368,19 @@ def compute_completionist(db: Session, group_ids: List[str]) -> List[dict]:
 
 
 def compute_genre_snob(db: Session, group_ids: List[str]) -> List[dict]:
-    user_genres: dict = {}
-    for uid in group_ids:
-        stmt = (
-            select(ArtistGenre.genre)
-            .select_from(Listen)
-            .join(TrackArtist, Listen.track_id == TrackArtist.track_id)
-            .join(ArtistGenre, TrackArtist.artist_id == ArtistGenre.artist_id)
-            .where(Listen.user_id == uid)
-            .group_by(ArtistGenre.genre)
-        )
-        user_genres[uid] = set(r[0] for r in db.execute(stmt).all())
+    # One query for every (user, genre) pair in the group instead of one query
+    # per user.
+    rows = db.execute(
+        select(Listen.user_id, ArtistGenre.genre)
+        .select_from(Listen)
+        .join(TrackArtist, Listen.track_id == TrackArtist.track_id)
+        .join(ArtistGenre, TrackArtist.artist_id == ArtistGenre.artist_id)
+        .where(Listen.user_id.in_(group_ids))
+        .group_by(Listen.user_id, ArtistGenre.genre)
+    ).all()
+    user_genres: dict = defaultdict(set)
+    for r in rows:
+        user_genres[r.user_id].add(r.genre)
 
     results = []
     for uid in group_ids:
