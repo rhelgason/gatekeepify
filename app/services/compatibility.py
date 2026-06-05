@@ -73,6 +73,46 @@ def compute_quick_score(db: Session, user_id_1: str, user_id_2: str) -> float:
     return len(a1 & a2) / len(a1 | a2) * 100
 
 
+def compute_quick_scores_batch(
+    db: Session, user_id: str, friend_ids: list[str], limit: int = 50
+) -> dict[str, float]:
+    """Quick Jaccard score of ``user_id`` against each friend.
+
+    Equivalent to calling compute_quick_score per friend, but computes the
+    requesting user's top artists once and pulls all friends' artist/play-count
+    rows in a single query (top-N applied per friend in memory) instead of
+    re-querying the user N times.
+    """
+    if not friend_ids:
+        return {}
+
+    mine = set(a["artist_id"] for a in get_user_artists(db, user_id, limit))
+    if not mine:
+        return {fid: 0.0 for fid in friend_ids}
+
+    rows = db.execute(
+        select(Listen.user_id, TrackArtist.artist_id, func.count().label("cnt"))
+        .select_from(Listen)
+        .join(TrackArtist, Listen.track_id == TrackArtist.track_id)
+        .where(Listen.user_id.in_(friend_ids))
+        .group_by(Listen.user_id, TrackArtist.artist_id)
+    ).all()
+
+    counts_by_friend: dict[str, list[tuple[str, int]]] = {}
+    for r in rows:
+        counts_by_friend.setdefault(r.user_id, []).append((r.artist_id, r.cnt))
+
+    scores: dict[str, float] = {}
+    for fid in friend_ids:
+        ranked = sorted(counts_by_friend.get(fid, []), key=lambda x: (-x[1], x[0]))
+        theirs = set(a for a, _ in ranked[:limit])
+        if not theirs:
+            scores[fid] = 0.0
+        else:
+            scores[fid] = len(mine & theirs) / len(mine | theirs) * 100
+    return scores
+
+
 def get_user_artists(db: Session, user_id: str, limit: int) -> list[dict]:
     stmt = (
         select(TrackArtist.artist_id, func.count().label("cnt"))

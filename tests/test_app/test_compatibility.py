@@ -13,6 +13,7 @@ from app.models import (
 )
 from app.services.compatibility import (
     compute_quick_score,
+    compute_quick_scores_batch,
     get_user_artists,
     get_user_genres,
 )
@@ -78,3 +79,22 @@ class TestComputeQuickScore:
 
         score = compute_quick_score(db, "no_ov_1", "no_ov_2")
         assert score == 0
+
+
+class TestComputeQuickScoresBatch:
+    def test_matches_per_friend_score(self, db, two_users):
+        # The batched helper must produce the same score as calling
+        # compute_quick_score for each friend individually.
+        batch = compute_quick_scores_batch(db, "compat_u1", ["compat_u2"])
+        single = compute_quick_score(db, "compat_u1", "compat_u2")
+        assert batch["compat_u2"] == pytest.approx(single)
+
+    def test_empty_friends_returns_empty(self, db, two_users):
+        assert compute_quick_scores_batch(db, "compat_u1", []) == {}
+
+    def test_friend_with_no_listens_scores_zero(self, db, two_users):
+        db.add(User(user_id="empty_friend", user_name="Empty"))
+        db.commit()
+        scores = compute_quick_scores_batch(db, "compat_u1", ["compat_u2", "empty_friend"])
+        assert scores["empty_friend"] == 0.0
+        assert scores["compat_u2"] > 0
