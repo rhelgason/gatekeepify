@@ -69,6 +69,7 @@ export default function Navbar() {
             <Link
               key={link.href}
               href={link.href}
+              aria-current={pathname.startsWith(link.href) ? "page" : undefined}
               className={`relative text-sm px-4 py-2 rounded-full transition-all duration-200 ${
                 pathname.startsWith(link.href)
                   ? "bg-white/10 text-white font-medium"
@@ -88,7 +89,10 @@ export default function Navbar() {
           <div className="relative ml-2" ref={menuRef}>
             <button
               onClick={() => setMenuOpen(!menuOpen)}
-              className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-xs font-bold text-gray-400 hover:text-white hover:bg-white/15 transition-all duration-200 overflow-hidden"
+              aria-label="Account menu"
+              aria-haspopup="true"
+              aria-expanded={menuOpen}
+              className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-xs font-bold text-gray-400 hover:text-white hover:bg-white/15 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--green)] transition-all duration-200 overflow-hidden"
             >
               {user?.image_url ? (
                 <img src={user.image_url} alt="" className="w-full h-full object-cover" />
@@ -149,9 +153,12 @@ export default function Navbar() {
         {/* Mobile hamburger */}
         <button
           onClick={() => setMobileOpen(!mobileOpen)}
+          aria-label={mobileOpen ? "Close menu" : "Open menu"}
+          aria-expanded={mobileOpen}
+          aria-controls="mobile-menu"
           className="md:hidden text-gray-400 hover:text-white p-2"
         >
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
             {mobileOpen ? (
               <path d="M6 6l12 12M6 18L18 6" />
             ) : (
@@ -163,7 +170,7 @@ export default function Navbar() {
 
       {/* Mobile menu */}
       {mobileOpen && (
-        <div className="md:hidden border-t border-white/5 bg-[#0a0a0a]/95 backdrop-blur-xl animate-slide-up">
+        <div id="mobile-menu" className="md:hidden border-t border-white/5 bg-[#0a0a0a]/95 backdrop-blur-xl animate-slide-up">
           <div className="px-4 py-3 space-y-1">
             {user && (
               <div className="px-4 py-2 mb-1">
@@ -176,6 +183,7 @@ export default function Navbar() {
                 key={link.href}
                 href={link.href}
                 onClick={() => setMobileOpen(false)}
+                aria-current={pathname.startsWith(link.href) ? "page" : undefined}
                 className={`flex items-center justify-between px-4 py-3 rounded-xl text-sm transition-all ${
                   pathname.startsWith(link.href)
                     ? "bg-white/10 text-white font-medium"

@@ -1,6 +1,10 @@
 from celery import Celery
 
 from app.config import settings
+from app.services.observability import init_sentry
+
+# Surface Celery task failures in Sentry (no-op unless SENTRY_DSN + sentry-sdk).
+init_sentry()
 
 celery_app = Celery(
     "gatekeepify",

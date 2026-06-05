@@ -57,6 +57,19 @@ class TestAuditLogService:
         assert entry.user_id is None
         assert entry.action == "system.startup"
 
+    def test_flush_failure_is_logged_not_swallowed(self, db, test_user, caplog):
+        """A failed audit flush must be logged (and Sentry-captured), never
+        silently dropped, and must not raise into the caller."""
+        from unittest.mock import patch
+
+        with patch.object(db, "flush", side_effect=RuntimeError("db gone")):
+            with caplog.at_level("ERROR"):
+                # Must not raise.
+                log_action(db, "test.flush_fail", user_id=test_user.user_id)
+        assert any(
+            "Failed to persist audit entry" in r.message for r in caplog.records
+        )
+
 
 class TestAuditFromEndpoints:
     def test_backfill_upload_creates_audit_entry(self, client, seeded_db, auth_headers):

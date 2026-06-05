@@ -19,7 +19,7 @@ from app.routers.auth import get_current_user
 from app.routers.friends import get_friend_ids
 from app.services.audit import log_action
 from app.services.activity import generate_activity_feed
-from app.services.compatibility import compute_quick_score, get_user_artists
+from app.services.compatibility import compute_quick_scores_batch, get_user_artists
 
 router = APIRouter(prefix="/discover", tags=["discover"])
 
@@ -37,10 +37,7 @@ def _get_my_artist_ids(db: Session, user_id: str) -> set:
 
 
 def _get_friend_compat_scores(db: Session, user_id: str, friend_ids: list) -> dict:
-    scores = {}
-    for fid in friend_ids:
-        scores[fid] = compute_quick_score(db, user_id, fid)
-    return scores
+    return compute_quick_scores_batch(db, user_id, friend_ids)
 
 
 @router.get("/friends-fresh-finds")

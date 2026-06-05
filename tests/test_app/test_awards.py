@@ -170,6 +170,16 @@ class TestComputeBasic:
         for r in results:
             assert 0 <= r["stat_value"] <= 100
 
+    def test_overlap_values_are_exact(self, award_db):
+        # alice/bob both have {art1,art2,art3}; charlie has {art1}.
+        # charlie overlaps 100% with each friend -> rank 1 at 100.0.
+        # alice/bob overlap 100% with each other, ~33.3% with charlie -> 66.7 avg.
+        by_user = {r["user_id"]: r for r in compute_basic(award_db, ["alice", "bob", "charlie"])}
+        assert by_user["charlie"]["stat_value"] == 100.0
+        assert by_user["charlie"]["rank"] == 1
+        assert by_user["alice"]["stat_value"] == 66.7
+        assert by_user["bob"]["stat_value"] == 66.7
+
 
 class TestComputeStreak:
     def test_finds_consecutive_days(self, award_db):

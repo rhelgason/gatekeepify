@@ -67,6 +67,7 @@ function GatekeepContent() {
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search for an artist..."
+          aria-label="Search for an artist"
           className="w-full bg-white/5 border border-white/10 rounded-full px-6 py-3 text-gray-100 placeholder-gray-600 focus:border-[var(--green)] focus:outline-none focus:ring-1 focus:ring-[var(--green)] transition-all"
         />
         {searching && (

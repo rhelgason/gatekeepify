@@ -17,6 +17,7 @@ from app.routers.auth import get_current_user
 from app.schemas import BackfillStatusResponse, BackfillUploadResponse
 from app.services.audit import log_action
 from app.services.ingestion import upsert_track_metadata
+from app.services.ratelimit import enforce_rate_limit
 from app.services.spotify import SpotifyService, decrypt_token
 
 logger = logging.getLogger("gatekeepify.backfill")
@@ -236,6 +237,7 @@ def upload_data_export(
     user: UserModel = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    enforce_rate_limit(db, "backfill.upload", user.user_id)
     if not file.filename or not file.filename.endswith(".zip"):
         log_action(
             db, "backfill.upload",

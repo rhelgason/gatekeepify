@@ -17,7 +17,7 @@ jobs:
           python-version: "3.10"
 
       - name: Install dependencies
-        run: pip install -r requirements-server.txt pytest httpx ruff
+        run: pip install -r requirements-server.txt pytest pytest-cov httpx ruff
 
       - name: Lint Python
         run: ruff check app/ tests/
@@ -25,16 +25,70 @@ jobs:
       - name: Run tests
         env:
           DATABASE_URL: "sqlite://"
-        run: python -m pytest tests/test_app/ -v
+        run: python -m pytest tests/test_app/ -v --cov=app --cov-report=term-missing --cov-report=xml
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-xml
+          path: coverage.xml
 
       - name: Verify server starts
         env:
           DATABASE_URL: "sqlite://"
         run: |
           uvicorn app.main:app --host 127.0.0.1 --port 8000 &
-          sleep 3
+          for i in $(seq 1 10); do
+            curl -sf http://127.0.0.1:8000/health && break
+            sleep 2
+          done
           curl -sf http://127.0.0.1:8000/health | python -m json.tool
           kill %1
+
+  migrations:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: gk
+          POSTGRES_PASSWORD: gk
+          POSTGRES_DB: gatekeepify
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Install dependencies
+        run: pip install -r requirements-server.txt
+
+      - name: Validate migrations against PostgreSQL
+        env:
+          DATABASE_URL: "postgresql://gk:gk@localhost:5432/gatekeepify"
+        run: |
+          python -m alembic upgrade head
+          python -m alembic downgrade -1
+          python -m alembic upgrade head
+
+  docker:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build Docker image
+        run: docker build -t gatekeepify:ci .
 
   frontend:
     runs-on: ubuntu-latest
@@ -58,6 +112,10 @@ jobs:
         working-directory: frontend
         run: npx tsc --noEmit
 
+      - name: Test
+        working-directory: frontend
+        run: npm test
+
       - name: Build
         working-directory: frontend
         run: npm run build
@@ -76,15 +134,22 @@ jobs:
         with:
           node-version: "20"
 
+      # pip-audit reports known CVEs in pinned deps. Left non-blocking because
+      # transitive vulns can appear with no fix available and need manual triage;
+      # promote to blocking (drop continue-on-error) once findings are clean.
       - name: Audit Python dependencies
         continue-on-error: true
         run: |
           pip install pip-audit
           pip-audit -r requirements-server.txt
 
+      # Blocks the build on CRITICAL advisories in production deps. Gated at
+      # critical (not high) because Next 14 currently carries high/moderate
+      # advisories whose only npm-recognized fix is a breaking upgrade to Next 16,
+      # tracked separately. The full report is still printed for visibility.
       - name: Audit Node dependencies
-        continue-on-error: true
         working-directory: frontend
         run: |
           npm install
-          npm audit --omit=dev
+          npm audit --omit=dev || true
+          npm audit --omit=dev --audit-level=critical

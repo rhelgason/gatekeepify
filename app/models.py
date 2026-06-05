@@ -124,6 +124,10 @@ class Listen(Base):
     __table_args__ = (
         Index("ix_listens_user_track", "user_id", "track_id"),
         Index("ix_listens_track_ts", "track_id", "ts"),
+        # Covers the very common "this user's listens over a time window" pattern
+        # (top-tracks/artists/genres with a period filter). The user_track index
+        # can't serve the ts bound since track_id sits between user_id and ts.
+        Index("ix_listens_user_ts", "user_id", "ts"),
     )
 
 

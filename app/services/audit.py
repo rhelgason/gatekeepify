@@ -31,8 +31,11 @@ def log_action(
     db.add(entry)
     try:
         db.flush()
-    except Exception:
-        pass
+    except Exception as e:
+        # Audit logging is best-effort and must never break the request, but a
+        # failure here means we're losing the audit trail — surface it (and let
+        # Sentry capture it) instead of swallowing silently.
+        logger.error(f"Failed to persist audit entry for action '{action}': {e!r}")
 
     log_msg = f"[{status}] {action}"
     if user_id:

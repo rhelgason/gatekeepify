@@ -20,6 +20,7 @@ from app.routers import auth, awards, backfill, discover, friends, gatekeep, sea
 from app.models import User
 from app.routers.auth import get_admin_user, get_current_user
 from app.services.audit import log_action
+from app.services.observability import init_sentry
 
 logging.basicConfig(
     level=logging.INFO,
@@ -29,6 +30,7 @@ logging.basicConfig(
 logger = logging.getLogger("gatekeepify.http")
 
 validate_settings()
+init_sentry()
 Base.metadata.create_all(bind=engine)
 
 import re
@@ -61,20 +63,60 @@ def _add_column_if_missing(engine, table, column, col_type):
         logger.info(f"Added column {table}.{column}")
 
 
+def _add_index_if_missing(engine, index_name, table, columns):
+    from sqlalchemy import inspect as sa_inspect, text as sa_text
+
+    # Validate identifiers to prevent SQL injection.
+    for ident in (index_name, table, *columns):
+        if not re.match(r"^[a-z_][a-z0-9_]*$", ident):
+            raise ValueError(f"Invalid identifier: {ident}")
+    insp = sa_inspect(engine)
+    existing = {ix["name"] for ix in insp.get_indexes(table)}
+    if index_name not in existing:
+        cols = ", ".join(columns)
+        with engine.begin() as conn:
+            conn.execute(sa_text(f"CREATE INDEX {index_name} ON {table} ({cols})"))
+        logger.info(f"Added index {index_name} on {table}({cols})")
+
+
+# Incremental columns added to existing tables after the initial schema.
+# This list is the runtime authority for schema drift because the deploy builds
+# the schema via Base.metadata.create_all (not `alembic upgrade`), and create_all
+# does not alter existing tables. Alembic migration 006 mirrors this same set so
+# `alembic upgrade head` produces an equivalent schema (verified in CI). Keep the
+# two in sync when adding a column to an existing table.
+_INCREMENTAL_COLUMNS = [
+    ("dim_all_albums", "image_url", "VARCHAR(512)"),
+    ("dim_all_tracks", "image_url", "VARCHAR(512)"),
+    ("dim_all_artists", "image_url", "VARCHAR(512)"),
+    ("friend_invites", "to_user_id", "VARCHAR(255)"),
+    ("dim_all_users", "token_invalidated_at", "TIMESTAMP"),
+    ("dim_all_listens", "ms_played", "INTEGER"),
+    ("dim_all_tracks", "enrich_attempts", "INTEGER DEFAULT 0"),
+    ("dim_all_users", "image_url", "VARCHAR(512)"),
+    ("dim_all_users", "is_admin", "BOOLEAN DEFAULT FALSE"),
+    ("job_runs", "details", "TEXT"),
+]
+
+# Indexes added to existing tables after the initial schema. Same rationale as
+# _INCREMENTAL_COLUMNS: create_all adds these to fresh DBs, but existing prod
+# tables need them backfilled at startup. Mirrored by an Alembic migration.
+_INCREMENTAL_INDEXES = [
+    ("ix_listens_user_ts", "dim_all_listens", ["user_id", "ts"]),
+]
+
+
 def _run_schema_migrations():
-    try:
-        _add_column_if_missing(engine, "dim_all_albums", "image_url", "VARCHAR(512)")
-        _add_column_if_missing(engine, "dim_all_tracks", "image_url", "VARCHAR(512)")
-        _add_column_if_missing(engine, "dim_all_artists", "image_url", "VARCHAR(512)")
-        _add_column_if_missing(engine, "friend_invites", "to_user_id", "VARCHAR(255)")
-        _add_column_if_missing(engine, "dim_all_users", "token_invalidated_at", "TIMESTAMP")
-        _add_column_if_missing(engine, "dim_all_listens", "ms_played", "INTEGER")
-        _add_column_if_missing(engine, "dim_all_tracks", "enrich_attempts", "INTEGER DEFAULT 0")
-        _add_column_if_missing(engine, "dim_all_users", "image_url", "VARCHAR(512)")
-        _add_column_if_missing(engine, "dim_all_users", "is_admin", "BOOLEAN DEFAULT FALSE")
-        _add_column_if_missing(engine, "job_runs", "details", "TEXT")
-    except Exception as e:
-        logger.warning(f"Column migration skipped: {e}")
+    for table, column, col_type in _INCREMENTAL_COLUMNS:
+        try:
+            _add_column_if_missing(engine, table, column, col_type)
+        except Exception as e:
+            logger.warning(f"Column migration skipped ({table}.{column}): {e}")
+    for index_name, table, columns in _INCREMENTAL_INDEXES:
+        try:
+            _add_index_if_missing(engine, index_name, table, columns)
+        except Exception as e:
+            logger.warning(f"Index migration skipped ({index_name}): {e}")
 
 
 def _resume_orphaned_jobs():
@@ -168,10 +210,11 @@ def startup_event():
     _resume_orphaned_jobs()
 
 
-def _error_response(status_code: int, error: str, detail: str) -> JSONResponse:
+def _error_response(status_code: int, error: str, detail: str, headers: dict | None = None) -> JSONResponse:
     return JSONResponse(
         status_code=status_code,
         content={"error": error, "detail": detail},
+        headers=headers,
     )
 
 
@@ -188,7 +231,7 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 
 @app.exception_handler(HTTPException)
 async def http_exception_handler(request: Request, exc: HTTPException):
-    return _error_response(exc.status_code, "http_error", str(exc.detail))
+    return _error_response(exc.status_code, "http_error", str(exc.detail), headers=exc.headers)
 
 
 @app.exception_handler(OperationalError)
