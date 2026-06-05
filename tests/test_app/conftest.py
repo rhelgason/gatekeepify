@@ -29,6 +29,15 @@ TEST_ENGINE = create_engine(
 TestSession = sessionmaker(bind=TEST_ENGINE, autoflush=False)
 
 
+@pytest.fixture(autouse=True)
+def _reset_rate_limiter():
+    """Clear in-memory rate-limit state before each test to avoid cross-test bleed."""
+    from app.services.ratelimit import reset_limiter
+
+    reset_limiter()
+    yield
+
+
 @pytest.fixture()
 def db():
     Base.metadata.create_all(bind=TEST_ENGINE)

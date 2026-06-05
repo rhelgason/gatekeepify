@@ -14,6 +14,7 @@ from sqlalchemy import func
 
 from app.schemas import FriendResponse, InviteAcceptResponse, InviteResponse
 from app.services.audit import log_action
+from app.services.ratelimit import enforce_rate_limit
 
 router = APIRouter(prefix="/friends", tags=["friends"])
 
@@ -89,6 +90,7 @@ def accept_invite(
     user: UserModel = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    enforce_rate_limit(db, "friends.accept", user.user_id)
     invite = db.query(FriendInvite).filter(FriendInvite.invite_code == invite_code).first()
     if not invite:
         log_action(
@@ -197,6 +199,7 @@ def search_users(
     user: UserModel = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    enforce_rate_limit(db, "friends.search", user.user_id)
     existing_friend_ids = set(get_friend_ids(db, user.user_id))
     words = q.strip().split()
     word_filters = [User.user_name.ilike(f"%{_escape_like(w)}%") for w in words]

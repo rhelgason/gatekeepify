@@ -168,10 +168,11 @@ def startup_event():
     _resume_orphaned_jobs()
 
 
-def _error_response(status_code: int, error: str, detail: str) -> JSONResponse:
+def _error_response(status_code: int, error: str, detail: str, headers: dict | None = None) -> JSONResponse:
     return JSONResponse(
         status_code=status_code,
         content={"error": error, "detail": detail},
+        headers=headers,
     )
 
 
@@ -188,7 +189,7 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 
 @app.exception_handler(HTTPException)
 async def http_exception_handler(request: Request, exc: HTTPException):
-    return _error_response(exc.status_code, "http_error", str(exc.detail))
+    return _error_response(exc.status_code, "http_error", str(exc.detail), headers=exc.headers)
 
 
 @app.exception_handler(OperationalError)

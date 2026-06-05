@@ -19,6 +19,8 @@ class Settings(BaseSettings):
     lastfm_api_key: str = ""
     poll_interval_seconds: int = 900
     backfill_interval_seconds: int = 120
+    rate_limit_enabled: bool = True
+    sentry_dsn: str = ""
 
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 

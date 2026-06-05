@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import RedirectResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import jwt
@@ -14,6 +14,7 @@ from app.models import User
 from app.schemas import AuthResponse, AuthUrlResponse, UserResponse
 from app.services.audit import log_action
 from app.services.ingestion import upsert_from_recent_listens
+from app.services.ratelimit import client_ip, enforce_rate_limit
 from app.services.spotify import SpotifyService, encrypt_token
 
 logger = logging.getLogger("gatekeepify.auth")
@@ -66,10 +67,16 @@ def get_admin_user(user: User = Depends(get_current_user)) -> User:
 
 
 @router.get("/login", response_model=AuthUrlResponse)
-def login(return_url: str = Query(None), invite_code: str = Query(None)):
+def login(
+    request: Request,
+    return_url: str = Query(None),
+    invite_code: str = Query(None),
+    db: Session = Depends(get_db),
+):
     import base64
     import json as _json
 
+    enforce_rate_limit(db, "auth.login", client_ip(request))
     service = SpotifyService()
     auth_url = service.get_auth_url()
     if return_url or invite_code:
@@ -84,7 +91,13 @@ def login(return_url: str = Query(None), invite_code: str = Query(None)):
 
 
 @router.get("/callback", response_model=AuthResponse)
-def callback(code: str = Query(...), state: str = Query(None), db: Session = Depends(get_db)):
+def callback(
+    request: Request,
+    code: str = Query(...),
+    state: str = Query(None),
+    db: Session = Depends(get_db),
+):
+    enforce_rate_limit(db, "auth.callback", client_ip(request))
     service = SpotifyService()
 
     try:

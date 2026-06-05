@@ -21,6 +21,7 @@ from app.routers.auth import get_current_user
 from app.schemas import ArtistDetailResponse, ArtistSearchResult, TrackDetailResponse, TrackSearchResult
 from app.services.audit import log_action
 from app.services.ingestion import _get_best_image
+from app.services.ratelimit import enforce_rate_limit
 from app.services.spotify import SpotifyService, decrypt_token
 
 logger = logging.getLogger("gatekeepify.search")
@@ -41,6 +42,7 @@ def search_artists(
     limit: int = 10,
     db: Session = Depends(get_db),
 ):
+    enforce_rate_limit(db, "search", user.user_id)
     clamped = max(1, min(limit, MAX_RESULTS))
     words = q.strip().split()
 
@@ -100,6 +102,7 @@ def search_tracks(
     limit: int = 10,
     db: Session = Depends(get_db),
 ):
+    enforce_rate_limit(db, "search", user.user_id)
     clamped = max(1, min(limit, MAX_RESULTS))
     pattern = f"%{_escape_like(q)}%"
 
@@ -251,6 +254,7 @@ def resolve_artist(
 ):
     from fastapi import HTTPException
 
+    enforce_rate_limit(db, "search", user.user_id)
     existing = db.query(Artist).filter(
         func.lower(Artist.artist_name) == name.lower()
     ).first()
@@ -313,6 +317,7 @@ def search_spotify_artists(
     user: UserModel = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    enforce_rate_limit(db, "search", user.user_id)
     user_obj = db.query(User).filter(User.user_id == user.user_id).first()
     if not user_obj or not user_obj.spotify_refresh_token:
         return []
