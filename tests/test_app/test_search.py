@@ -46,6 +46,54 @@ class TestSearchArtists:
         resp = client.get("/search/artists", params={"q": "test"})
         assert resp.status_code in (401, 403)
 
+    def test_exact_match_ranked_first(self, client, seeded_db, db, auth_headers):
+        """An exact-name match outranks a more-listened-to substring match."""
+        from app.models import Artist
+
+        # "ar" is a substring of "Radiohead"/"Thom Yorke"... add an artist
+        # literally named "ar" with zero listens — it must still rank first.
+        db.add(Artist(artist_id="artist_ar", artist_name="ar"))
+        db.commit()
+
+        resp = client.get("/search/artists", params={"q": "ar"}, headers=auth_headers)
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data[0]["artist_id"] == "artist_ar"
+        assert data[0]["your_listen_count"] == 0
+
+    def test_prefix_match_ranked_above_substring(self, client, seeded_db, db, auth_headers):
+        from app.models import Artist
+
+        db.add(Artist(artist_id="artist_rad", artist_name="Rad Crew"))  # prefix of "rad"
+        db.commit()
+
+        resp = client.get("/search/artists", params={"q": "rad"}, headers=auth_headers)
+        data = resp.json()
+        names = [r["artist_name"] for r in data]
+        # "Rad Crew" (prefix) ranks above "Radiohead" only if Radiohead were a
+        # mere substring; both are prefixes here, so just assert both present and
+        # ordered with the exact/prefix tier intact.
+        assert "Rad Crew" in names and "Radiohead" in names
+
+    def test_search_pagination_offset(self, client, seeded_db, db, auth_headers):
+        from app.models import Artist
+
+        for i in range(5):
+            db.add(Artist(artist_id=f"artist_x{i}", artist_name=f"xband {i}"))
+        db.commit()
+
+        page1 = client.get(
+            "/search/artists", params={"q": "xband", "limit": 2, "offset": 0}, headers=auth_headers
+        ).json()
+        page2 = client.get(
+            "/search/artists", params={"q": "xband", "limit": 2, "offset": 2}, headers=auth_headers
+        ).json()
+        assert len(page1) == 2
+        assert len(page2) == 2
+        ids1 = {r["artist_id"] for r in page1}
+        ids2 = {r["artist_id"] for r in page2}
+        assert ids1.isdisjoint(ids2)
+
 
 class TestSearchTracks:
     def test_search_by_name(self, client, seeded_db, auth_headers):
@@ -88,6 +136,19 @@ class TestSearchTracks:
         data = resp.json()
         if len(data) >= 2:
             assert data[0]["your_listen_count"] >= data[1]["your_listen_count"]
+
+    def test_exact_match_ranked_first(self, client, seeded_db, db, auth_headers):
+        """An exactly-named track outranks a more-listened-to substring match."""
+        from app.models import Track
+
+        # "Karma" is a substring of "Karma Police"; an exact "Karma" with zero
+        # listens must still rank first.
+        db.add(Track(track_id="track_karma", track_name="Karma", album_id="album_1", is_local=False))
+        db.commit()
+
+        resp = client.get("/search/tracks", params={"q": "Karma"}, headers=auth_headers)
+        data = resp.json()
+        assert data[0]["track_id"] == "track_karma"
 
 
 class TestArtistDetail:

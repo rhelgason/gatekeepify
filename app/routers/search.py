@@ -1,7 +1,7 @@
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import func, select
+from sqlalchemy import case, func, select
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -35,22 +35,42 @@ def _escape_like(q: str) -> str:
     return q.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
 
 
+def _relevance(column, q: str):
+    """Rank exact matches (0) above prefix matches (1) above substring matches (2).
+
+    Keeps an exactly-named artist/track at the top even when a more-listened-to
+    artist merely contains the query as a substring (e.g. searching "ear" should
+    surface the artist literally named "ear" before "Bears" or "Years & Years").
+    """
+    q_norm = q.strip().lower()
+    prefix = _escape_like(q_norm) + "%"
+    return case(
+        (func.lower(column) == q_norm, 0),
+        (func.lower(column).like(prefix, escape="\\"), 1),
+        else_=2,
+    )
+
+
 @router.get("/artists", response_model=List[ArtistSearchResult])
 def search_artists(
     q: str = Query(..., min_length=1),
     user: UserModel = Depends(get_current_user),
     limit: int = 10,
+    offset: int = 0,
     db: Session = Depends(get_db),
 ):
     enforce_rate_limit(db, "search", user.user_id)
     clamped = max(1, min(limit, MAX_RESULTS))
+    offset = max(0, offset)
     words = q.strip().split()
+    relevance = _relevance(Artist.artist_name, q).label("relevance")
 
     stmt = (
         select(
             Artist.artist_id,
             Artist.artist_name,
             Artist.image_url,
+            relevance,
             func.count(Listen.track_id).label("your_listen_count"),
         )
         .outerjoin(TrackArtist, Artist.artist_id == TrackArtist.artist_id)
@@ -61,8 +81,14 @@ def search_artists(
         )
         .where(*[Artist.artist_name.ilike(f"%{_escape_like(w)}%") for w in words])
         .group_by(Artist.artist_id, Artist.artist_name)
-        .order_by(func.count(Listen.track_id).desc(), Artist.artist_name.asc())
+        .order_by(
+            relevance.asc(),
+            func.count(Listen.track_id).desc(),
+            Artist.artist_name.asc(),
+            Artist.artist_id.asc(),
+        )
         .limit(clamped)
+        .offset(offset)
     )
     rows = db.execute(stmt).all()
 
@@ -105,6 +131,7 @@ def search_tracks(
     enforce_rate_limit(db, "search", user.user_id)
     clamped = max(1, min(limit, MAX_RESULTS))
     pattern = f"%{_escape_like(q)}%"
+    relevance = _relevance(Track.track_name, q).label("relevance")
 
     stmt = (
         select(
@@ -113,6 +140,7 @@ def search_tracks(
             Album.album_name,
             Track.image_url,
             Track.duration_ms,
+            relevance,
             func.count(Listen.track_id).label("your_listen_count"),
         )
         .outerjoin(Album, Track.album_id == Album.album_id)
@@ -128,7 +156,12 @@ def search_tracks(
             Album.album_name,
             Track.duration_ms,
         )
-        .order_by(func.count(Listen.track_id).desc(), Track.track_name.asc())
+        .order_by(
+            relevance.asc(),
+            func.count(Listen.track_id).desc(),
+            Track.track_name.asc(),
+            Track.track_id.asc(),
+        )
         .limit(clamped)
     )
     rows = db.execute(stmt).all()

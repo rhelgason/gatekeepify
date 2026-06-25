@@ -166,7 +166,8 @@ export const api = {
   getCompatibility: (friendId: string) =>
     cachedRequest<any>(`/friends/compatibility/${friendId}`),
 
-  searchArtists: (q: string) => request<any[]>(`/search/artists?q=${encodeURIComponent(q)}`),
+  searchArtists: (q: string, limit = 10, offset = 0) =>
+    request<any[]>(`/search/artists?q=${encodeURIComponent(q)}&limit=${limit}&offset=${offset}`),
 
   searchSpotifyArtists: (q: string) => request<any[]>(`/search/spotify-artists?q=${encodeURIComponent(q)}`),
 

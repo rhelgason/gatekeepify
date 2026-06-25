@@ -13,10 +13,15 @@ function GatekeepContent() {
   const preselected = searchParams.get("artist");
   const prefillQuery = searchParams.get("q");
 
+  const PAGE_SIZE = 10;
+
   const [query, setQuery] = useState(prefillQuery || "");
   const [results, setResults] = useState<any[]>([]);
   const [spotifyResults, setSpotifyResults] = useState<any[]>([]);
   const [searching, setSearching] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(false);
+  const [activeQuery, setActiveQuery] = useState("");
 
   useEffect(() => {
     if (!isLoggedIn()) router.replace("/");
@@ -28,20 +33,44 @@ function GatekeepContent() {
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  const searchSpotify = useCallback(async (searchQuery: string, knownIds: Set<string>) => {
+    const spotify = await api.searchSpotifyArtists(searchQuery).catch(() => []);
+    setSpotifyResults(spotify.filter((a: any) => !knownIds.has(a.artist_id)));
+  }, []);
+
   const doSearch = useCallback(async (searchQuery: string) => {
     if (!searchQuery) return;
     setSearching(true);
     setSpotifyResults([]);
+    setActiveQuery(searchQuery);
     trackEvent("gatekeep_search", { query: searchQuery });
-    const data = await api.searchArtists(searchQuery);
+    const data = await api.searchArtists(searchQuery, PAGE_SIZE, 0);
     setResults(data);
+    setHasMore(data.length === PAGE_SIZE);
     if (data.length < 3) {
-      const spotify = await api.searchSpotifyArtists(searchQuery).catch(() => []);
-      const existingIds = new Set(data.map((a: any) => a.artist_id));
-      setSpotifyResults(spotify.filter((a: any) => !existingIds.has(a.artist_id)));
+      await searchSpotify(searchQuery, new Set(data.map((a: any) => a.artist_id)));
     }
     setSearching(false);
-  }, []);
+  }, [searchSpotify]);
+
+  const loadMore = useCallback(async () => {
+    if (!activeQuery || loadingMore) return;
+    setLoadingMore(true);
+    trackEvent("gatekeep_search_load_more", { query: activeQuery, offset: results.length });
+    const more = await api.searchArtists(activeQuery, PAGE_SIZE, results.length).catch(() => []);
+    setResults((prev) => {
+      const existing = new Set(prev.map((a: any) => a.artist_id));
+      return [...prev, ...more.filter((a: any) => !existing.has(a.artist_id))];
+    });
+    setHasMore(more.length === PAGE_SIZE);
+    setLoadingMore(false);
+  }, [activeQuery, loadingMore, results.length]);
+
+  const searchSpotifyManually = useCallback(async () => {
+    if (!activeQuery) return;
+    trackEvent("gatekeep_search_spotify", { query: activeQuery });
+    await searchSpotify(activeQuery, new Set(results.map((a: any) => a.artist_id)));
+  }, [activeQuery, results, searchSpotify]);
 
   useEffect(() => {
     if (prefillQuery) doSearch(prefillQuery);
@@ -107,7 +136,26 @@ function GatekeepContent() {
               )}
             </Link>
           ))}
+
+          {hasMore && (
+            <button
+              onClick={loadMore}
+              disabled={loadingMore}
+              className="card-hover w-full text-center px-4 py-3 text-sm font-medium text-gray-400 hover:text-gray-100 disabled:opacity-50"
+            >
+              {loadingMore ? "Loading..." : "Load more results"}
+            </button>
+          )}
         </div>
+      )}
+
+      {results.length > 0 && spotifyResults.length === 0 && !searching && (
+        <button
+          onClick={searchSpotifyManually}
+          className="mt-4 text-sm text-gray-500 hover:text-[var(--green)] transition-colors"
+        >
+          Can&apos;t find who you&apos;re looking for? Search Spotify &rarr;
+        </button>
       )}
 
       {spotifyResults.length > 0 && (
