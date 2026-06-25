@@ -54,3 +54,8 @@ coverage.xml
 
 # DS Store
 **/.DS_Store
+
+# Spotify data exports (user-uploaded test data — never commit)
+*.zip
+my_spotify_data*
+Spotify Account Data/
