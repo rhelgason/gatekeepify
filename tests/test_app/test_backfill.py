@@ -5,7 +5,11 @@ from unittest.mock import patch, MagicMock
 from datetime import date
 
 from app.models import Album, Listen, ListenSource, Track
-from app.routers.backfill import _extract_json_from_zip, _validate_and_process_listens
+from app.routers.backfill import (
+    _extract_json_from_zip,
+    _is_basic_export,
+    _validate_and_process_listens,
+)
 
 
 def _make_zip(files: dict[str, list[dict]]) -> io.BytesIO:
@@ -63,6 +67,49 @@ class TestUploadEndpoint:
             files={"file": ("data.txt", b"not a zip", "text/plain")},
         )
         assert resp.status_code == 400
+
+    def test_upload_rejects_basic_export_with_guidance(self, client, seeded_db, auth_headers):
+        # The basic "Account data" export: StreamingHistory_music_*.json with
+        # endTime/artistName/trackName/msPlayed (no spotify_track_uri).
+        basic = [{
+            "endTime": "2025-05-25 22:00",
+            "artistName": "Klangspiel",
+            "trackName": "Brown Noise Focus Flow",
+            "msPlayed": 59814,
+        }]
+        zip_buf = _make_zip({
+            "Spotify Account Data/StreamingHistory_music_0.json": basic,
+            "Spotify Account Data/YourLibrary.json": [{"x": 1}],
+        })
+        resp = client.post(
+            "/backfill/upload",
+            headers=auth_headers,
+            files={"file": ("my_spotify_data.zip", zip_buf, "application/zip")},
+        )
+        assert resp.status_code == 400
+        assert "Extended streaming history" in resp.json()["detail"]
+
+
+class TestBasicExportDetection:
+    def test_detects_basic_streaming_history_file(self):
+        content = _make_zip_bytes({
+            "Spotify Account Data/StreamingHistory_music_0.json": [{"a": 1}],
+        })
+        assert _is_basic_export(content) is True
+
+    def test_detects_basic_export_marker_file(self):
+        content = _make_zip_bytes({"Spotify Account Data/YourLibrary.json": [{"a": 1}]})
+        assert _is_basic_export(content) is True
+
+    def test_extended_export_not_flagged_as_basic(self):
+        content = _make_zip_bytes({
+            "Streaming_History_Audio_2024_0.json": [_make_listen_json()],
+        })
+        assert _is_basic_export(content) is False
+
+    def test_unrelated_zip_not_flagged_as_basic(self):
+        content = _make_zip_bytes({"random_file.json": [{"a": 1}]})
+        assert _is_basic_export(content) is False
 
 
 class TestExtractJson:

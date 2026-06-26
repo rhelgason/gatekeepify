@@ -27,6 +27,19 @@ router = APIRouter(prefix="/backfill", tags=["backfill"])
 BACKFILL_DATETIME_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
 FILE_PREFIX = "Streaming_History_Audio"
 FILE_SUFFIX = ".json"
+# Marker files that only appear in the basic "Account data" export (not the
+# "Extended streaming history" export we actually ingest). The basic export's
+# streaming files are named e.g. "StreamingHistory_music_0.json" (no underscore
+# after "Streaming") and lack spotify_track_uri, so they can't be ingested.
+BASIC_EXPORT_PREFIX = "StreamingHistory"
+BASIC_EXPORT_MARKERS = ("YourLibrary.json", "Marquee.json", "Inferences.json")
+BASIC_EXPORT_MESSAGE = (
+    "This looks like the basic \"Account data\" export, which only covers the "
+    "last ~12 months and doesn't include the data we need. Please request the "
+    "\"Extended streaming history\" export instead (Spotify → Account → "
+    "Privacy settings → Download your data → Extended streaming history). "
+    "It can take up to 30 days to arrive but contains your full listening history."
+)
 MIN_PLAY_TIME_MS = 30000
 TRACK_URI_PREFIX = "spotify:track:"
 MAX_UPLOAD_BYTES = 100 * 1024 * 1024  # 100 MB
@@ -80,6 +93,27 @@ def _extract_json_from_zip(content: bytes) -> list[dict]:
                 except json.JSONDecodeError:
                     continue
     return all_listens
+
+
+def _is_basic_export(content: bytes) -> bool:
+    """Detect the basic "Account data" export, which we can't ingest.
+
+    Returns True if the ZIP contains basic-export streaming files
+    (StreamingHistory_*.json) or other basic-export-only marker files but
+    no "Extended streaming history" audio files.
+    """
+    try:
+        zf = zipfile.ZipFile(io.BytesIO(content))
+    except zipfile.BadZipFile:
+        return False
+
+    for name in zf.namelist():
+        basename = name.split("/")[-1]
+        if basename.startswith(BASIC_EXPORT_PREFIX) and basename.endswith(FILE_SUFFIX):
+            return True
+        if basename in BASIC_EXPORT_MARKERS:
+            return True
+    return False
 
 
 def _validate_and_process_listens(
@@ -266,6 +300,10 @@ def upload_data_export(
 
     raw_listens = _extract_json_from_zip(content)
     if not raw_listens:
+        if _is_basic_export(content):
+            log_action(db, "backfill.upload", user_id=user.user_id, status="error",
+                       details={"reason": "basic_export_uploaded"})
+            raise HTTPException(status_code=400, detail=BASIC_EXPORT_MESSAGE)
         log_action(db, "backfill.upload", user_id=user.user_id, status="error",
                    details={"reason": "no_streaming_history_files"})
         raise HTTPException(status_code=400, detail="No streaming history files found in the ZIP")
