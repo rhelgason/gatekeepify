@@ -1,96 +1,100 @@
 # Gatekeepify
 
-**Prove you listened first.**
+**Prove you listened first.** 🎧
 
-Gatekeepify tracks your Spotify listening history and lets you competitively compare with friends. Settle the debate with timestamps, not opinions.
+You've been saying it for years: *you* were into that artist before everyone else. Gatekeepify gives you the receipts. Track your Spotify listening history, stack it against your friends', and settle the debate with timestamps instead of vibes.
 
-## What It Does
+> "I've listened to Radiohead 847 times since 2017. You started in 2021. Sit down."
 
-- **Track listening history** automatically via Spotify API polling every 15 minutes
-- **Upload your full history** from Spotify's data export for years of data
-- **Compare with friends** -- see who discovered an artist first, with verified vs. self-reported badges
-- **12 competitive awards** -- Crown, Archaeologist, Patient Zero, The Obsessive, Night Owl, Genre Snob, and more
-- **Head-to-head matchups** -- compare all metrics against any friend
-- **Discover new music** -- see what friends are listening to, find artists you're late on, track rising artists
-- **Predicted Spotify Wrapped** -- your year-in-review, available any time with historical data
-- **Artist deep-dives** -- listening timeline charts, Last.fm global stats, gatekeep comparison, challenge cards
-- **Data integrity** -- 5-layer fraud detection including release date validation, anomaly detection, and trust scores
+<!-- SCREENSHOT: Landing page / hero shot — the "Prove you listened first" sign-in screen -->
 
-## Tech Stack
+---
 
-**Backend:** Python, FastAPI, SQLAlchemy, PostgreSQL, Celery + Redis, spotipy
+## Why Gatekeepify?
 
-**Frontend:** Next.js 14, TypeScript, Tailwind CSS
+Because being right isn't enough — you need to *prove* it. Gatekeepify turns your listening history into a competitive sport, backed by real timestamped data, and lets you flex on your friends with charts, trophies, and shareable brag cards.
 
-**Deployment:** Railway (backend + PostgreSQL + Redis), Vercel (frontend)
+It's performative. It's a little bit annoying. That's the whole point.
 
-**CI:** GitHub Actions runs 199 tests on every push
-
-## Architecture
-
-```
-Frontend (Vercel)          Backend (Railway)
-Next.js + Tailwind    -->  FastAPI + SQLAlchemy
-                           |
-                     PostgreSQL (Railway)
-                           |
-                     Celery Worker + Beat
-                           |
-                     Redis (Railway)
-                           |
-                     Spotify API + Last.fm API
-```
-
-Three processes run in a single Railway container via supervisord:
-- **Web server** (uvicorn) -- serves the API
-- **Celery Worker** -- executes background tasks
-- **Celery Beat** -- schedules periodic polling and award computation
+---
 
 ## Features
 
-### For Users
-- Sign in with Spotify, start tracking immediately
-- Upload Spotify data export for full history
-- Dashboard with top tracks, artists, genres by time period
-- Dedicated artist pages with cover art, listening timeline, and gatekeep comparison
-- Wrapped predictions for any year
-- Trophy case with 12 award categories
-- Head-to-head comparisons with friends
-- Music discovery feed (friends' finds, trending, "you're late on...")
-- Invite friends via shareable links
+### 🏆 Gatekeep your friends
+Search any artist or track and instantly see who in your friend group listened first — and how badly you're beating (or losing to) them. Every listen is tagged **verified** or **self-reported**, so there's no faking your way to the top of the leaderboard.
 
-### For Data Integrity
-- Listen source tagging (API-verified vs. self-reported export data)
-- Release date validation (reject listens before a track existed)
-- Retroactive validation when track metadata is backfilled
-- Statistical anomaly detection (rapid-fire, bot-like spacing, single-day dumps, backdated clusters)
-- Trust scores per user (0-100)
+<!-- SCREENSHOT: Gatekeep comparison — artist search results with "first listener" leaderboard -->
 
-### For Scale
-- Batched polling with priority ordering (least recently polled first)
-- Redis distributed lock prevents overlapping poll cycles
-- Inter-user delay respects Spotify rate limits
-- Designed for 10k+ users
+### 📈 Artist deep-dives
+Every artist gets their own page: a smooth listening-timeline chart (you vs. friends vs. the world), Last.fm global stats, your personal gatekeep standing, and a challenge card to call out a friend directly.
 
-## Development
+<!-- SCREENSHOT: Artist detail page — hero image + timeline line chart -->
 
-```bash
-# Install dependencies
-source env/bin/activate
-pip install -r requirements-server.txt
+### 🥇 Trophies & awards
+Earn **11 competitive awards** across four tiers — Discovery, Devotion, Taste, and Dynamic. Claim the **Crown** for an artist, dig up deep cuts as the **Archaeologist**, or get roasted with **The Basic** anti-award. Each award has an expandable leaderboard so you can see exactly where you rank.
 
-# Run tests (no external services needed)
-python -m pytest tests/test_app/ -v
+<!-- SCREENSHOT: Trophy case — award grid grouped by tier -->
 
-# Run the server locally
-uvicorn app.main:app --reload
-# Swagger UI at http://localhost:8000/docs
+### ⚔️ Head-to-head
+Pick a friend and go stat-for-stat in a side-by-side showdown with visual bars. Total domination has never been so quantifiable.
 
-# Run Celery (requires Redis)
-celery -A app.celery_app worker --loglevel=info
-celery -A app.celery_app beat --loglevel=info
-```
+<!-- SCREENSHOT: Head-to-head comparison page -->
 
-## License
+### 🔮 Predicted Wrapped
+Don't wait until December. Get your year-in-review any time, for any year you have data — top artists, tracks, genres, and the numbers to back up your taste.
 
-MIT
+<!-- SCREENSHOT: Wrapped view — year-in-review hero card -->
+
+### 🧭 Discover & feed
+See what your friends are freshly into, find the artists you're embarrassingly *late* on, and catch rising artists before they blow up. A live activity feed keeps the trash talk flowing.
+
+<!-- SCREENSHOT: Feed + Discover two-column layout -->
+
+### 📤 Bring your whole history
+Sign in with Spotify and start tracking immediately, or upload your full Spotify data export to unlock *years* of listening history. The upload runs in the background with a progress bar and enriches every track as it goes.
+
+<!-- SCREENSHOT: Upload page — progress bar mid-import -->
+
+### 📲 Share the flex
+One tap generates a clean 1080×1080 share card — artist art, your headline stat, and Gatekeepify branding — ready for your story. Available on artist pages, Wrapped, and shareable feed events.
+
+<!-- SCREENSHOT: Generated share card example -->
+
+---
+
+## Built on trust
+
+The whole app falls apart if people can fake their history — so they can't. Gatekeepify keeps everyone honest behind the scenes:
+
+- **Verified vs. self-reported** — every listen is sourced and badged, so API-tracked plays always outrank uploaded ones.
+- **Release-date validation** — you can't claim you heard a song before it existed.
+
+Your bragging rights are only as good as your data — and here, the data is real.
+
+---
+
+## Get started
+
+1. **Sign in with Spotify** — no account setup, no passwords.
+2. **(Optional) Upload your data export** for full historical depth.
+3. **Add your friends** with a one-tap invite link.
+4. **Start gatekeeping.**
+
+Add it to your home screen on mobile for a full-screen, app-like experience.
+
+---
+
+## Tech Stack
+
+<details>
+<summary>For the curious (click to expand)</summary>
+
+**Backend:** Python · FastAPI · SQLAlchemy · PostgreSQL · Celery + Redis · spotipy
+
+**Frontend:** Next.js · TypeScript · Tailwind CSS
+
+**Integrations:** Spotify API · Last.fm API
+
+**Deployment:** Railway (backend + PostgreSQL + Redis) · Vercel (frontend)
+
+</details>
