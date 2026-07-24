@@ -143,9 +143,11 @@ jobs:
           pip install pip-audit
           pip-audit -r requirements-server.txt
 
-      # Blocks the build on high/critical advisories in production deps. The
-      # Next 16 / React 19 upgrade in this branch clears the Next 14 advisories
-      # that previously forced a critical-only gate.
+      # Blocks the build on high/critical advisories in production deps. Next.js
+      # bundles vulnerable postcss/sharp with no forward in-range fix, so
+      # package.json pins patched versions via "overrides". If a future advisory
+      # appears with no fix available, add continue-on-error here for manual
+      # triage (see the Python audit step above for that pattern).
       - name: Audit Node dependencies
         working-directory: frontend
         run: |
